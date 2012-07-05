@@ -4,11 +4,13 @@
      flymad
 
   </description>
-  <author>Andrew Straw</author>
-  <license>BSD</license>
+  <author>strawlab</author>
+  <license>unknown</license>
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/flymad</url>
 
+  <depend package="rospy"/>
+  <rosdep name="python-serial"/>
 </package>
 
 

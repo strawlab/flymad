@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+import roslib; roslib.load_manifest('flymad')
+import rospy
+from std_msgs.msg import UInt8
+
+import time
+import serial
+
+class FlyMADMicro(object):
+    def __init__(self):
+        rospy.init_node('flymad_micro')
+        _ = rospy.Subscriber('~/laser', UInt8, self.laser_callback)
+        self.ser = serial.Serial(port='/dev/ttyACM0',
+                                 timeout=0.1,
+                                 baudrate=115200,
+                                 )
+        self.laser = 0
+        self.posA = 0
+        self.posB = 0
+        self.ser.open()
+
+    def laser_callback(self,msg):
+        val = msg.data
+        self._update(laser=val)
+
+    def _update(self,laser=None, posA=None, posB=None):
+        if laser is not None:
+            self.laser = laser
+        if posA is not None:
+            self.posA = posA
+        if posB is not None:
+            self.posB = posB
+
+        cmd = 0
+        if self.laser:
+            cmd |= 0x02
+
+        self.ser.write('%d %d %d\n'%(cmd,self.posA, self.posB))
+
+    def run(self):
+        count = 0
+        while not rospy.is_shutdown():
+            if count > 2**16:
+                count = 0
+            self._update(posA=count, posB=2**16-count)
+            time.sleep(0.001)
+            count += 100
+
+if __name__=='__main__':
+    flymad_micro=FlyMADMicro()
+    flymad_micro.run()
