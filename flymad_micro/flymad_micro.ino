@@ -13,8 +13,8 @@ uint8_t velocity_mode=0;
 uint16_t posA=0;
 uint16_t posB=0;
 
-uint16_t rateA=0;
-uint16_t rateB=0;
+uint32_t rateA=0;
+uint32_t rateB=0;
 int8_t signA=1;
 int8_t signB=1;
 
@@ -26,7 +26,6 @@ unsigned long last_stampB;
 #define DEBUG_BIT    0X01
 
 #define stamp_func micros
-#define timescale 5
 
 void setup() {
   // initialize the digital pin as an output.
@@ -43,8 +42,7 @@ void setup() {
   analogOut.setValue_AB(posA,posB);
 }
 
-void set_stuff( uint16_t dac, uint16_t* rate, int8_t *sign ) {
-	int16_t speed = (int16_t)dac; // cast uint to int
+void set_stuff( int32_t speed, uint32_t* rate, int8_t *sign ) {
 
 	if (speed==0) {
 		*sign = 0;
@@ -59,35 +57,35 @@ void set_stuff( uint16_t dac, uint16_t* rate, int8_t *sign ) {
 		*sign = 1;
 	}
 
-	float num = 65536.0f;
+	float num = 2097152.0f; // 65536.0f * 2**5;
 	float ratef = num/(float)speed;
 
-	*rate = ratef; //cast float to uint
+	*rate = ratef; //cast float to int
 }
 
 void loop() {
 
   if (velocity_mode) {
     unsigned long cur_stamp = stamp_func();
-    unsigned long dtA = (cur_stamp-last_stampA)>>timescale;
-    unsigned long dtB = (cur_stamp-last_stampB)>>timescale;
+	unsigned long dtA = (cur_stamp-last_stampA);
+	unsigned long dtB = (cur_stamp-last_stampB);
 
 	uint8_t newvals = 0;
     if (dtA>0) {
-		int16_t stepsA = (int16_t)(dtA/rateA);
+		int32_t stepsA = (int32_t)(dtA/rateA);
 
 		if (stepsA != 0) {
 			posA += signA*stepsA;
 			newvals = 1;
-			last_stampA += (stepsA*rateA)<<timescale;
+			last_stampA += (stepsA*rateA);
 		}
     }
 	if (dtB>0) {
-		int16_t stepsB = (int16_t)(dtB/rateB);
+		int32_t stepsB = (int32_t)(dtB/rateB);
 		if (stepsB != 0) {
 			posB += signB*stepsB;
 			newvals = 1;
-			last_stampB += (stepsB*rateB)<<timescale;
+			last_stampB += (stepsB*rateB);
 		}
 	}
 
@@ -99,8 +97,8 @@ void loop() {
 
   while (Serial.available() > 0) {
     uint8_t cmd = Serial.parseInt();
-    uint16_t dacA = Serial.parseInt();
-    uint16_t dacB = Serial.parseInt();
+    int32_t dacA = Serial.parseInt();
+    int32_t dacB = Serial.parseInt();
 
     if (Serial.read() == '\n') {
 		if (cmd & LASER_BIT) {
@@ -129,18 +127,19 @@ void loop() {
 
                 } else {
                   velocity_mode=0;
-                  posA = dacA; posB = dacB;
+                  posA = (uint16_t)dacA;
+				  posB = (uint16_t)dacB;
                   analogOut.setValue_AB(posA,posB);
                 }
 
       if (cmd & DEBUG_BIT) {
         // print the three numbers in one string as hexadecimal:
+        Serial.write("0x");
         Serial.print(cmd, HEX);
         Serial.write(" ");
-        Serial.print(dacA, HEX);
+        Serial.print(dacA, DEC);
         Serial.write(" ");
-
-        Serial.println(dacB, HEX);
+        Serial.println(dacB, DEC);
       }
     }
   }
