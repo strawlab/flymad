@@ -21,8 +21,12 @@ void setup() {
 
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
-  SPI.setClockDivider(SPI_CLOCK_DIV8);
+  SPI.setClockDivider(SPI_CLOCK_DIV2);
   SPI.begin();
+
+  digitalWrite(LASER, LOW);
+  analogOut.setValue_AB(0,0);
+
 }
 
 void loop() {
@@ -39,7 +43,7 @@ void loop() {
 		}
 		analogOut.setValue_AB(dacA,dacB);
 
-  
+
       if (cmd & DEBUG_BIT) {
         // print the three numbers in one string as hexadecimal:
         Serial.print(cmd, HEX);
