@@ -1,50 +1,120 @@
 #!/usr/bin/env python
+"""
+notes:
+
+Full range is 65536 units.
+
+So, if a full cycle takes 1 second, the speed must be 65536
+units/second. Likewise, a speed of 1 unit/second would complete the
+full range in 65536 seconds.
+
+A speed of 65536/4.0 should take 4 seconds.
+
+Currently, using micros, a speed of 100 takes ~6 seconds.
+
+"""
 import roslib; roslib.load_manifest('flymad')
 import rospy
 from std_msgs.msg import UInt8
+from flymad.msg import MicroVelocity, MicroPosition
 
-import time
 import serial
+import threading
 
 class FlyMADMicro(object):
     def __init__(self):
         rospy.init_node('flymad_micro')
-        _ = rospy.Subscriber('~/laser', UInt8, self.laser_callback)
-        self.ser = serial.Serial(port='/dev/ttyACM0',
+        _ = rospy.Subscriber('~laser', UInt8, self.laser_callback)
+        _ = rospy.Subscriber('~position', MicroPosition, self.position_callback)
+        _ = rospy.Subscriber('~velocity', MicroVelocity, self.velocity_callback)
+        port = rospy.get_param( '~port', default = '/dev/ttyACM0' )
+        self.ser = serial.Serial(port=port,
                                  timeout=0.1,
                                  baudrate=115200,
                                  )
-        self.laser = 0
-        self.posA = 0
-        self.posB = 0
+        self._buf = ''
+        self._lock = threading.Lock()
+        with self._lock:
+            self.laser = 0
+            self.argA = 0
+            self.argB = 0
+            self.velocity_mode = False
+        self._debug = True
         self.ser.open()
 
     def laser_callback(self,msg):
         val = msg.data
         self._update(laser=val)
 
-    def _update(self,laser=None, posA=None, posB=None):
-        if laser is not None:
-            self.laser = laser
-        if posA is not None:
-            self.posA = posA
-        if posB is not None:
-            self.posB = posB
+    def position_callback(self,msg):
+        self._update(posA=msg.posA, posB=msg.posB)
 
-        cmd = 0
-        if self.laser:
-            cmd |= 0x02
+    def velocity_callback(self,msg):
+        print 'got velocity:',msg.velA, msg.velB
 
-        self.ser.write('%d %d %d\n'%(cmd,self.posA, self.posB))
+        self._update(velA=msg.velA, velB=msg.velB)
+
+    def _update(self,
+                laser=None,
+                posA=None, posB=None,
+                velA=None, velB=None):
+        with self._lock:
+
+            if laser is not None:
+                self.laser = laser
+
+            cmd = 0
+            if self.laser:
+                cmd |= 0x02
+
+            if velA is not None or velB is not None:
+                assert posA is None
+                assert posB is None
+                assert velA is not None
+                assert velB is not None
+
+                self.velocity_mode = True
+                print 'vel mode'
+                self.argA = velA
+                self.argB = velB
+
+            if posA is not None or posB is not None:
+                assert posA is not None
+                assert posB is not None
+                assert velA is None
+                assert velB is None
+
+                self.velocity_mode = False
+                self.argA = posA
+                self.argB = posB
+
+            if self.velocity_mode:
+                cmd |= 0x04
+
+            if self._debug:
+                cmd |= 0x01
+
+            serstr = '%d %d %d\n'%(cmd, self.argA, self.argB)
+            print 'sending: ',repr(serstr)
+            self.ser.write(serstr)
 
     def run(self):
         count = 0
         while not rospy.is_shutdown():
-            if count > 2**16:
-                count = 0
-            self._update(posA=count, posB=2**16-count)
-            time.sleep(0.001)
-            count += 100
+            if self._debug:
+                buf = self.ser.read(100)
+                if len(buf):
+                    self._printbuf(buf)
+                    #print 'read: ',repr(buf)
+            else:
+                rospy.spin()
+
+    def _printbuf(self,inbuf):
+        self._buf += inbuf
+        lines = self._buf.split('\r\n')
+        self._buf = lines.pop()
+        for l in lines:
+            print 'readline: ',repr(l)
 
 if __name__=='__main__':
     flymad_micro=FlyMADMicro()
