@@ -14,7 +14,7 @@ import flydra.a2.benu as benu
 import roslib; roslib.load_manifest('flymad')
 import rospy
 
-from flymad.msg import Raw2dPositions
+from flymad.msg import Raw2dPositions, TrackedObj
 from geometry_msgs.msg import Pose2D
 
 class PixelCoordWidget(Gtk.DrawingArea):
@@ -24,6 +24,9 @@ class PixelCoordWidget(Gtk.DrawingArea):
         _ = rospy.Subscriber('/flymad/raw_2d_positions',
                              Raw2dPositions,
                              self.on_data)
+        _ = rospy.Subscriber('/flymad/tracked',
+                             TrackedObj,
+                             self.on_tracking)
         Gtk.DrawingArea.__init__(self)
         self.lock = threading.Lock()
         with self.lock:
@@ -33,6 +36,7 @@ class PixelCoordWidget(Gtk.DrawingArea):
             self.pts_y = np.array([])
             self.dataw = 1024
             self.datah = 768
+            self.living_objs = {}
         self.backbuf = None
 
         self.connect('draw', self.on_draw)
@@ -45,6 +49,14 @@ class PixelCoordWidget(Gtk.DrawingArea):
         with self.lock:
             self.pts_x = x
             self.pts_y = y
+
+    def on_tracking(self, msg):
+        with self.lock:
+            if msg.is_living:
+                xy = (msg.state_vec[0],msg.state_vec[1])
+                self.living_objs[msg.obj_id] = xy
+            else:
+                del self.living_objs[msg.obj_id]
 
     def on_resize(self,widget,event):
         with self.lock:
@@ -92,6 +104,16 @@ class PixelCoordWidget(Gtk.DrawingArea):
                              color_rgba=(0,1,0,1),
                              close_path=True,
                              linewidth=3)
+                    for obj_id in self.living_objs:
+                        x,y = self.living_objs[obj_id]
+                        bc.scatter( [x],[y],
+                                    color_rgba=(1,1,0,1),
+                                    radius=5.0,
+                                    )
+                        bc.text( str(obj_id), x,y,
+                                    color_rgba=(1,1,0,1),
+                                    )
+
             bb.flush()
             self.queue_draw()
         return True
