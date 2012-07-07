@@ -2,7 +2,6 @@
 import roslib; roslib.load_manifest('flymad')
 import rospy
 
-import flymad.dynamic_model as dynamic_model
 from flymad.msg import Raw2dPositions
 from geometry_msgs.msg import Pose2D
 
