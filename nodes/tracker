@@ -1,0 +1,134 @@
+#!/usr/bin/env python
+import roslib; roslib.load_manifest('flymad')
+import rospy
+
+from flymad.msg import Raw2dPositions, TrackedObj
+from geometry_msgs.msg import Pose2D
+
+import numpy as np
+import adskalman.adskalman as adskalman
+
+FPS = 30.0
+MAX_DIST_PIXELS = 10.0
+max_dist_squared = MAX_DIST_PIXELS**2
+
+def make_new_object(xy):
+    x,y=xy
+    return TrackedObject(x,y)
+
+class ObjIdGetter:
+    def __init__(self):
+        self.current=0
+    def get_next(self):
+        result = self.current
+        self.current+=1
+        return result
+
+static_obj_ids = ObjIdGetter()
+get_next_obj_id = static_obj_ids.get_next
+
+class TrackedObject:
+    def __init__(self,x,y):
+        self.obj_id = get_next_obj_id()
+        dt = 1.0/FPS
+
+        # process model
+        A = np.array([[1, 0, dt, 0],
+                      [0, 1, 0, dt],
+                      [0, 0, 1,  0],
+                      [0, 0, 0,  1]],
+                     dtype=np.float64)
+        # observation model
+        C = np.array([[1, 0, 0, 0],
+                      [0, 1, 0, 0]],
+                     dtype=np.float64)
+        Qsigma=0.1
+        Rsigma=0.5
+        # process covariance
+        Q = Qsigma*np.eye(4)
+        # measurement covariance
+        R = Rsigma*np.eye(2)
+
+        x0 = np.array([x,y,0,0],dtype=np.float)
+
+        self.kf = adskalman.KalmanFilter(A,C,Q,R,x0,Q)
+        self.isinitial = True
+
+    def step(self, xy, framenumber, pub):
+        # xy is Nx2 array of possible observations
+
+        xhatminus, Pminus = \
+                   self.kf.step1__calculate_a_priori(isinitial=self.isinitial)
+        #print xy
+        #print xhatminus
+        diff = xy-xhatminus[:2]
+        d2 = np.sum(diff**2,axis=1)
+        idx = np.argmin(d2)
+        this_d2 = d2[idx]
+        #print diff
+        #print d2
+        #print idx
+        #print this_d2
+        #print
+        if this_d2 > max_dist_squared:
+            # best point is not good enough
+            raise NotImplementedError()
+
+
+        obs = xy[idx,:]
+        N = len(xy)
+        unused = xy[ np.arange(N)!=idx ]
+
+        xhat,P = \
+               self.kf.step2__calculate_a_posteri(xhatminus, Pminus,
+                                                  y=obs,
+                                                  full_output=False)
+        self.isinitial = False
+
+        msg = TrackedObj()
+        msg.obj_id = self.obj_id
+        msg.header.stamp = rospy.Time.now()
+        msg.header.frame_id = "pixels"
+        msg.framenumber = framenumber
+        msg.state_vec = map(float,xhat) # convert from numpy
+        pub.publish(msg)
+
+        return unused
+
+class Tracker:
+    def __init__(self):
+        rospy.init_node('flymad_tracker')
+        _ = rospy.Subscriber('/flymad/raw_2d_positions',
+                             Raw2dPositions,
+                             self.on_data)
+        self.last_framenumber = None
+        self.objs = []
+        self.pub = rospy.Publisher( '/flymad/tracked', TrackedObj)
+
+    def on_data(self, msg):
+        stamp = msg.header.stamp
+        framenumber = msg.framenumber
+        if self.last_framenumber is not None:
+            dframes = framenumber - self.last_framenumber
+            assert dframes > 0
+        else:
+            dframes = 1
+        self.last_framenumber = framenumber
+        xy = np.array([(p.x,p.y) for p in msg.points])
+
+        if dframes > 1:
+            raise NotImplementedError('missing data')
+
+        for obj in self.objs:
+            xy = obj.step( xy, framenumber, self.pub )
+
+        while len(xy):
+            self.objs.append( make_new_object( xy[0] ))
+            xy = xy[1:]
+
+    def run(self):
+        rospy.spin()
+
+if __name__=='__main__':
+    t=Tracker()
+    t.run()
