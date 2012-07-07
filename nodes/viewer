@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+from gi.repository import Gtk, Gdk, GObject, GLib
+
+GObject.threads_init()
+Gdk.threads_init()
+
+import sys
+import numpy as np
+import threading
+
+import cairo
+import flydra.a2.benu as benu
+
+import roslib; roslib.load_manifest('flymad')
+import rospy
+
+from flymad.msg import Raw2dPositions
+from geometry_msgs.msg import Pose2D
+
+class PixelCoordWidget(Gtk.DrawingArea):
+    UPDATE_FREQ = 30
+    def __init__ (self):
+        super(PixelCoordWidget,self).__init__()
+        _ = rospy.Subscriber('/flymad/raw_2d_positions',
+                             Raw2dPositions,
+                             self.on_data)
+        Gtk.DrawingArea.__init__(self)
+        self.lock = threading.Lock()
+        with self.lock:
+            self.w = 640
+            self.h = 480
+            self.pts_x = np.array([])
+            self.pts_y = np.array([])
+            self.dataw = 1024
+            self.datah = 768
+        self.backbuf = None
+
+        self.connect('draw', self.on_draw)
+        self.connect('configure-event', self.on_resize)
+        GLib.timeout_add(1000/self.UPDATE_FREQ, self.on_update)
+
+    def on_data(self, msg):
+        x = np.array([p.x for p in msg.points])
+        y = np.array([p.y for p in msg.points])
+        with self.lock:
+            self.pts_x = x
+            self.pts_y = y
+
+    def on_resize(self,widget,event):
+        with self.lock:
+            self.w = event.width
+            self.h = event.height
+
+        if self.backbuf is not None:
+            self.backbuf.finish()
+            self.backbuf = None
+
+        self.backbuf = cairo.ImageSurface(
+            cairo.FORMAT_ARGB32,
+            widget.get_allocated_width(),
+            widget.get_allocated_height())
+
+        self.on_update()
+
+        return False
+
+    def on_draw(self, widget, context):
+        if self.backbuf is not None:
+            context.set_source_surface(self.backbuf, 0.0, 0.0)
+            context.paint()
+        else:
+            print 'invalid back buffer'
+        return False
+
+    def on_update(self):
+        bb = self.backbuf
+        if bb is not None:
+            context = cairo.Context(bb)
+            bc = benu.ExternalSurfaceCanvas(context,color_rgba=(0,0,0,1))
+            with self.lock:
+                device_rect = (10,10,self.w-20,self.h-20)
+                user_rect = (0,0,self.dataw,self.datah)
+                with bc.set_user_coords( device_rect,
+                                         user_rect ):
+                    bc.scatter( self.pts_x,
+                                self.pts_y,
+                                color_rgba=(0,1,0,1),
+                                radius=3.0,
+                                )
+                    bc.plot( [0,0,self.dataw, self.dataw],
+                             [0,self.datah,self.datah,0],
+                             color_rgba=(0,1,0,1),
+                             close_path=True,
+                             linewidth=3)
+            bb.flush()
+            self.queue_draw()
+        return True
+
+class ViewerApp(Gtk.Window):
+    def __init__(self):
+        super(ViewerApp,self).__init__()
+        self.set_title ("FlyMAD Viewer")
+        self.set_default_size(640,480)
+
+        rospy.init_node('viewer')
+
+        box = Gtk.Box()
+        box.set_orientation(Gtk.Orientation.VERTICAL)
+        box.set_spacing(5)
+        self.add(box)
+
+        pcw = PixelCoordWidget()
+        box.pack_start(pcw,True,True,0)
+
+        self.connect_after('destroy', Gtk.main_quit)
+        self.show_all()
+
+        rosthread = threading.Thread(name="ros spin thread", target=rospy.spin)
+        rosthread.daemon = True
+        rosthread.start()
+
+if __name__ == "__main__":
+    app = ViewerApp()
+    sys.exit(Gtk.main())
