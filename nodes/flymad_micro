@@ -1,18 +1,4 @@
 #!/usr/bin/env python
-"""
-notes:
-
-Full range is 65536 units.
-
-So, if a full cycle takes 1 second, the speed must be 65536
-units/second. Likewise, a speed of 1 unit/second would complete the
-full range in 65536 seconds.
-
-A speed of 65536/4.0 should take 4 seconds.
-
-Currently, using micros, a speed of 100 takes ~6 seconds.
-
-"""
 import roslib; roslib.load_manifest('flymad')
 import rospy
 from std_msgs.msg import UInt8
