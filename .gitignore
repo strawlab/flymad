@@ -1,4 +1,4 @@
 build
 msg_gen
-src/flymad
+src/flymad/msg
 flymad_micro/build-cli
