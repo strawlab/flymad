@@ -4,7 +4,6 @@ import rospy
 
 from flymad.msg import MicroPosition
 
-import serial
 import math
 
 class Circler:
