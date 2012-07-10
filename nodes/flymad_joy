@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+import numpy as np
+
+import roslib; roslib.load_manifest('flymad')
+import rospy
+
+from std_msgs.msg import UInt8
+from sensor_msgs.msg import Joy
+from flymad.msg import MicroVelocity
+
+A = 10.0
+B = 20.0
+R = np.array([[-1, 0],
+              [0, 1]],dtype=np.float)
+
+class FlymadJoy:
+    def __init__(self):
+        rospy.init_node('flymad_joy')
+        _ = rospy.Subscriber('joy', Joy, self.on_joy)
+        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
+                                                MicroVelocity,
+                                                tcp_nodelay=True)
+        self.cur = 0,0
+        self.last = 0,0
+        # throttle output
+        rospy.Timer(rospy.Duration(1.0/50.0), self.on_timer)
+
+    def on_joy(self,msg):
+        xax, yax = msg.axes[:2]
+        vec = np.c_[xax, yax].T
+        vec = np.dot( R, vec )
+        vels = B*(A*vec)**3
+        self.cur = vels
+
+    def on_timer(self,event):
+        cur = self.cur
+        if not np.allclose(self.last,cur):
+            msg = MicroVelocity()
+            msg.velA, msg.velB = cur
+            self.pub_dac_velocity.publish(msg)
+            self.last = cur
+
+    def run(self):
+        rospy.spin()
+
+if __name__=='__main__':
+    j=FlymadJoy()
+    j.run()
