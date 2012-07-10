@@ -115,16 +115,6 @@ void loop() {
 				  last_stampA = cur_stamp-rateA; // trigger update next cycle
 				  last_stampB = cur_stamp-rateB;
 
-				  Serial.write("sign, rate (A): ");
-				  Serial.print(signA, DEC);
-				  Serial.write(" ");
-				  Serial.println(rateA, DEC);
-
-				  Serial.write("sign, rate (B): ");
-				  Serial.print(signB, DEC);
-				  Serial.write(" ");
-				  Serial.println(rateB, DEC);
-
                 } else {
                   velocity_mode=0;
                   posA = (uint16_t)dacA;
