@@ -17,8 +17,9 @@ class Circler:
         tf = 0.1
         while not rospy.is_shutdown():
             t = rospy.get_time()
-            x = math.sin( tf*2*math.pi*t ) * 32000 + 32000
-            y = math.cos( tf*2*math.pi*t ) * 32000 + 32000
+            x = math.sin( tf*2*math.pi*t ) * 2**14
+            y = math.cos( tf*2*math.pi*t ) * 2**14
+            print x,y
             msg = MicroPosition()
             msg.posA = int(x)
             msg.posB = int(y)

@@ -7,7 +7,7 @@ import roslib; roslib.load_manifest('flymad')
 import rospy
 from std_msgs.msg import UInt8
 from flymad.msg import MicroVelocity, MicroPosition
-from flymad.util import myint16
+from flymad.util import myint16, dac_value_wrap
 
 class FlyMADMicro(object):
     def __init__(self):
@@ -23,6 +23,8 @@ class FlyMADMicro(object):
                                      baudrate=115200,
                                      )
             self.ser.open()
+            rospy.loginfo('opened serial port: %s'%port)
+
         except serial.serialutil.SerialException, err:
             rospy.logwarn('could not open serial port: %s'%(str(err),))
             self.ser = None
@@ -88,6 +90,10 @@ class FlyMADMicro(object):
                 assert velB is None
 
                 self.velocity_mode = False
+                if dac_value_wrap(posA) != posA:
+                    raise ValueError("position A value (%d) too large"%posA)
+                if dac_value_wrap(posB) != posB:
+                    raise ValueError("position B value (%d) too large"%posB)
                 argA = posA
                 argB = posB
 
@@ -121,11 +127,13 @@ class FlyMADMicro(object):
                 now = rospy.get_time()
                 dt = now-self._last_vel_time
 
-                print 'self._last_posA, self._last_velA, dt',self._last_posA, self._last_velA, dt
+                #print 'self._last_posA, self._last_velA, dt',self._last_posA, self._last_velA, dt
 
                 a = self._last_posA + self._last_velA*dt
                 b = self._last_posB + self._last_velB*dt
 
+                a = dac_value_wrap(a)
+                b = dac_value_wrap(b)
                 self._last_posA = a
                 self._last_posB = b
                 self._last_vel_time = now

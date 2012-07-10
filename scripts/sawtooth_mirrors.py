@@ -14,7 +14,7 @@ def sawtooth():
     time.sleep(0.2) # give some time. (Seems needed so published message is not lost.)
 
     msg = MicroVelocity()
-    msg.velA = 2**20
+    msg.velA = 2**14
     msg.velB = -40000.0
     pub.publish(msg)
     print 'published velocity...', msg
