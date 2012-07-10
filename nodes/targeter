@@ -32,9 +32,15 @@ class Targeter:
         _ = rospy.Subscriber('/flymad_micro/position_echo',
                              MicroPosition,
                              self.on_dac)
-        #self.pub_laser = rospy.Publisher('/flymad_micro/laser',UInt8)
-        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',MicroPosition)
-        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',MicroVelocity)
+        # self.pub_laser = rospy.Publisher('/flymad_micro/laser',
+        #                                  UInt8,
+        #                                  tcp_nodelay=True)
+        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
+                                                MicroPosition,
+                                                tcp_nodelay=True)
+        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
+                                                MicroVelocity,
+                                                tcp_nodelay=True)
         self.cur_obj_id = None
         self.lock = threading.Lock()
         self.dacs = 0,0

@@ -131,7 +131,8 @@ class Tracker:
                              self.on_data)
         self.last_framenumber = None
         self.objs = []
-        self.pub = rospy.Publisher( '/flymad/tracked', TrackedObj)
+        self.pub = rospy.Publisher( '/flymad/tracked', TrackedObj,
+                                    tcp_nodelay=True)
 
     def on_data(self, msg):
         stamp = msg.header.stamp
