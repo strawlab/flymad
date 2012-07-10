@@ -1,2 +1,2 @@
-uint16 posA
-uint16 posB
+int16 posA
+int16 posB

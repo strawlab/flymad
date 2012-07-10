@@ -1,15 +1,16 @@
 #!/usr/bin/env python
+import math
+
+import numpy as np
+import sys
+import Queue
+
 import roslib; roslib.load_manifest('flymad')
 import rospy
 
 from flymad.msg import MicroPosition, Raw2dPositions
+from flymad.laser_camera_calibration import save_raw_calibration_data
 
-import math
-
-import numpy as np
-import json
-import sys
-import Queue
 
 def to_plain(arr):
     if arr.ndim==1:
@@ -52,7 +53,7 @@ class Calibration:
         if len(msg.points):
             p = msg.points[0]
             self.q.put( (p.x, p.y) )
-    
+
     def get_last_pixel(self,timeout=None):
         self._clear()
         try:
@@ -72,19 +73,14 @@ class Calibration:
 def main():
     fc = Calibration()
     fname = sys.argv[1]
-    daca, dacb = np.mgrid[0:0xFFFF:100j, 0:0xFFFF:100j]
-    daca = daca.ravel().astype(np.uint16)
-    dacb = dacb.ravel().astype(np.uint16)
+    daca, dacb = np.mgrid[-0x7FFF:0x7FFF:100j, -0x7FFF:0x7FFF:100j]
+    daca = daca.ravel().astype(np.int16)
+    dacb = dacb.ravel().astype(np.int16)
     dac = np.array([daca,dacb])
     pixels = fc.pixels_for_dac( dac )
     print 'dac.shape',dac.shape
     print 'pixels.shape',pixels.shape
-    to_save = {'dac':to_plain(dac),
-               'pixels':to_plain(pixels.astype(np.int))}
-    fd = open(fname,mode='w')
-    import yaml
-    json.dump(to_save,fd) # JSON is valid YAML. And faster.
-    fd.close()
+    save_raw_calibration_data(fname, dac, pixels)
 
 if __name__=='__main__':
     main()

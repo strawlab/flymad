@@ -1,11 +1,13 @@
 #!/usr/bin/env python
+import serial
+import threading
+import numpy as np
+
 import roslib; roslib.load_manifest('flymad')
 import rospy
 from std_msgs.msg import UInt8
 from flymad.msg import MicroVelocity, MicroPosition
-
-import serial
-import threading
+from flymad.util import myint16
 
 class FlyMADMicro(object):
     def __init__(self):
@@ -13,20 +15,29 @@ class FlyMADMicro(object):
         _ = rospy.Subscriber('~laser', UInt8, self.laser_callback)
         _ = rospy.Subscriber('~position', MicroPosition, self.position_callback)
         _ = rospy.Subscriber('~velocity', MicroVelocity, self.velocity_callback)
+        self.pub_dac_position = rospy.Publisher('/flymad_micro/position_echo',MicroPosition)
         port = rospy.get_param( '~port', default = '/dev/ttyACM0' )
-        self.ser = serial.Serial(port=port,
-                                 timeout=0.1,
-                                 baudrate=115200,
-                                 )
+        try:
+            self.ser = serial.Serial(port=port,
+                                     timeout=0.1,
+                                     baudrate=115200,
+                                     )
+            self.ser.open()
+        except serial.serialutil.SerialException, err:
+            rospy.logwarn('could not open serial port: %s'%(str(err),))
+            self.ser = None
         self._buf = ''
         self._lock = threading.Lock()
         with self._lock:
             self.laser = 0
-            self.argA = 0
-            self.argB = 0
             self.velocity_mode = False
         self._debug = False
-        self.ser.open()
+
+        self._last_posA = 0
+        self._last_posB = 0
+        self._last_velA = 0
+        self._last_velB = 0
+        self._last_vel_time = rospy.get_time()
 
     def laser_callback(self,msg):
         val = msg.data
@@ -63,8 +74,12 @@ class FlyMADMicro(object):
                 self.velocity_mode = True
                 if self._debug:
                     print 'vel mode'
-                self.argA = velA
-                self.argB = velB
+                argA = velA
+                argB = velB
+
+                self._last_velA = velA
+                self._last_velB = velB
+                self._last_vel_time = rospy.get_time()
 
             if posA is not None or posB is not None:
                 assert posA is not None
@@ -73,8 +88,11 @@ class FlyMADMicro(object):
                 assert velB is None
 
                 self.velocity_mode = False
-                self.argA = posA
-                self.argB = posB
+                argA = posA
+                argB = posB
+
+                self._last_posA = posA
+                self._last_posB = posB
 
             if self.velocity_mode:
                 cmd |= 0x04
@@ -82,21 +100,44 @@ class FlyMADMicro(object):
             if self._debug:
                 cmd |= 0x01
 
-            serstr = '%d %d %d\n'%(cmd, self.argA, self.argB)
+            serstr = '%d %d %d\n'%(cmd, argA, argB)
             if self._debug:
                 print 'sending: ',repr(serstr)
-            self.ser.write(serstr)
+            if self.ser is not None:
+                self.ser.write(serstr)
 
     def run(self):
         count = 0
+        r = rospy.Rate(100)
         while not rospy.is_shutdown():
-            if self._debug:
+            if self._debug and self.ser is not None:
                 buf = self.ser.read(100)
                 if len(buf):
                     self._printbuf(buf)
                     #print 'read: ',repr(buf)
-            else:
-                rospy.spin()
+            r.sleep()
+            if 1:
+                # publish best guess of DAC positions
+                now = rospy.get_time()
+                dt = now-self._last_vel_time
+
+                print 'self._last_posA, self._last_velA, dt',self._last_posA, self._last_velA, dt
+
+                a = self._last_posA + self._last_velA*dt
+                b = self._last_posB + self._last_velB*dt
+
+                self._last_posA = a
+                self._last_posB = b
+                self._last_vel_time = now
+
+                msg = MicroPosition()
+                msg.posA = myint16(np.round(a))
+                msg.posB = myint16(np.round(b))
+                try:
+                    self.pub_dac_position.publish(msg)
+                except:
+                    print msg
+                    raise
 
     def _printbuf(self,inbuf):
         self._buf += inbuf

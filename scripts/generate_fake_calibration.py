@@ -1,6 +1,8 @@
 import numpy as np
-import json
 import sys
+
+import roslib; roslib.load_manifest('flymad')
+from flymad.laser_camera_calibration import save_raw_calibration_data
 
 class FakeCalibration:
     def __init__(self):
@@ -34,12 +36,7 @@ def main():
     pixels = fc.pixels_for_dac( dac )
     print 'dac.shape',dac.shape
     print 'pixels.shape',pixels.shape
-    to_save = {'dac':to_plain(dac),
-               'pixels':to_plain(pixels.astype(np.int))}
-    fd = open(fname,mode='w')
-    import yaml
-    json.dump(to_save,fd) # JSON is valid YAML. And faster.
-    fd.close()
+    save_raw_calibration_data(fname, dac, pixels)
 
 if __name__=='__main__':
     main()

@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+import numpy as np
+import adskalman.adskalman as adskalman
+import sys
+import threading
+
+import roslib; roslib.load_manifest('flymad')
+import rospy
+
+from flymad.msg import Raw2dPositions, TrackedObj
+from geometry_msgs.msg import Pose2D
+from std_msgs.msg import UInt8, Int64
+from flymad.msg import MicroVelocity, MicroPosition
+
+from flymad.laser_camera_calibration import load_calibration
+from flymad.util import myint32
+
+LATENCY = 0.03
+FPS = 30.0
+K_PROPORTIONAL = 100.0
+
+class Targeter:
+    def __init__(self,cal_fname):
+        self.cal = load_calibration(cal_fname)
+        rospy.init_node('flymad_targeter')
+        _ = rospy.Subscriber('/flymad/tracked',
+                             TrackedObj,
+                             self.on_tracking)
+        _ = rospy.Subscriber('/flymad/target_object',
+                             Int64,
+                             self.on_target_object)
+        _ = rospy.Subscriber('/flymad_micro/position_echo',
+                             MicroPosition,
+                             self.on_dac)
+        #self.pub_laser = rospy.Publisher('/flymad_micro/laser',UInt8)
+        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',MicroPosition)
+        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',MicroVelocity)
+        self.cur_obj_id = None
+        self.lock = threading.Lock()
+        self.dacs = 0,0
+
+    def on_dac(self,msg):
+        self.dacs = msg.posA, msg.posB
+
+    def _get_current_dacs(self):
+        return self.dacs
+
+    def on_target_object(self, msg):
+        obj_id = msg.data
+        if obj_id < 0:
+            rospy.loginfo('stopped targeting object %d'%self.cur_obj_id)
+            self.cur_obj_id = None
+        else:
+            self.cur_obj_id = obj_id
+            rospy.loginfo('now targeting object %d'%self.cur_obj_id)
+
+    def on_tracking(self, msg):
+        if self.cur_obj_id is None:
+            self.cur_obj_id = msg.obj_id
+            rospy.loginfo('now targeting object %d'%self.cur_obj_id)
+
+        if self.cur_obj_id != msg.obj_id:
+            return
+
+        if not msg.is_living:
+            rospy.loginfo('stopped targeting object %d'%self.cur_obj_id)
+            self.cur_obj_id = None
+            return
+
+        # calculate fly position in pixel coordinates
+        s = msg.state_vec
+        x = s[0] + s[2]*LATENCY
+        y = s[1] + s[3]*LATENCY
+
+        x = int(max(0,x))
+        y = int(max(0,y))
+
+        print
+        print self.cur_obj_id
+        print 'x,y',x,y
+
+        # desired
+        try:
+            daca = self.cal.p2da[y,x]
+            dacb = self.cal.p2db[y,x]
+        except IndexError:
+            return
+
+        print 'daca, dacb',daca, dacb
+
+        # actual (XXX TODO fixme)
+        aa, ab = self._get_current_dacs()
+        print 'aa,ab',aa,ab
+
+        diffa = daca-aa
+        diffb = dacb-ab
+
+        dt = 1.0/FPS
+        vela = diffa*dt*K_PROPORTIONAL
+        velb = diffb*dt*K_PROPORTIONAL
+
+        if np.isnan(vela) or np.isnan(velb):
+            return
+        msg = MicroVelocity()
+        msg.velA = myint32(vela)
+        msg.velB = myint32(velb)
+        print msg
+        self.pub_dac_velocity.publish(msg)
+
+    def run(self):
+        rospy.spin()
+
+if __name__=='__main__':
+    cal_fname = sys.argv[1]
+    t=Targeter(cal_fname)
+    t.run()
