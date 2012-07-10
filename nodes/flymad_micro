@@ -99,6 +99,9 @@ class FlyMADMicro(object):
 
                 self._last_posA = posA
                 self._last_posB = posB
+                self._last_velA = 0
+                self._last_velB = 0
+                self._last_vel_time = rospy.get_time()
 
             if self.velocity_mode:
                 cmd |= 0x04
