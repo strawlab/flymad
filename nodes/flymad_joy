@@ -10,8 +10,8 @@ from flymad.msg import MicroVelocity
 
 A = 10.0
 B = 20.0
-R = np.array([[-1, 0],
-              [0, 1]],dtype=np.float)
+R = np.array([[1, 0],
+              [0, -1]],dtype=np.float)
 
 class FlymadJoy:
     def __init__(self):
