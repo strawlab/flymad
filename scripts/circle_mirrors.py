@@ -21,8 +21,8 @@ class Circler:
             y = math.cos( tf*2*math.pi*t ) * 2**14
             print x,y
             msg = MicroPosition()
-            msg.posA = int(x)
-            msg.posB = int(y)
+            msg.posA = int(round(x))
+            msg.posB = int(round(y))
             self.pub.publish(msg)
             r.sleep()
 
