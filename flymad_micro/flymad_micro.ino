@@ -107,30 +107,30 @@ void loop() {
 			digitalWrite(LASER, LOW);      // set the output off
 		}
 		if (cmd & VELOCITY_BIT) {
-                  velocity_mode=1;
-				  set_stuff( dacA, &rateA, &signA );
-				  set_stuff( dacB, &rateB, &signB );
+			velocity_mode=1;
+			set_stuff( dacA, &rateA, &signA );
+			set_stuff( dacB, &rateB, &signB );
 
-				  unsigned long cur_stamp = stamp_func();
-				  last_stampA = cur_stamp-rateA; // trigger update next cycle
-				  last_stampB = cur_stamp-rateB;
+			unsigned long cur_stamp = stamp_func();
+			last_stampA = cur_stamp-rateA; // trigger update next cycle
+			last_stampB = cur_stamp-rateB;
 
-                } else {
-                  velocity_mode=0;
-                  posA = (uint16_t)dacA;
-				  posB = (uint16_t)dacB;
-                  analogOut.setValue_AB(posA,posB);
-                }
+		} else {
+			velocity_mode=0;
+			posA = (uint16_t)dacA;
+			posB = (uint16_t)dacB;
+			analogOut.setValue_AB(posA,posB);
+		}
 
-      if (cmd & DEBUG_BIT) {
-        // print the three numbers in one string as hexadecimal:
-        Serial.write("0x");
-        Serial.print(cmd, HEX);
-        Serial.write(" ");
-        Serial.print(dacA, DEC);
-        Serial.write(" ");
-        Serial.println(dacB, DEC);
-      }
+		if (cmd & DEBUG_BIT) {
+			// print the three numbers in one string as hexadecimal:
+			Serial.write("0x");
+			Serial.print(cmd, HEX);
+			Serial.write(" ");
+			Serial.print(dacA, DEC);
+			Serial.write(" ");
+			Serial.println(dacB, DEC);
+		}
     }
   }
 }
