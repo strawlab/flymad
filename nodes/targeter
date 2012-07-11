@@ -15,9 +15,9 @@ from flymad.msg import MicroVelocity, MicroPosition
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
 
-LATENCY = 0.03
+LATENCY = 0.05
 FPS = 30.0
-K_PROPORTIONAL = 100.0
+K_PROPORTIONAL = 1e3
 
 class Targeter:
     def __init__(self,cal_fname):
@@ -32,9 +32,6 @@ class Targeter:
         _ = rospy.Subscriber('/flymad_micro/position_echo',
                              MicroPosition,
                              self.on_dac)
-        # self.pub_laser = rospy.Publisher('/flymad_micro/laser',
-        #                                  UInt8,
-        #                                  tcp_nodelay=True)
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
                                                 MicroPosition,
                                                 tcp_nodelay=True)
@@ -44,6 +41,7 @@ class Targeter:
         self.cur_obj_id = None
         self.lock = threading.Lock()
         self.dacs = 0,0
+        self.last_vals = None
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -94,24 +92,46 @@ class Targeter:
 
         print 'daca, dacb',daca, dacb
 
-        # actual (XXX TODO fixme)
-        aa, ab = self._get_current_dacs()
-        print 'aa,ab',aa,ab
+        if 1:
+            # velocity mode
+            aa, ab = self._get_current_dacs()
+            print 'aa,ab',aa,ab
 
-        diffa = daca-aa
-        diffb = dacb-ab
+            diffa = daca-aa
+            diffb = dacb-ab
 
-        dt = 1.0/FPS
-        vela = diffa*dt*K_PROPORTIONAL
-        velb = diffb*dt*K_PROPORTIONAL
+            dt = 1.0/FPS
+            vela = diffa*dt*K_PROPORTIONAL
+            velb = diffb*dt*K_PROPORTIONAL
 
-        if np.isnan(vela) or np.isnan(velb):
-            return
-        msg = MicroVelocity()
-        msg.velA = myint32(vela)
-        msg.velB = myint32(velb)
-        print msg
-        self.pub_dac_velocity.publish(msg)
+            if np.isnan(vela) or np.isnan(velb):
+                return
+            msg = MicroVelocity()
+            msg.velA = myint32(vela)
+            msg.velB = myint32(velb)
+            print msg
+            this_vels = msg.velA, msg.velB
+            if this_vels != self.last_vals:
+                self.pub_dac_velocity.publish(msg)
+                self.last_vals = this_vels
+        else:
+            # position mode
+            a = int(np.round(daca))
+            b = int(np.round(dacb))
+            msg = MicroPosition()
+            msg.posA = a
+            msg.posB = b
+            assert msg.posA==a
+            assert msg.posB==b
+            this_vals = msg.posA, msg.posB
+            if this_vals != self.last_vals:
+                self.pub_dac_position.publish(msg)
+                self.last_vals = this_vals
+
+            ix = msg.posA, msg.posB
+            px = self.cal.d2px(ix)
+            py = self.cal.d2py(ix)
+            print 'ix,px,py',ix,px,py
 
     def run(self):
         rospy.spin()
