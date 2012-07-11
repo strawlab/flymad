@@ -27,7 +27,6 @@ class FlyMADMicro(object):
                                      )
             self.ser.open()
             rospy.loginfo('opened serial port: %s'%port)
-
         except serial.serialutil.SerialException, err:
             rospy.logwarn('could not open serial port: %s'%(str(err),))
             self.ser = None
@@ -45,6 +44,8 @@ class FlyMADMicro(object):
             self._last_velA = 0
             self._last_velB = 0
             self._last_vel_time = rospy.get_time()
+        rospy.Timer( rospy.Duration(1.0/100.0),
+                     self.on_timer )
 
     def laser_callback(self,msg):
         val = msg.data
@@ -69,7 +70,11 @@ class FlyMADMicro(object):
         if laser is not None:
             self.laser = laser
 
+
         cmd = 0
+        argA = 0
+        argB = 0
+
         if self.laser:
             cmd |= 0x02
 
@@ -121,49 +126,54 @@ class FlyMADMicro(object):
         if self.ser is not None:
             self.ser.write(serstr)
 
+    def on_timer(self, event):
+        with self.lock:
+            # publish best guess of DAC positions
+            now = rospy.get_time()
+            dt = now-self._last_vel_time
+
+            a = self._last_posA + self._last_velA*dt
+            b = self._last_posB + self._last_velB*dt
+
+            a = dac_value_wrap(a)
+            b = dac_value_wrap(b)
+            self._last_posA = a
+            self._last_posB = b
+            self._last_vel_time = now
+
+            msg = MicroPosition()
+            msg.posA = myint16(np.round(a))
+            msg.posB = myint16(np.round(b))
+            try:
+                self.pub_dac_position.publish(msg)
+            except:
+                print msg
+                raise
+
     def run(self):
-        r = rospy.Rate(100)
         while not rospy.is_shutdown():
-            if self._debug and self.ser is not None:
-                buf = self.ser.read(100)
+            if self.ser is not None:
+                buf = self.ser.read()
                 if len(buf):
                     self._handle_read(buf)
-            r.sleep()
-            with self.lock:
-                # publish best guess of DAC positions
-                now = rospy.get_time()
-                dt = now-self._last_vel_time
-
-                a = self._last_posA + self._last_velA*dt
-                b = self._last_posB + self._last_velB*dt
-
-                a = dac_value_wrap(a)
-                b = dac_value_wrap(b)
-                self._last_posA = a
-                self._last_posB = b
-                self._last_vel_time = now
-
-                msg = MicroPosition()
-                msg.posA = myint16(np.round(a))
-                msg.posB = myint16(np.round(b))
-                try:
-                    self.pub_dac_position.publish(msg)
-                except:
-                    print msg
-                    raise
+            # We'd call rospy.spinOnce() here if it existed.
 
     def _handle_read(self,inbuf):
         self._buf += inbuf
         lines = self._buf.split('\r\n')
-        self._buf = lines.pop()
+        self._buf = lines.pop() # returns '' when last chars were \r\n
         line = None
         for line in lines:
-            print '                                      read: ',repr(line)
+            if self._debug:
+                print '                                      read: ',repr(line)
+
+        # take last line (most current) and update it
         if line is not None:
             dacA, dacB = map(int,line.split()[-2:])
             dacA = dac_value_wrap(dacA)
             dacB = dac_value_wrap(dacB)
-            print '                                      last: %d %d'%(dacA, dacB)
+            if self._debug:
+                print '                                      last: %d %d'%(dacA, dacB)
 
             with self.lock:
                 self._last_posA = dacA
