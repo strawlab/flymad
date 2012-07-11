@@ -11,6 +11,8 @@ import rospy
 from flymad.msg import MicroPosition, Raw2dPositions
 from flymad.laser_camera_calibration import save_raw_calibration_data
 
+PER_PIXEL_SECONDS = 0.1
+WAIT = 0.03
 
 def to_plain(arr):
     if arr.ndim==1:
@@ -24,7 +26,7 @@ class Calibration:
     def __init__(self):
         rospy.init_node('calibration')
         dest = '/flymad_micro'
-        self.pub = rospy.Publisher( dest+'/position', MicroPosition )
+        self.pub = rospy.Publisher( dest+'/position', MicroPosition, tcp_nodelay=True )
         _ = rospy.Subscriber('/flymad/raw_2d_positions',
                              Raw2dPositions,
                              self.on_data)
@@ -33,10 +35,8 @@ class Calibration:
     def pixels_for_dac( self, dac ):
         two, n_dacs = dac.shape
         pixels = []
-        per_pixel_seconds = 0.05
-        wait = 0.03
         if 1:
-            dur = n_dacs*per_pixel_seconds
+            dur = n_dacs*PER_PIXEL_SECONDS
             print 'duration will be %.1f seconds'%dur
         for i in range(n_dacs):
             daca, dacb = dac[:,i]
@@ -44,8 +44,8 @@ class Calibration:
             msg.posA = daca
             msg.posB = dacb
             self.pub.publish(msg)
-            rospy.sleep(per_pixel_seconds) # allow msec
-            pixels.append(self.get_last_pixel(timeout=wait))
+            rospy.sleep(PER_PIXEL_SECONDS) # allow msec
+            pixels.append(self.get_last_pixel(timeout=WAIT))
         pixels = np.array(pixels).T
         return pixels
 
