@@ -20,25 +20,16 @@ class FlymadJoy:
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
                                                 MicroVelocity,
                                                 tcp_nodelay=True)
-        self.cur = 0,0
-        self.last = 0,0
-        # throttle output
-        rospy.Timer(rospy.Duration(1.0/50.0), self.on_timer)
 
     def on_joy(self,msg):
         xax, yax = msg.axes[:2]
         vec = np.c_[xax, yax].T
         vec = np.dot( R, vec )
         vels = B*(A*vec)**3
-        self.cur = vels
 
-    def on_timer(self,event):
-        cur = self.cur
-        if not np.allclose(self.last,cur):
-            msg = MicroVelocity()
-            msg.velA, msg.velB = cur
-            self.pub_dac_velocity.publish(msg)
-            self.last = cur
+        msg = MicroVelocity()
+        msg.velA, msg.velB = vels
+        self.pub_dac_velocity.publish(msg)
 
     def run(self):
         rospy.spin()
