@@ -57,7 +57,9 @@ void set_stuff( int32_t speed, uint32_t* rate, int8_t *sign ) {
 		*sign = 1;
 	}
 
-	float num = 2097152.0f; // 65536.0f * 2**5;
+	// magic constant found by trial and error
+	float num =   1000000.0f;
+
 	float ratef = num/(float)speed;
 
 	*rate = ratef; //cast float to int
