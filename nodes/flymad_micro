@@ -33,7 +33,7 @@ class FlyMADMicro(object):
         self._buf = ''
         self.laser = 0
         self.velocity_mode = False
-        self._debug = True
+        self._debug = False
         if self._debug:
             print 'debug mode on'
 
@@ -71,7 +71,7 @@ class FlyMADMicro(object):
             self.laser = laser
 
 
-        cmd = 0
+        cmd = 0x01
         argA = 0
         argB = 0
 
@@ -117,9 +117,6 @@ class FlyMADMicro(object):
         if self.velocity_mode:
             cmd |= 0x04
 
-        if self._debug:
-            cmd |= 0x01
-
         serstr = '%d %d %d\n'%(cmd, argA, argB)
         if self._debug:
             print 'sending: ',repr(serstr)
@@ -141,14 +138,10 @@ class FlyMADMicro(object):
             self._last_posB = b
             self._last_vel_time = now
 
-            msg = MicroPosition()
-            msg.posA = myint16(np.round(a))
-            msg.posB = myint16(np.round(b))
-            try:
-                self.pub_dac_position.publish(msg)
-            except:
-                print msg
-                raise
+        msg = MicroPosition()
+        msg.posA = a
+        msg.posB = b
+        self.pub_dac_position.publish(msg)
 
     def run(self):
         while not rospy.is_shutdown():
