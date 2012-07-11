@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import serial
 import numpy as np
+import threading
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
@@ -33,19 +34,26 @@ class FlyMADMicro(object):
         self._buf = ''
         self.laser = 0
         self.velocity_mode = False
-        self._debug = False
+        self._debug = True
+        if self._debug:
+            print 'debug mode on'
 
-        self._last_posA = 0
-        self._last_posB = 0
-        self._last_velA = 0
-        self._last_velB = 0
-        self._last_vel_time = rospy.get_time()
+        self.lock = threading.Lock()
+        with self.lock:
+            self._last_posA = 0
+            self._last_posB = 0
+            self._last_velA = 0
+            self._last_velB = 0
+            self._last_vel_time = rospy.get_time()
 
     def laser_callback(self,msg):
         val = msg.data
         self._update(laser=val)
 
     def position_callback(self,msg):
+        if self._debug:
+            print 'got position:',msg.posA, msg.posB
+
         self._update(posA=msg.posA, posB=msg.posB)
 
     def velocity_callback(self,msg):
@@ -72,14 +80,13 @@ class FlyMADMicro(object):
             assert velB is not None
 
             self.velocity_mode = True
-            if self._debug:
-                print 'vel mode'
             argA = velA
             argB = velB
 
-            self._last_velA = velA
-            self._last_velB = velB
-            self._last_vel_time = rospy.get_time()
+            with self.lock:
+                self._last_velA = velA
+                self._last_velB = velB
+                self._last_vel_time = rospy.get_time()
 
         if posA is not None or posB is not None:
             assert posA is not None
@@ -95,11 +102,12 @@ class FlyMADMicro(object):
             argA = posA
             argB = posB
 
-            self._last_posA = posA
-            self._last_posB = posB
-            self._last_velA = 0
-            self._last_velB = 0
-            self._last_vel_time = rospy.get_time()
+            with self.lock:
+                self._last_posA = posA
+                self._last_posB = posB
+                self._last_velA = 0
+                self._last_velB = 0
+                self._last_vel_time = rospy.get_time()
 
         if self.velocity_mode:
             cmd |= 0x04
@@ -119,10 +127,9 @@ class FlyMADMicro(object):
             if self._debug and self.ser is not None:
                 buf = self.ser.read(100)
                 if len(buf):
-                    self._printbuf(buf)
-                    print 'read: ',repr(buf)
+                    self._handle_read(buf)
             r.sleep()
-            if 1:
+            with self.lock:
                 # publish best guess of DAC positions
                 now = rospy.get_time()
                 dt = now-self._last_vel_time
@@ -145,12 +152,23 @@ class FlyMADMicro(object):
                     print msg
                     raise
 
-    def _printbuf(self,inbuf):
+    def _handle_read(self,inbuf):
         self._buf += inbuf
         lines = self._buf.split('\r\n')
         self._buf = lines.pop()
-        for l in lines:
-            print 'readline: ',repr(l)
+        line = None
+        for line in lines:
+            print '                                      read: ',repr(line)
+        if line is not None:
+            dacA, dacB = map(int,line.split()[-2:])
+            dacA = dac_value_wrap(dacA)
+            dacB = dac_value_wrap(dacB)
+            print '                                      last: %d %d'%(dacA, dacB)
+
+            with self.lock:
+                self._last_posA = dacA
+                self._last_posB = dacB
+                self._last_vel_time = rospy.get_time()
 
 if __name__=='__main__':
     flymad_micro=FlyMADMicro()
