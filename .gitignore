@@ -1,6 +1,12 @@
 build
 msg_gen
 src/flymad/msg
-flymad_micro/build-cli
 *.yaml
 *.bag
+flymad_micro/build-cli/*.o
+flymad_micro/build-cli/*.cpp
+flymad_micro/build-cli/*.d
+flymad_micro/build-cli/*.elf
+flymad_micro/build-cli/*.a
+flymad_micro/build-cli/depends.mk
+flymad_micro/build-cli/libs
