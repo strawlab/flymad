@@ -13,13 +13,13 @@ def main():
     print 'removing all points outside radius from pixel center'
     center = np.c_[320,240].T
     r = np.sqrt(np.sum((pixels_in-center)**2,axis=0))
-    valid1 = r < 240
+    valid1 = r < 300
 
     print 'removing all points outside near DAC zero'
     dac2 = dac_in.astype(np.int16)
     dac3 = dac2.astype(np.float)
     rd = np.sqrt(np.sum(dac3**2,axis=0))
-    valid2 = rd < 14000
+    valid2 = rd < 16000
 
     valid = valid1 & valid2
 
