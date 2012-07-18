@@ -1,0 +1,73 @@
+Cmp-Mod V01 Created by CvPCB (2011-05-25)-stable date = Wed 18 Jul 2012 11:34:35 AM CEST
+
+BeginCmp
+TimeStamp = /50059383;
+Reference = C1;
+ValeurCmp = CP1;
+IdModule  = CP4;
+EndCmp
+
+BeginCmp
+TimeStamp = /500593DA;
+Reference = C2;
+ValeurCmp = CP1;
+IdModule  = CP4;
+EndCmp
+
+BeginCmp
+TimeStamp = /50056EAB;
+Reference = DAC1;
+ValeurCmp = DAC714;
+IdModule  = DAC714P;
+EndCmp
+
+BeginCmp
+TimeStamp = /50056ECA;
+Reference = DAC2;
+ValeurCmp = DAC714;
+IdModule  = DAC714P;
+EndCmp
+
+BeginCmp
+TimeStamp = /5005727C;
+Reference = P1;
+ValeurCmp = BNC;
+IdModule  = BNC_horizontal;
+EndCmp
+
+BeginCmp
+TimeStamp = /50057289;
+Reference = P2;
+ValeurCmp = BNC;
+IdModule  = BNC_horizontal;
+EndCmp
+
+BeginCmp
+TimeStamp = /5005C3C5;
+Reference = P3;
+ValeurCmp = CONN_10;
+IdModule  = term_block;
+EndCmp
+
+BeginCmp
+TimeStamp = /50065BB0;
+Reference = P4;
+ValeurCmp = CONN_2;
+IdModule  = SIL-2;
+EndCmp
+
+BeginCmp
+TimeStamp = /50057034;
+Reference = RELAY1;
+ValeurCmp = SSRELAY;
+IdModule  = SSR_CMX;
+EndCmp
+
+BeginCmp
+TimeStamp = /5005B378;
+Reference = U1;
+ValeurCmp = ARDUINO_NANO;
+IdModule  = arduino_nano;
+EndCmp
+
+EndListe
