@@ -1,10 +1,11 @@
-PCBNEW-LibModule-V1  Wed 18 Jul 2012 11:29:16 AM CEST
+PCBNEW-LibModule-V1  Sun 22 Jul 2012 08:51:21 AM CEST
 # encoding utf-8
 $INDEX
 Relay
 relay2
 relay3
 SSR_CMX
+term_block
 $EndINDEX
 $INDEX
 arduino_nano
@@ -759,90 +760,6 @@ Ne 0 ""
 Po 6890 0
 $EndPAD
 $EndMODULE  terminal block
-$MODULE term_block
-Po 0 0 0 15 5005C6A5 00000000 ~~
-Li term_block
-Cd Phoenix Contact PT 1,5/ 4-PH-3,5
-Sc 00000000
-AR terminal
-Op 0 0 0
-T0 0 -2000 600 600 0 120 N V 21 N "term_block"
-T1 0 2000 600 600 0 120 N V 21 N "VAL**"
-DS -6890 -1378 -6890 1378 150 21
-DS -6890 1378 8268 1378 150 21
-DS 8268 1378 8268 -1378 150 21
-DS 8268 -1378 -6890 -1378 150 21
-$PAD
-Sh "1" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po -5512 0
-$EndPAD
-$PAD
-Sh "2" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po -4134 0
-$EndPAD
-$PAD
-Sh "3" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po -2756 0
-$EndPAD
-$PAD
-Sh "4" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po -1378 0
-$EndPAD
-$PAD
-Sh "5" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po 0 0
-$EndPAD
-$PAD
-Sh "6" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po 1378 0
-$EndPAD
-$PAD
-Sh "7" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po 2756 0
-$EndPAD
-$PAD
-Sh "8" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po 4134 0
-$EndPAD
-$PAD
-Sh "9" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po 5512 0
-$EndPAD
-$PAD
-Sh "10" C 600 600 0 0 0
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po 6890 0
-$EndPAD
-$EndMODULE  term_block
 $MODULE Relay
 Po 0 0 0 15 5005C9BB 00000000 ~~
 Li Relay
@@ -1012,4 +929,88 @@ Ne 0 ""
 Po 3000 -2000
 $EndPAD
 $EndMODULE  SSR_CMX
+$MODULE term_block
+Po 0 0 0 15 500BA2E3 00000000 ~~
+Li term_block
+Cd Phoenix Contact PT 1,5/ 10-PH-3,5
+Sc 00000000
+AR terminal
+Op 0 0 0
+T0 0 -2000 600 600 0 120 N V 21 N "term_block"
+T1 0 2000 600 600 0 120 N V 21 N "VAL**"
+DS -6890 -1378 -6890 1378 150 21
+DS -6890 1378 8268 1378 150 21
+DS 8268 1378 8268 -1378 150 21
+DS 8268 -1378 -6890 -1378 150 21
+$PAD
+Sh "1" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po -5512 0
+$EndPAD
+$PAD
+Sh "2" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po -4134 0
+$EndPAD
+$PAD
+Sh "3" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po -2756 0
+$EndPAD
+$PAD
+Sh "4" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po -1378 0
+$EndPAD
+$PAD
+Sh "5" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po 0 0
+$EndPAD
+$PAD
+Sh "6" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po 1378 0
+$EndPAD
+$PAD
+Sh "7" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po 2756 0
+$EndPAD
+$PAD
+Sh "8" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po 4134 0
+$EndPAD
+$PAD
+Sh "9" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po 5512 0
+$EndPAD
+$PAD
+Sh "10" C 600 600 0 0 0
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po 6890 0
+$EndPAD
+$EndMODULE  term_block
 $EndLIBRARY
