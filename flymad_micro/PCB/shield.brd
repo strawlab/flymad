@@ -1,4 +1,4 @@
-PCBNEW-BOARD Version 1 date Wed 18 Jul 2012 11:47:31 AM CEST
+PCBNEW-BOARD Version 1 date Mon 23 Jul 2012 09:37:15 AM CEST
 
 # Created by Pcbnew(2011-05-25)-stable
 
@@ -21,7 +21,7 @@ $EndGENERAL
 $SHEETDESCR
 Sheet A4 11700 8267
 Title "FlyMAD DAC"
-Date "18 jul 2012"
+Date "23 jul 2012"
 Rev ""
 Comp "strawlab"
 Comment1 ""
@@ -60,7 +60,7 @@ PadDrill 320
 Pad2MaskClearance 100
 GridOrigin 36000 23000
 AuxiliaryAxisOrg 36000 23000
-PcbPlotParams (pcbplotparams (layerselection 3178497) (usegerberextensions true) (excludeedgelayer true) (linewidth 60) (plotframeref false) (viasonmask false) (mode 1) (useauxorigin false) (hpglpennumber 1) (hpglpenspeed 20) (hpglpendiameter 15) (hpglpenoverlay 0) (pscolor true) (psnegative false) (psa4output false) (plotreference true) (plotvalue true) (plotothertext true) (plotinvisibletext false) (padsonsilk false) (subtractmaskfromsilk false) (outputformat 1) (mirror false) (drillshape 1) (scaleselection 1) (outputdirectory ""))
+PcbPlotParams (pcbplotparams (layerselection 14712833) (usegerberextensions true) (excludeedgelayer true) (linewidth 60) (plotframeref false) (viasonmask false) (mode 1) (useauxorigin false) (hpglpennumber 1) (hpglpenspeed 20) (hpglpendiameter 15) (hpglpenoverlay 0) (pscolor true) (psnegative false) (psa4output false) (plotreference true) (plotvalue true) (plotothertext true) (plotinvisibletext false) (padsonsilk false) (subtractmaskfromsilk false) (outputformat 1) (mirror false) (drillshape 1) (scaleselection 1) (outputdirectory g8))
 $EndSETUP
 
 $EQUIPOT
@@ -158,90 +158,6 @@ AddNet "N-000048"
 AddNet "N-000049"
 AddNet "N-000053"
 $EndNCLASS
-$MODULE term_block
-Po 48000 29000 1800 15 5005C6A5 5005CD38 ~~
-Li term_block
-Cd Phoenix Contact PT 1,5/ 4-PH-3,5
-Sc 5005CD38
-AR /5005C3C5
-Op 0 0 0
-T0 0 -2000 600 600 1800 120 N V 21 N "P3"
-T1 0 2000 600 600 1800 120 N V 21 N "CONN_10"
-DS -6890 -1378 -6890 1378 150 21
-DS -6890 1378 8268 1378 150 21
-DS 8268 1378 8268 -1378 150 21
-DS 8268 -1378 -6890 -1378 150 21
-$PAD
-Sh "1" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 6 "N-000020"
-Po -5512 0
-$EndPAD
-$PAD
-Sh "2" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 1 "GND"
-Po -4134 0
-$EndPAD
-$PAD
-Sh "3" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 5 "N-000019"
-Po -2756 0
-$EndPAD
-$PAD
-Sh "4" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po -1378 0
-$EndPAD
-$PAD
-Sh "5" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po 0 0
-$EndPAD
-$PAD
-Sh "6" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 0 ""
-Po 1378 0
-$EndPAD
-$PAD
-Sh "7" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 8 "N-000030"
-Po 2756 0
-$EndPAD
-$PAD
-Sh "8" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 16 "N-000053"
-Po 4134 0
-$EndPAD
-$PAD
-Sh "9" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 16 "N-000053"
-Po 5512 0
-$EndPAD
-$PAD
-Sh "10" C 600 600 0 0 1800
-Dr 320 0 0
-At STD N 00E0FFFF
-Ne 15 "N-000049"
-Po 6890 0
-$EndPAD
-$EndMODULE  term_block
 $MODULE DAC714P
 Po 51000 35000 0 15 00200000 5005CD3A ~~
 Li DAC714P
@@ -1058,6 +974,90 @@ Ne 1 "GND"
 Po 3000 -2000
 $EndPAD
 $EndMODULE  SSR_CMX
+$MODULE term_block
+Po 48000 29000 1800 15 500BA2E3 500CFEBD ~~
+Li term_block
+Cd Phoenix Contact PT 1,5/ 10-PH-3,5
+Sc 500CFEBD
+AR /5005C3C5
+Op 0 0 0
+T0 0 -2000 600 600 1800 120 N V 21 N "P3"
+T1 0 2000 600 600 1800 120 N V 21 N "CONN_10"
+DS -6890 -1378 -6890 1378 150 21
+DS -6890 1378 8268 1378 150 21
+DS 8268 1378 8268 -1378 150 21
+DS 8268 -1378 -6890 -1378 150 21
+$PAD
+Sh "1" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 6 "N-000020"
+Po -5512 0
+$EndPAD
+$PAD
+Sh "2" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 1 "GND"
+Po -4134 0
+$EndPAD
+$PAD
+Sh "3" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 5 "N-000019"
+Po -2756 0
+$EndPAD
+$PAD
+Sh "4" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po -1378 0
+$EndPAD
+$PAD
+Sh "5" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po 0 0
+$EndPAD
+$PAD
+Sh "6" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 0 ""
+Po 1378 0
+$EndPAD
+$PAD
+Sh "7" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 8 "N-000030"
+Po 2756 0
+$EndPAD
+$PAD
+Sh "8" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 16 "N-000053"
+Po 4134 0
+$EndPAD
+$PAD
+Sh "9" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 16 "N-000053"
+Po 5512 0
+$EndPAD
+$PAD
+Sh "10" C 600 600 0 0 1800
+Dr 472 0 0
+At STD N 00E0FFFF
+Ne 15 "N-000049"
+Po 6890 0
+$EndPAD
+$EndMODULE  term_block
 $COTATION
 Ge 0 25 0
 Va 25000

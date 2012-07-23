@@ -1,4 +1,4 @@
-update=Tue 17 Jul 2012 08:55:40 PM CEST
+update=Mon 23 Jul 2012 09:34:01 AM CEST
 last_client=pcbnew
 [eeschema]
 version=1
@@ -87,18 +87,17 @@ DrawLar=150
 EdgeLar=150
 TxtLar=120
 MSegLar=150
-LastNetListRead=shield.net
+LastNetListRead=
 [pcbnew/libraries]
-LibDir=
-LibName1=myshield
-LibName2=arduino_shields
-LibName3=sockets
-LibName4=connect
-LibName5=discret
-LibName6=pin_array
-LibName7=divers
-LibName8=libcms
-LibName9=display
-LibName10=valves
-LibName11=led
-LibName12=dip_sockets
+LibDir=../PCB
+LibName1=sockets
+LibName2=connect
+LibName3=discret
+LibName4=pin_array
+LibName5=divers
+LibName6=libcms
+LibName7=display
+LibName8=valves
+LibName9=led
+LibName10=dip_sockets
+LibName11=myshield
