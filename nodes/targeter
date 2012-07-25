@@ -84,10 +84,6 @@ class Targeter:
         x = int(max(0,x))
         y = int(max(0,y))
 
-        print
-        print self.cur_obj_id
-        print 'x,y',x,y
-
         # desired
         try:
             daca = self.cal.p2da[y,x]
@@ -95,12 +91,9 @@ class Targeter:
         except IndexError:
             return
 
-        print 'daca, dacb',daca, dacb
-
         if 1:
             # velocity mode
             aa, ab = self._get_current_dacs()
-            print 'aa,ab',aa,ab
 
             diffa = daca-aa
             diffb = dacb-ab
@@ -114,7 +107,7 @@ class Targeter:
             msg = MicroVelocity()
             msg.velA = myint32(vela)
             msg.velB = myint32(velb)
-            print msg
+
             this_vels = msg.velA, msg.velB
             if this_vels != self.last_vals:
                 self.pub_dac_velocity.publish(msg)
@@ -136,7 +129,6 @@ class Targeter:
             ix = msg.posA, msg.posB
             px = self.cal.d2px(ix)
             py = self.cal.d2py(ix)
-            print 'ix,px,py',ix,px,py
 
         msg = StampedObject()
         msg.header.stamp = rospy.Time.now()
