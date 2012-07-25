@@ -6,6 +6,8 @@ import collections
 import numpy as np
 import motmot.imops.imops as imops
 import warnings
+import pytz
+import datetime
 
 import roslib; roslib.load_manifest('rosbag')
 import rospy
@@ -34,6 +36,13 @@ def main():
          zoomt=args.zoom_transform,
          )
 
+class DateFormatter:
+    def __init__(self,tz):
+        self.tz = tz
+
+    def format_date(self, x, pos=None):
+        return str(datetime.datetime.fromtimestamp(x,self.tz))
+
 def doit(widef=None,zoomf=None,rosbagf=None,
          widet=None, zoomt=None):
     wide = fmf.FlyMovie(widef)
@@ -61,9 +70,20 @@ def doit(widef=None,zoomf=None,rosbagf=None,
         stamp = stamp.secs + stamp.nsecs*1e-9
         for pt in msg.points:
             raw2d.append(( stamp, pt.x, pt.y ))
+
     raw2d = np.array( raw2d, dtype=[('stamp',np.float64),
                                      ('x',np.float32),
                                      ('y',np.float32)] )
+
+
+    tzname = None
+    for topic, msg, t in bag.read_messages(topics='/timezone'):
+        tzname = msg.value
+    if tzname is None:
+        # default timezone
+        tzname = 'CET'
+        warnings.warn('No data in /timezone topic - setting default timezone '
+                      'to %s'%tzname)
 
     start_time = np.max( [np.min(wide_ts),
                           np.min(zoom_ts),
@@ -78,6 +98,9 @@ def doit(widef=None,zoomf=None,rosbagf=None,
 
     times = np.arange(start_time, stop_time+1e-10, rate)
     print 'at %f fps, this is %d frames'%(FPS,len(times))
+
+    tz = pytz.timezone( tzname )
+    pretty_time = DateFormatter(tz)
 
     for out_fno, cur_time in enumerate(times):
         print 'frame %d of %d'%(out_fno+1, len(times))
@@ -167,6 +190,10 @@ def doit(widef=None,zoomf=None,rosbagf=None,
         user_rect = (0,0, zoom.get_width(), zoom.get_height())
         with canv.set_user_coords(device_rect, user_rect, transform=zoomt):
             canv.imshow(zoom_frame,0,0,filter='best')
+
+        canv.text( '%s' % pretty_time.format_date(cur_time),
+                   5,15,
+                   color_rgba=(1,1,1,1))
 
         canv.save()
 
