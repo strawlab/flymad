@@ -19,8 +19,7 @@ class FlyMADMicro(object):
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position_echo',
                                                 MicroPosition,
                                                 tcp_nodelay=True)
-        self.pub_timezone = rospy.Publisher('/timezone',
-                                            String )
+        self._send_timezone()
 
         port = rospy.get_param( '~port', default = '/dev/ttyACM0' )
         try:
@@ -49,8 +48,14 @@ class FlyMADMicro(object):
             self._last_vel_time = rospy.get_time()
         rospy.Timer( rospy.Duration(1.0/100.0),
                      self.on_timer )
-        rospy.Timer( rospy.Duration(1.0),
-                     self.on_slow_timer )
+
+    def _send_timezone(self):
+        pub_timezone = rospy.Publisher('/timezone',
+                                       String,
+                                       latch=True)
+        msg = String()
+        msg.data = time.tzname[0]
+        pub_timezone.publish(msg)
 
     def laser_callback(self,msg):
         val = msg.data
@@ -127,9 +132,6 @@ class FlyMADMicro(object):
             print 'sending: ',repr(serstr)
         if self.ser is not None:
             self.ser.write(serstr)
-
-    def on_slow_timer(self, event):
-        self.pub_timezone.publish(time.tzname[0])
 
     def on_timer(self, event):
         with self.lock:
