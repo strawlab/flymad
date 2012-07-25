@@ -118,6 +118,46 @@ def doit(widef=None,zoomf=None,rosbagf=None,
                           this_raw2d['y'],
                           color_rgba=(0,1,0,0.3), radius=2.0 )
 
+
+        r = 25
+        wz_height = max_panel_h//2
+        dev_w, dev_h = scale( r*2, r*2, max_panel_w, wz_height )
+        device_rect = (margin, final_h - margin - wz_height, dev_w, dev_h)
+
+        if 1:
+            warnings.warn( 'magnified wide-field view should use objs[ obj_id ] to zoom on tracked object')
+
+        xc = this_raw2d['x'][-1]
+        yc = this_raw2d['y'][-1]
+
+        x0 = xc-r
+        x1 = xc+r
+        if x0 < 0:
+            x0 = 0
+            x1 = 2*r
+        elif x1 >= wide.get_width():
+            x1 = wide.get_width-1
+            x0 = x1-2*r
+
+        y0 = yc-r
+        y1 = yc+r
+        if y0 < 0:
+            y0 = 0
+            y1 = 2*r
+        elif y1 >= wide.get_height():
+            y1 = wide.get_height()-1
+            y0 = y1-2*r
+
+        user_rect = (x0,y0,2*r,2*r)
+        with canv.set_user_coords(device_rect, user_rect, transform=widet):
+            #crop = wide_frame[ y0:y1, x0:x1 ]
+            crop = wide_frame
+            canv.imshow(crop,0,0,filter='nearest')
+            canv.scatter( this_raw2d['x'],
+                          this_raw2d['y'],
+                          color_rgba=(0,1,0,0.3), radius=2.0 )
+
+
         # zoomed view --------------------------
         w,h = zoom.get_width(), zoom.get_height()
         if zoomt is not None and '90' in zoomt: # rotate aspect ratio
