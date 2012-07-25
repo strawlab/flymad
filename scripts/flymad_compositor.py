@@ -58,11 +58,17 @@ def doit(widef=None,zoomf=None,rosbagf=None,
         state = msg.state_vec
         objs[ msg.obj_id ] .append( (stamp.secs + stamp.nsecs*1e-9, state[0], state[1]) )
 
+    obj_times = []
     for obj_id in objs:
         objs[ obj_id ] = np.array( objs[ obj_id ], dtype=[('stamp',np.float64),
                                                           ('x',np.float32),
                                                           ('y',np.float32)] )
 
+        stamps = objs[obj_id]['stamp']
+        obj_times.append( (np.min(stamps),
+                           np.max(stamps),
+                           obj_id ) )
+    obj_times = np.array(obj_times)
 
     raw2d = []
     for topic, msg, t in bag.read_messages(topics='/flymad/raw_2d_positions'):
@@ -104,6 +110,9 @@ def doit(widef=None,zoomf=None,rosbagf=None,
 
     for out_fno, cur_time in enumerate(times):
         print 'frame %d of %d'%(out_fno+1, len(times))
+        valid_obj_cond = (obj_times[:,0] <= cur_time) & (cur_time <= obj_times[:,1])
+        valid_obj_ids = map(int,obj_times[valid_obj_cond,2])
+
         wide_frame, this_wide_ts = wide.get_frame_at_or_before_timestamp(cur_time)
         zoom_frame, this_zoom_ts = zoom.get_frame_at_or_before_timestamp(cur_time)
 
@@ -135,17 +144,12 @@ def doit(widef=None,zoomf=None,rosbagf=None,
             w,h = h,w
         dev_w, dev_h = scale( w, h, max_panel_w, max_panel_h )
         device_rect = (margin, margin, dev_w, dev_h)
-        with canv.set_user_coords(device_rect, user_rect, transform=widet):
-            canv.imshow(wide_frame,0,0,filter='best')
-            canv.scatter( this_raw2d['x'],
-                          this_raw2d['y'],
-                          color_rgba=(0,1,0,0.3), radius=2.0 )
 
 
         r = 25
         wz_height = max_panel_h//2
         dev_w, dev_h = scale( r*2, r*2, max_panel_w, wz_height )
-        device_rect = (margin, final_h - margin - wz_height, dev_w, dev_h)
+        device_rect_crop = (margin, final_h - margin - wz_height, dev_w, dev_h)
 
         if 1:
             warnings.warn( 'magnified wide-field view should use objs[ obj_id ] to zoom on tracked object')
@@ -171,14 +175,24 @@ def doit(widef=None,zoomf=None,rosbagf=None,
             y1 = wide.get_height()-1
             y0 = y1-2*r
 
-        user_rect = (x0,y0,2*r,2*r)
-        with canv.set_user_coords(device_rect, user_rect, transform=widet):
-            #crop = wide_frame[ y0:y1, x0:x1 ]
-            crop = wide_frame
-            canv.imshow(crop,0,0,filter='nearest')
-            canv.scatter( this_raw2d['x'],
-                          this_raw2d['y'],
-                          color_rgba=(0,1,0,0.3), radius=2.0 )
+        user_rect_crop = (x0,y0,2*r,2*r)
+        for d,u in [ (device_rect, user_rect),
+                     (device_rect_crop, user_rect_crop) ]:
+            with canv.set_user_coords(d, u, transform=widet):
+                canv.imshow(wide_frame,0,0,filter='nearest')
+                canv.scatter( this_raw2d['x'],
+                              this_raw2d['y'],
+                              color_rgba=(0,1,0,0.3), radius=2.0 )
+                for obj_id in valid_obj_ids:
+                    stamps = objs[ obj_id ]['stamp']
+                    cond = stamps <= cur_time
+                    last_idx = np.nonzero(cond)[0][-1]
+                    r = objs[obj_id][last_idx]
+                    canv.scatter( [r['x']], [r['y']],
+                                  color_rgba=(1,0,1,0.4), radius=1.5 )
+                    canv.text( '%d' % obj_id,
+                               r['x'], r['y'],
+                               color_rgba=(1,0,1,0.4))
 
 
         # zoomed view --------------------------
