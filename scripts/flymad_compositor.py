@@ -82,6 +82,20 @@ def doit(widef=None,zoomf=None,rosbagf=None,
                                      ('y',np.float32)] )
 
 
+    micro_vels = []
+    for topic, msg, t in bag.read_messages(topics='/flymad_micro/velocity'):
+        micro_vels.append( (t.secs + t.nsecs*1e-9, msg.velA, msg.velB) )
+    micro_vels = np.array( micro_vels, dtype=[('t',np.float64),
+                                              ('A',np.float32),
+                                              ('B',np.float32)] )
+
+    micro_position_echos = []
+    for topic, msg, t in bag.read_messages(topics='/flymad_micro/position_echo'):
+        micro_position_echos.append( (t.secs + t.nsecs*1e-9, msg.posA, msg.posB) )
+    micro_position_echos = np.array( micro_position_echos, dtype=[('t',np.float64),
+                                                                  ('A',np.float32),
+                                                                  ('B',np.float32)] )
+
     tzname = None
     for topic, msg, t in bag.read_messages(topics='/timezone'):
         tzname = msg.value
@@ -176,6 +190,31 @@ def doit(widef=None,zoomf=None,rosbagf=None,
             y0 = y1-2*r
 
         user_rect_crop = (x0,y0,2*r,2*r)
+
+        idxs = np.nonzero(micro_vels['t'] <= cur_time)[0]
+        if len(idxs):
+            last_idx = idxs[-1]
+            row = micro_vels[last_idx]
+            velA = row['A']
+            velB = row['B']
+            vel_age = cur_time - row['t']
+        else:
+            velA = None
+            velB = None
+            vel_age = None
+
+        idxs = np.nonzero(micro_position_echos['t'] <= cur_time)[0]
+        if len(idxs):
+            last_idx = idxs[-1]
+            row = micro_position_echos[last_idx]
+            posA = row['A']
+            posB = row['B']
+            pos_age = cur_time - row['t']
+        else:
+            posA = None
+            posB = None
+            pos_age = None
+
         for d,u in [ (device_rect, user_rect),
                      (device_rect_crop, user_rect_crop) ]:
             with canv.set_user_coords(d, u, transform=widet):
@@ -190,9 +229,11 @@ def doit(widef=None,zoomf=None,rosbagf=None,
                     r = objs[obj_id][last_idx]
                     canv.scatter( [r['x']], [r['y']],
                                   color_rgba=(1,0,1,0.4), radius=1.5 )
-                    canv.text( '%d' % obj_id,
-                               r['x'], r['y'],
-                               color_rgba=(1,0,1,0.4))
+                    if 1:
+                    #with benu_ctx.clip_off(): # also transform off
+                        canv.text( '%d' % obj_id,
+                                   r['x'], r['y'],
+                                   color_rgba=(1,0,1,0.4))
 
 
         # zoomed view --------------------------
@@ -204,6 +245,16 @@ def doit(widef=None,zoomf=None,rosbagf=None,
         user_rect = (0,0, zoom.get_width(), zoom.get_height())
         with canv.set_user_coords(device_rect, user_rect, transform=zoomt):
             canv.imshow(zoom_frame,0,0,filter='best')
+            if 1:
+            #with benu_ctx.clip_off(): # also transform off
+                if velA is not None:
+                    canv.text( 'vel: %.1f, %.1f (data age: %.1f msec)'%(velA,velB,vel_age*1e3),
+                               5,15,
+                               color_rgba=(1,1,1,1))
+                if posA is not None:
+                    canv.text( 'pos: %.1f, %.1f (data age: %.1f msec)'%(posA,posB,pos_age*1e3),
+                               5,25,
+                               color_rgba=(1,1,1,1))
 
         canv.text( '%s' % pretty_time.format_date(cur_time),
                    5,15,
