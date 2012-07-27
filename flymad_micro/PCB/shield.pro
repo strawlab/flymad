@@ -1,5 +1,5 @@
-update=Mon 23 Jul 2012 09:34:01 AM CEST
-last_client=pcbnew
+update=Fri 27 Jul 2012 05:15:59 PM CEST
+last_client=kicad
 [eeschema]
 version=1
 LibDir=
@@ -64,8 +64,6 @@ LibName29=opto
 LibName30=atmel
 LibName31=contrib
 LibName32=valves
-[general]
-version=1
 [cvpcb]
 version=1
 NetIExt=net
@@ -87,7 +85,7 @@ DrawLar=150
 EdgeLar=150
 TxtLar=120
 MSegLar=150
-LastNetListRead=
+LastNetListRead=shield.net
 [pcbnew/libraries]
 LibDir=../PCB
 LibName1=sockets
@@ -101,3 +99,5 @@ LibName8=valves
 LibName9=led
 LibName10=dip_sockets
 LibName11=myshield
+[general]
+version=1

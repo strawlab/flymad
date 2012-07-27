@@ -1,4 +1,4 @@
-Cmp-Mod V01 Created by CvPCB (2011-05-25)-stable date = Wed 18 Jul 2012 11:34:35 AM CEST
+Cmp-Mod V01 Created by CvPCB (2011-05-25)-stable date = Fri 27 Jul 2012 05:02:44 PM CEST
 
 BeginCmp
 TimeStamp = /50059383;
@@ -29,31 +29,66 @@ IdModule  = DAC714P;
 EndCmp
 
 BeginCmp
-TimeStamp = /5005727C;
-Reference = P1;
-ValeurCmp = BNC;
-IdModule  = BNC_horizontal;
+TimeStamp = /5012ABED;
+Reference = DAC3;
+ValeurCmp = DAC714;
+IdModule  = DAC714P;
 EndCmp
 
 BeginCmp
-TimeStamp = /50057289;
+TimeStamp = /50065BB0;
+Reference = P1;
+ValeurCmp = CONN_2;
+IdModule  = SIL-2;
+EndCmp
+
+BeginCmp
+TimeStamp = /5005727C;
 Reference = P2;
 ValeurCmp = BNC;
 IdModule  = BNC_horizontal;
 EndCmp
 
 BeginCmp
-TimeStamp = /5005C3C5;
+TimeStamp = /50057289;
 Reference = P3;
-ValeurCmp = CONN_10;
-IdModule  = term_block;
+ValeurCmp = BNC;
+IdModule  = BNC_horizontal;
 EndCmp
 
 BeginCmp
-TimeStamp = /50065BB0;
+TimeStamp = /5012AC14;
 Reference = P4;
+ValeurCmp = BNC;
+IdModule  = BNC_horizontal;
+EndCmp
+
+BeginCmp
+TimeStamp = /5012AAFD;
+Reference = P5;
 ValeurCmp = CONN_2;
-IdModule  = SIL-2;
+IdModule  = Phoenix_1888687;
+EndCmp
+
+BeginCmp
+TimeStamp = /5012AB0E;
+Reference = P6;
+ValeurCmp = CONN_2;
+IdModule  = Phoenix_1888687;
+EndCmp
+
+BeginCmp
+TimeStamp = /5012AB14;
+Reference = P7;
+ValeurCmp = CONN_2;
+IdModule  = Phoenix_1888687;
+EndCmp
+
+BeginCmp
+TimeStamp = /5012AB1E;
+Reference = P8;
+ValeurCmp = CONN_2;
+IdModule  = Phoenix_1888687;
 EndCmp
 
 BeginCmp
