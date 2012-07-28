@@ -30,7 +30,7 @@ unsigned long last_stampB;
 void setup() {
   // initialize the digital pin as an output.
   pinMode(LASER, OUTPUT);
-  // start serial port at 9600 bps:
+  // start serial port at 115200 bps:
   Serial.begin(115200);
 
   SPI.setDataMode(SPI_MODE0);
