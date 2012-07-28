@@ -1,4 +1,4 @@
-EESchema Schematic File Version 2  date Fri 27 Jul 2012 05:09:34 PM CEST
+EESchema Schematic File Version 2  date Sat 28 Jul 2012 11:31:05 PM CEST
 LIBS:myshield
 LIBS:power
 LIBS:device
@@ -37,7 +37,7 @@ $Descr A4 11700 8267
 encoding utf-8
 Sheet 1 1
 Title ""
-Date "27 jul 2012"
+Date "28 jul 2012"
 Rev ""
 Comp ""
 Comment1 ""
@@ -45,6 +45,11 @@ Comment2 ""
 Comment3 ""
 Comment4 ""
 $EndDescr
+Connection ~ 9600 2050
+Wire Wire Line
+	9600 1250 9600 2050
+Wire Wire Line
+	9600 1250 9650 1250
 Connection ~ 9850 4400
 Connection ~ 9850 3350
 Wire Wire Line
@@ -83,8 +88,6 @@ Wire Wire Line
 Wire Wire Line
 	7800 5000 7800 5500
 Wire Wire Line
-	9400 1050 9600 1050
-Wire Wire Line
 	6500 5000 6500 5400
 Wire Wire Line
 	5700 4550 5700 5700
@@ -94,7 +97,7 @@ Wire Wire Line
 	6450 5800 6500 5800
 Connection ~ 10100 3350
 Wire Wire Line
-	9575 1525 9575 1875
+	9425 1425 9425 1775
 Connection ~ 9750 2050
 Connection ~ 9750 3350
 Wire Wire Line
@@ -207,10 +210,7 @@ Wire Wire Line
 Wire Wire Line
 	6400 4900 8400 4900
 Wire Wire Line
-	9600 1250 9600 2050
-Wire Wire Line
 	9600 2050 9650 2050
-Connection ~ 9650 2050
 Wire Wire Line
 	8000 5500 8200 5500
 Wire Wire Line
@@ -254,6 +254,17 @@ Wire Wire Line
 Wire Wire Line
 	9050 3600 9050 800 
 Connection ~ 9050 2450
+Wire Wire Line
+	9600 1050 9400 1050
+$Comp
+L CONN_2 P8
+U 1 1 501456A4
+P 9950 1150
+F 0 "P8" V 9900 1150 40  0000 C CNN
+F 1 "CONN_2" V 10000 1150 40  0000 C CNN
+	1    9950 1150
+	1    0    0    -1  
+$EndComp
 NoConn ~ 8800 3800
 NoConn ~ 8800 3900
 NoConn ~ 8800 4000
@@ -270,10 +281,10 @@ F 1 "GND" H 7050 4030 30  0001 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L BNC P4
+L BNC P3
 U 1 1 5012AC14
 P 10150 3900
-F 0 "P4" H 10160 4020 60  0000 C CNN
+F 0 "P3" H 10160 4020 60  0000 C CNN
 F 1 "BNC" V 10260 3840 40  0000 C CNN
 	1    10150 3900
 	1    0    0    -1  
@@ -289,37 +300,37 @@ F 1 "DAC714" H 8000 3550 60  0000 C CNN
 $EndComp
 NoConn ~ 8600 5500
 $Comp
-L CONN_2 P8
+L CONN_2 P7
 U 1 1 5012AB1E
 P 9100 5850
-F 0 "P8" V 9050 5850 40  0000 C CNN
+F 0 "P7" V 9050 5850 40  0000 C CNN
 F 1 "CONN_2" V 9150 5850 40  0000 C CNN
 	1    9100 5850
 	0    1    1    0   
 $EndComp
 $Comp
-L CONN_2 P7
+L CONN_2 P6
 U 1 1 5012AB14
 P 8700 5850
-F 0 "P7" V 8650 5850 40  0000 C CNN
+F 0 "P6" V 8650 5850 40  0000 C CNN
 F 1 "CONN_2" V 8750 5850 40  0000 C CNN
 	1    8700 5850
 	0    1    1    0   
 $EndComp
 $Comp
-L CONN_2 P6
+L CONN_2 P5
 U 1 1 5012AB0E
 P 8300 5850
-F 0 "P6" V 8250 5850 40  0000 C CNN
+F 0 "P5" V 8250 5850 40  0000 C CNN
 F 1 "CONN_2" V 8350 5850 40  0000 C CNN
 	1    8300 5850
 	0    1    1    0   
 $EndComp
 $Comp
-L CONN_2 P5
+L CONN_2 P4
 U 1 1 5012AAFD
 P 7900 5850
-F 0 "P5" V 7850 5850 40  0000 C CNN
+F 0 "P4" V 7850 5850 40  0000 C CNN
 F 1 "CONN_2" V 7950 5850 40  0000 C CNN
 	1    7900 5850
 	0    1    1    0   
@@ -332,15 +343,6 @@ F 0 "#PWR02" H 6450 5800 30  0001 C CNN
 F 1 "GND" H 6450 5730 30  0001 C CNN
 	1    6450 5800
 	0    1    1    0   
-$EndComp
-$Comp
-L CONN_2 P1
-U 1 1 50065BB0
-P 9950 1150
-F 0 "P1" V 9900 1150 40  0000 C CNN
-F 1 "CONN_2" V 10000 1150 40  0000 C CNN
-	1    9950 1150
-	1    0    0    -1  
 $EndComp
 Text Notes 9925 885  2    60   ~ 0
 GND
@@ -461,19 +463,19 @@ F 1 "GND" H 6950 1580 30  0001 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L BNC P3
+L BNC P2
 U 1 1 50057289
 P 10150 3150
-F 0 "P3" H 10160 3270 60  0000 C CNN
+F 0 "P2" H 10160 3270 60  0000 C CNN
 F 1 "BNC" V 10260 3090 40  0000 C CNN
 	1    10150 3150
 	1    0    0    -1  
 $EndComp
 $Comp
-L BNC P2
+L BNC P1
 U 1 1 5005727C
 P 10150 1850
-F 0 "P2" H 10160 1970 60  0000 C CNN
+F 0 "P1" H 10160 1970 60  0000 C CNN
 F 1 "BNC" V 10260 1790 40  0000 C CNN
 	1    10150 1850
 	1    0    0    -1  
