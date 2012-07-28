@@ -1,4 +1,4 @@
-Cmp-Mod V01 Created by CvPCB (2011-05-25)-stable date = Sat 28 Jul 2012 11:18:09 PM CEST
+Cmp-Mod V01 Created by CvPCB (2011-05-25)-stable date = Sat 28 Jul 2012 11:39:47 PM CEST
 
 BeginCmp
 TimeStamp = /50059383;
@@ -64,13 +64,6 @@ IdModule  = Phoenix_1888687;
 EndCmp
 
 BeginCmp
-TimeStamp = /5012AB0E;
-Reference = P5;
-ValeurCmp = CONN_2;
-IdModule  = Phoenix_1888687;
-EndCmp
-
-BeginCmp
 TimeStamp = /5012AB14;
 Reference = P6;
 ValeurCmp = CONN_2;
@@ -87,6 +80,20 @@ EndCmp
 BeginCmp
 TimeStamp = /501456A4;
 Reference = P8;
+ValeurCmp = CONN_2;
+IdModule  = SIL-2;
+EndCmp
+
+BeginCmp
+TimeStamp = /50145B4C;
+Reference = P9;
+ValeurCmp = CONN_2;
+IdModule  = SIL-2;
+EndCmp
+
+BeginCmp
+TimeStamp = /50145B72;
+Reference = P10;
 ValeurCmp = CONN_2;
 IdModule  = SIL-2;
 EndCmp
