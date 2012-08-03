@@ -1,10 +1,10 @@
-# EESchema Netlist Version 1.1 created  Sat 28 Jul 2012 11:39:47 PM CEST
+# EESchema Netlist Version 1.1 created  Fri 03 Aug 2012 01:44:08 PM CEST
 (
- ( /50059383 CP4 C1 CP1
+ ( /50059383 SIL-2 C1 CP1
   ( 1 N-000060 )
   ( 2 GND )
  )
- ( /500593DA CP4 C2 CP1
+ ( /500593DA SIL-2 C2 CP1
   ( 1 GND )
   ( 2 N-000025 )
  )

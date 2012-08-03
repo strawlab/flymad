@@ -1,17 +1,17 @@
-Cmp-Mod V01 Created by CvPCB (2011-05-25)-stable date = Sat 28 Jul 2012 11:39:47 PM CEST
+Cmp-Mod V01 Created by CvPCB (2011-05-25)-stable date = Fri 03 Aug 2012 01:44:08 PM CEST
 
 BeginCmp
 TimeStamp = /50059383;
 Reference = C1;
 ValeurCmp = CP1;
-IdModule  = CP4;
+IdModule  = SIL-2;
 EndCmp
 
 BeginCmp
 TimeStamp = /500593DA;
 Reference = C2;
 ValeurCmp = CP1;
-IdModule  = CP4;
+IdModule  = SIL-2;
 EndCmp
 
 BeginCmp
