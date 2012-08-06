@@ -3,6 +3,7 @@ import numpy as np
 import adskalman.adskalman as adskalman
 import sys
 import threading
+import time
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
@@ -47,6 +48,8 @@ class Targeter:
         self.lock = threading.Lock()
         self.dacs = 0,0
         self.last_vals = None
+        time.sleep(0.4) # give ROS a chance to start up?!
+        self.stop_tracking(None)
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -54,11 +57,21 @@ class Targeter:
     def _get_current_dacs(self):
         return self.dacs
 
+    def stop_tracking(self,old_obj_id):
+        rospy.loginfo('stopped targeting object %s'%old_obj_id)
+        self.cur_obj_id = None
+        msg = MicroVelocity()
+        msg.velA = myint32(0)
+        msg.velB = myint32(0)
+        this_vels = msg.velA, msg.velB
+        if this_vels != self.last_vals:
+            self.pub_dac_velocity.publish(msg)
+            self.last_vals = this_vels
+
     def on_target_object(self, msg):
         obj_id = msg.data
         if obj_id < 0:
-            rospy.loginfo('stopped targeting object %d'%self.cur_obj_id)
-            self.cur_obj_id = None
+            self.stop_tracking(self.cur_obj_id)
         else:
             self.cur_obj_id = obj_id
             rospy.loginfo('now targeting object %d'%self.cur_obj_id)
@@ -72,8 +85,7 @@ class Targeter:
             return
 
         if not msg.is_living:
-            rospy.loginfo('stopped targeting object %d'%self.cur_obj_id)
-            self.cur_obj_id = None
+            self.stop_tracking(self.cur_obj_id)
             return
 
         # calculate fly position in pixel coordinates
