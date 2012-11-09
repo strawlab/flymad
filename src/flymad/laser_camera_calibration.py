@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 from scipy.interpolate import griddata, CloughTocher2DInterpolator, LinearNDInterpolator
 import json
