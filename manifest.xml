@@ -1,0 +1,17 @@
+<package>
+  <description brief="gflyMAD">
+
+     gflyMAD
+
+  </description>
+  <author>mapa17</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gflyMAD</url>
+  <depend package="rosgobject"/>
+  <depend package="rospy"/>
+  <depend package="roscpp"/>
+
+</package>
+
+
