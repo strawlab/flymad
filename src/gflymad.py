@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import roslib; roslib.load_manifest('gflyMAD')
+import roslib; roslib.load_manifest('gflymad')
 
 import os.path
 
@@ -17,11 +17,13 @@ import subprocess
 from gi.repository import Gtk
 import subprocess
 
+rosbag_proc = None
+
 class UI:
     def __init__(self):
         me = os.path.dirname(os.path.abspath(__file__))
         self._ui = Gtk.Builder()
-        self._ui.add_from_file(os.path.join(me,"gflyMAD2.glade"))
+        self._ui.add_from_file(os.path.join(me,"gflymad2.glade"))
 
         #Workaround, keep references of all rosgobject elements
         self._refs = []
@@ -34,76 +36,101 @@ class UI:
 
     def _build_ui(self):
         
-        nodepath = "flyMAD"
-        package = "flyMAD"
+        nodepath = "gflymad"
+        package = "flymad"
         calibrationFile = "calibrationOUT"
         
         w = self._ui.get_object("bFlyTrax")
         w.connect("clicked", CBstartFlyTrax, None)
         
-        #self._refs.append( GtkButtonStartNode(
-        #        widget=self._ui.get_object("bFlyTrax"),
-        #        nodepath=nodepath,
-        #        nodemanager=self._manager,
-        #        package=package,
-        #        node_type="fview"
-        #        ,args='--plugins=2' )
-        #        )
-        
-        
         self._refs.append( GtkButtonStartNode(
-                widget=self._ui.get_object("bMicro"),
-                nodepath=nodepath,
+                widget=self._ui.get_object("bTracker"),
+                nodepath="flymad_tracker",
                 nodemanager=self._manager,
                 package=package,
-                node_type="flymad_micro" )
+                node_type="tracker" )
+                )
+        
+
+        nName = "flymad_micro"
+        self._refs.append( GtkButtonStartNode(
+                widget=self._ui.get_object("bMicro"),
+#                nodepath=nodepath,
+                nodepath=nName,
+                nodemanager=self._manager,
+                package=package,
+                node_type=nName )
                 )
         
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bStartCalibration"),
-                nodepath=nodepath,
+                nodepath="generate_calibration",
                 nodemanager=self._manager,
                 package=package,
-                node_type="laser_camera_calibration.py",
+                # node_type="laser_camera_calibration.py",
+                node_type="generate_calibration.py",
                 args=calibrationFile + ".yaml")
                 )
                 
         self._refs.append( GtkButtonKillNode(
                 widget=self._ui.get_object("bStopCalibration"),
-                nodepath= nodepath,
+                nodepath= "/generate_calibration",
                 nodemanager=self._manager )
                 )
-        
+
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bCleanCalibration"),
-                nodepath=nodepath,
+                nodepath="filter_calibration",
                 nodemanager=self._manager,
                 package=package,
                 node_type="filter_calibration_heuristics.py",
+                args=calibrationFile + ".yaml" )
+                )
+
+
+        self._refs.append( GtkButtonStartNode(
+                widget=self._ui.get_object("bCalibrationResults"),
+                nodepath="CalibrationResults",
+                nodemanager=self._manager,
+                package=package,
+                node_type="laser_camera_calibration.py",
                 args=calibrationFile + ".filtered.yaml" )
                 )
         
-        self._refs.append( GtkButtonStartNode(
-                widget=self._ui.get_object("bTracker"),
-                nodepath=nodepath,
-                nodemanager=self._manager,
-                package=package,
-                node_type="tracker" )
-                )
-                          
+                                  
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bTargeter"),
-                nodepath=nodepath,
+                nodepath="flymad_targeter",
                 nodemanager=self._manager,
                 package=package,
                 node_type="targeter",
                 args=calibrationFile + ".filtered.yaml")
                 )
+
+	w = self._ui.get_object("bRosBagStart")
+        w.connect("clicked", CBRosBagStart, None)
+
+	w = self._ui.get_object("bRosBagStop")
+        w.connect("clicked", CBRosBagStop, None)
         
 def CBstartFlyTrax(widget, event, data=None):
-    print "In the CBstartFlyTrax callback!"
-    subprocess.Popen(['evince'])
-    
+    #print "In the CBstartFlyTrax callback!"
+    subprocess.Popen(['fview', '--plugins=2'])
+
+def CBRosBagStart(widget, event, data=None):
+    #print "In the CBstartFlyTrax callback!"
+    global rosbag_proc
+    rosbag_proc = subprocess.Popen(['rosbag', 'record', '/flymad_target', '-o','/home/flymad/flymad_rosbag'])
+
+
+def CBRosBagStop(widget, event, data=None):
+    #print "In the CBstartFlyTrax callback!"
+    #subprocess.Popen(['pkill', 'rosbag /flymad_target'])
+    global rosbag_proc
+    if(rosbag_proc != None):
+        rosbag_proc.send_signal(subprocess.signal.SIGINT)
+    else:
+        print('You cant rosbag before starting it!')
     return False #Consume this event
 
 if __name__ == "__main__":
