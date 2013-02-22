@@ -13,7 +13,9 @@ import rosgobject.managers
 import rosgobject.gtk
 from rosgobject.wrappers import *
 
+import subprocess
 from gi.repository import Gtk
+import subprocess
 
 class UI:
     def __init__(self):
@@ -36,14 +38,18 @@ class UI:
         package = "flyMAD"
         calibrationFile = "calibrationOUT"
         
-        self._refs.append( GtkButtonStartNode(
-                widget=self._ui.get_object("bFlyTrax"),
-                nodepath=nodepath,
-                nodemanager=self._manager,
-                package=package,
-                node_type="fview"
-                ,args='_movie:="/media/DATA/Strokelitude2/movies/movie20121219_164901.fmf"' )
-                )
+        w = self._ui.get_object("bFlyTrax")
+        w.connect("clicked", CBstartFlyTrax, None)
+        
+        #self._refs.append( GtkButtonStartNode(
+        #        widget=self._ui.get_object("bFlyTrax"),
+        #        nodepath=nodepath,
+        #        nodemanager=self._manager,
+        #        package=package,
+        #        node_type="fview"
+        #        ,args='--plugins=2' )
+        #        )
+        
         
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bMicro"),
@@ -58,8 +64,8 @@ class UI:
                 nodepath=nodepath,
                 nodemanager=self._manager,
                 package=package,
-                node_type="generate_calibration",
-                args=calibrationFile )
+                node_type="laser_camera_calibration.py",
+                args=calibrationFile + ".yaml")
                 )
                 
         self._refs.append( GtkButtonKillNode(
@@ -73,7 +79,8 @@ class UI:
                 nodepath=nodepath,
                 nodemanager=self._manager,
                 package=package,
-                node_type="filter_calibration" )
+                node_type="filter_calibration_heuristics.py",
+                args=calibrationFile + ".filtered.yaml" )
                 )
         
         self._refs.append( GtkButtonStartNode(
@@ -89,10 +96,15 @@ class UI:
                 nodepath=nodepath,
                 nodemanager=self._manager,
                 package=package,
-                node_type="targeter" )
+                node_type="targeter",
+                args=calibrationFile + ".filtered.yaml")
                 )
         
-        
+def CBstartFlyTrax(widget, event, data=None):
+    print "In the CBstartFlyTrax callback!"
+    subprocess.Popen(['evince'])
+    
+    return False #Consume this event
 
 if __name__ == "__main__":
     rospy.init_node("gflyMAD", anonymous=True)
