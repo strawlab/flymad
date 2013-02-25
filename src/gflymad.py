@@ -112,6 +112,21 @@ class UI:
 
 	w = self._ui.get_object("bRosBagStop")
         w.connect("clicked", CBRosBagStop, None)
+
+	self._refs.append( GtkButtonStartNode(
+                widget=self._ui.get_object("bStartManualControll"),
+                nodepath="flymad_joy",
+                nodemanager=self._manager,
+                package=package,
+                node_type="flymad_joy")
+                )
+
+  	self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopManualControll"),
+                nodepath= "/flymad_joy",
+                nodemanager=self._manager )
+                )
+
         
 def CBstartFlyTrax(widget, event, data=None):
     #print "In the CBstartFlyTrax callback!"
