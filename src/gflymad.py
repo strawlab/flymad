@@ -107,6 +107,12 @@ class UI:
                 args=calibrationFile + ".filtered.yaml")
                 )
 
+  	self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopTargeter"),
+                nodepath= "/flymad_targeter",
+                nodemanager=self._manager )
+                )
+
 	w = self._ui.get_object("bRosBagStart")
         w.connect("clicked", CBRosBagStart, None)
 
