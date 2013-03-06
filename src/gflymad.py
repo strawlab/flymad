@@ -17,7 +17,10 @@ import subprocess
 from gi.repository import Gtk
 import subprocess
 
+#DIRTY: Global references to the processes launched in callbacks
+#They are kept in order to send a sigterm after the process is not needed any more
 rosbag_proc = None
+joynode_proc = None
 
 class UI:
     def __init__(self):
@@ -33,6 +36,10 @@ class UI:
         w = self._ui.get_object("gFlyMAD")
         w.connect("delete-event", rosgobject.main_quit)
         w.show_all()
+
+	#Start ros joy_node, so that in manual control mode the joystick can be used
+	global joynode_proc
+	joynode_proc = subprocess.Popen(['rosrun', 'joy', 'joy_node'])
 
     def _build_ui(self):
         
