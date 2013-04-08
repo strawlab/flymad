@@ -148,7 +148,7 @@ def CBstartFlyTrax(widget, event, data=None):
 def CBRosBagStart(widget, event, data=None):
     #print "In the CBstartFlyTrax callback!"
     global rosbag_proc
-    rosbag_proc = subprocess.Popen(['rosbag', 'record', '/flymad_target', '-o','/home/flymad/flymad_rosbag'])
+    rosbag_proc = subprocess.Popen(['rosbag', 'record', '-a', '-o','/home/flymad/flymad_rosbag/rosbagOut'])
 
 
 def CBRosBagStop(widget, event, data=None):
