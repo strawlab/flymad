@@ -123,6 +123,9 @@ def doit(widef=None,zoomf=None,rosbagf=None,
     FPS = 50.0
     rate = 1.0/FPS
 
+    #HACK ANDREW
+    use_wide_zoomed = False
+
     times = np.arange(start_time, stop_time+1e-10, rate)
     print 'at %f fps, this is %d frames'%(FPS,len(times))
 
@@ -149,7 +152,7 @@ def doit(widef=None,zoomf=None,rosbagf=None,
 
         save_fname_path = 'out%06d.png'%out_fno
         final_w = 1024
-        final_h = 768
+        final_h = 768 / (1 if use_wide_zoomed else 2)
 
         margin = 10
         max_panel_w = final_w // 2 - 3*margin//2
@@ -160,7 +163,8 @@ def doit(widef=None,zoomf=None,rosbagf=None,
         # wide-angle view --------------------------
         x0 = 0; w = wide.get_width()
         y0 = 0; h = wide.get_height()
-        if 1:
+        #commented code disables zoomed region of widefield view.
+        if use_wide_zoomed:
             warnings.warn('WARNING: zooming on center region as a hack!!!!')
             x0+=100; w-=240
         user_rect = (x0,y0,w,h)
@@ -168,38 +172,6 @@ def doit(widef=None,zoomf=None,rosbagf=None,
             w,h = h,w
         dev_w, dev_h = scale( w, h, max_panel_w, max_panel_h )
         device_rect = (margin, margin, dev_w, dev_h)
-
-
-        r = 25
-        wz_height = max_panel_h//2
-        dev_w, dev_h = scale( r*2, r*2, max_panel_w, wz_height )
-        device_rect_crop = (margin, final_h - margin - wz_height, dev_w, dev_h)
-
-        if 1:
-            warnings.warn( 'magnified wide-field view should use objs[ obj_id ] to zoom on tracked object')
-
-        xc = this_raw2d['x'][-1]
-        yc = this_raw2d['y'][-1]
-
-        x0 = xc-r
-        x1 = xc+r
-        if x0 < 0:
-            x0 = 0
-            x1 = 2*r
-        elif x1 >= wide.get_width():
-            x1 = wide.get_width-1
-            x0 = x1-2*r
-
-        y0 = yc-r
-        y1 = yc+r
-        if y0 < 0:
-            y0 = 0
-            y1 = 2*r
-        elif y1 >= wide.get_height():
-            y1 = wide.get_height()-1
-            y0 = y1-2*r
-
-        user_rect_crop = (x0,y0,2*r,2*r)
 
         idxs = np.nonzero(micro_vels['t'] <= cur_time)[0]
         if len(idxs):
@@ -225,8 +197,43 @@ def doit(widef=None,zoomf=None,rosbagf=None,
             posB = None
             pos_age = None
 
-        for d,u in [ (device_rect, user_rect),
-                     (device_rect_crop, user_rect_crop) ]:
+
+        wide_imgs_benu = [ (device_rect, user_rect) ]
+        if use_wide_zoomed:
+            r = 25
+            wz_height = max_panel_h//2
+            dev_w, dev_h = scale( r*2, r*2, max_panel_w, wz_height )
+            device_rect_crop = (margin, final_h - margin - wz_height, dev_w, dev_h)
+
+            if 1:
+                warnings.warn( 'magnified wide-field view should use objs[ obj_id ] to zoom on tracked object')
+
+            xc = this_raw2d['x'][-1]
+            yc = this_raw2d['y'][-1]
+
+            x0 = xc-r
+            x1 = xc+r
+            if x0 < 0:
+                x0 = 0
+                x1 = 2*r
+            elif x1 >= wide.get_width():
+                x1 = wide.get_width-1
+                x0 = x1-2*r
+
+            y0 = yc-r
+            y1 = yc+r
+            if y0 < 0:
+                y0 = 0
+                y1 = 2*r
+            elif y1 >= wide.get_height():
+                y1 = wide.get_height()-1
+                y0 = y1-2*r
+
+            user_rect_crop = (x0,y0,2*r,2*r)
+
+            wide_imgs_benu.append( (device_rect_crop, user_rect_crop) )
+
+        for d,u in wide_imgs_benu:
             with canv.set_user_coords(d, u, transform=widet):
                 canv.imshow(wide_frame,0,0,filter='nearest')
                 canv.scatter( this_raw2d['x'],
