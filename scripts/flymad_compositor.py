@@ -105,7 +105,7 @@ def doit(widef=None,zoomf=None,rosbagf=None,
 
     tzname = None
     for topic, msg, t in bag.read_messages(topics='/timezone'):
-        tzname = msg.value
+        tzname = msg.data
     if tzname is None:
         # default timezone
         tzname = 'CET'
