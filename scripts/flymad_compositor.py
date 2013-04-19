@@ -8,6 +8,7 @@ import motmot.imops.imops as imops
 import warnings
 import pytz
 import datetime
+import progressbar
 
 import roslib; roslib.load_manifest('rosbag')
 import rospy
@@ -35,6 +36,12 @@ def main():
          widet=args.wide_transform,
          zoomt=args.zoom_transform,
          )
+
+def get_progress_bar(name, maxval):
+    widgets = ["%s: " % name, progressbar.Percentage(),
+               progressbar.Bar(), progressbar.ETA()]
+    pbar = progressbar.ProgressBar(widgets=widgets,maxval=maxval).start()
+    return pbar
 
 class DateFormatter:
     def __init__(self,tz):
@@ -122,8 +129,11 @@ def doit(widef=None,zoomf=None,rosbagf=None,
     tz = pytz.timezone( tzname )
     pretty_time = DateFormatter(tz)
 
+    progress = get_progress_bar("frame", len(times))
+
     for out_fno, cur_time in enumerate(times):
-        print 'frame %d of %d'%(out_fno+1, len(times))
+        progress.update(out_fno+1)
+
         valid_obj_cond = (obj_times[:,0] <= cur_time) & (cur_time <= obj_times[:,1])
         valid_obj_ids = map(int,obj_times[valid_obj_cond,2])
 
@@ -261,6 +271,7 @@ def doit(widef=None,zoomf=None,rosbagf=None,
                    color_rgba=(1,1,1,1))
 
         canv.save()
+    progress.finished()
 
 if __name__=='__main__':
     main()
