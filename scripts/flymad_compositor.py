@@ -265,17 +265,22 @@ def doit(widef=None,zoomf=None,rosbagf=None,
             if 1:
             #with benu_ctx.clip_off(): # also transform off
                 if velA is not None:
-                    canv.text( 'vel: %.1f, %.1f (data age: %.1f msec)'%(velA,velB,vel_age*1e3),
+                    canv.text( 'vel: {0:>+8.1f}, {1:> 8.1f} (data age: {2:>4.1f} msec)'.format(
+                                    float(velA),float(velB),float(vel_age*1e3)),
                                5,15,
-                               color_rgba=(1,1,1,1))
+                               color_rgba=(1,1,1,1),
+                               font_face="Droid Sans Mono",bold=False)
                 if posA is not None:
-                    canv.text( 'pos: %.1f, %.1f (data age: %.1f msec)'%(posA,posB,pos_age*1e3),
+                    canv.text( 'pos: {0:> 8.1f}, {1:> 8.1f} (data age: {2:>4.1f} msec)'.format(
+                                    float(posA),float(posB),float(pos_age*1e3)),
                                5,25,
-                               color_rgba=(1,1,1,1))
+                               color_rgba=(1,1,1,1),
+                               font_face="Droid Sans Mono",bold=False)
 
         canv.text( '%s' % pretty_time.format_date(cur_time),
-                   5,15,
-                   color_rgba=(1,1,1,1))
+                   15,25,
+                   color_rgba=(1,1,1,1),
+                   font_face="Droid Sans Mono")
 
         canv.save()
     progress.finished()
