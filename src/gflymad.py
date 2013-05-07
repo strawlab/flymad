@@ -6,6 +6,7 @@ import os.path
 
 import rospy
 import std_msgs.msg
+from std_msgs.msg import UInt8
 
 import rosgobject.wrappers
 
@@ -120,6 +121,10 @@ class UI:
                 nodemanager=self._manager )
                 )
 
+        self.killer = Killer()
+        w = self._ui.get_object("bKillObjects")
+        w.connect("clicked", self.killer.cb_kill_all_tracked_objects, None)
+
 	w = self._ui.get_object("bRosBagStart")
         w.connect("clicked", CBRosBagStart, None)
 
@@ -160,6 +165,14 @@ def CBRosBagStop(widget, event, data=None):
     else:
         print('You cant rosbag before starting it!')
     return False #Consume this event
+
+class Killer:
+    def __init__(self):
+        self.pub = rospy.Publisher( '/flymad/kill_all',
+                                    UInt8,)
+    def cb_kill_all_tracked_objects(self,widget, event, data=None):
+        msg = UInt8(True)
+        self.pub.publish(msg)
 
 if __name__ == "__main__":
     rospy.init_node("gflyMAD", anonymous=True)
