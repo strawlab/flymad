@@ -1,16 +1,34 @@
+#!/usr/bin/env python
+
+import os.path
 import sh
 
-tmpdir = "./"
-fps = 30
+def doit(idir, fps=30, tmpmov=None, finalmov=None):
+    fps = 30
 
-sh.mplayer("mf://%s*.png" % tmpdir,
-           "-mf", "fps=%d" % fps,
-           "-vo", "yuv4mpeg:file=%s/movie.y4m" % tmpdir,
-           "-ao", "null",
-           "-nosound", "-noframedrop", "-benchmark", "-nolirc"
-)
+    if tmpmov is None:
+        tmpmov = "%s/movie.y4m" % idir
 
-sh.x264("--profile=baseline",
-        "--output=%smovie.mp4" % tmpdir,
-        "%smovie.y4m" % tmpdir,
-)
+    sh.mplayer("mf://%s/*.png" % idir,
+               "-mf", "fps=%d" % fps,
+               "-vo", "yuv4mpeg:file=%s" % tmpmov,
+               "-ao", "null",
+               "-nosound", "-noframedrop", "-benchmark", "-nolirc"
+    )
+
+    if finalmov is None:
+        finalmov = "%s/movie.mp4" % idir
+
+    sh.x264("--output=%s" % finalmov,
+            "%s" % tmpmov,
+    )
+
+    try:
+        os.unlink(tmpmov)
+    except OSError:
+        pass
+
+    return finalmov
+
+if __name__ == "__main__":
+    doit("./")

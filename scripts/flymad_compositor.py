@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import flydra.a2.benu as benu
 import motmot.FlyMovieFormat.FlyMovieFormat as fmf
 import argparse
 import collections
@@ -9,6 +8,9 @@ import warnings
 import pytz
 import datetime
 import progressbar
+import os.path
+
+from benu import benu
 
 import roslib; roslib.load_manifest('rosbag')
 import rospy
@@ -50,8 +52,7 @@ class DateFormatter:
     def format_date(self, x, pos=None):
         return str(datetime.datetime.fromtimestamp(x,self.tz))
 
-def doit(widef=None,zoomf=None,rosbagf=None,
-         widet=None, zoomt=None):
+def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
     wide = fmf.FlyMovie(widef)
     zoom = fmf.FlyMovie(zoomf)
     bag = rosbag.Bag(rosbagf)
@@ -120,7 +121,7 @@ def doit(widef=None,zoomf=None,rosbagf=None,
                          np.max(raw2d['stamp'])] )
 
     dur = stop_time-start_time
-    FPS = 50.0
+    FPS = 15.0
     rate = 1.0/FPS
 
     #HACK ANDREW
@@ -150,7 +151,7 @@ def doit(widef=None,zoomf=None,rosbagf=None,
         cond = (cur_time - 50*rate < raw2d['stamp']) & (raw2d['stamp'] <= cur_time)
         this_raw2d = raw2d[cond]
 
-        save_fname_path = 'out%06d.png'%out_fno
+        save_fname_path = os.path.join(imagepath,'out%06d.png' % out_fno)
         final_w = 1024
         final_h = 768 / (1 if use_wide_zoomed else 2)
 
@@ -283,7 +284,8 @@ def doit(widef=None,zoomf=None,rosbagf=None,
                    font_face="Droid Sans Mono")
 
         canv.save()
-    progress.finished()
+
+    progress.finish()
 
 if __name__=='__main__':
     main()
