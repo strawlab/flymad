@@ -61,7 +61,10 @@ class PixelCoordWidget(Gtk.DrawingArea):
                 xy = (msg.state_vec[0],msg.state_vec[1])
                 self.living_objs[msg.obj_id] = xy
             else:
-                del self.living_objs[msg.obj_id]
+                try:
+                    del self.living_objs[msg.obj_id]
+                except KeyError:
+                    pass
 
     def on_dac_pixels(self,px,py):
         with self.lock:
