@@ -4,6 +4,7 @@ import rospy
 
 from flymad.msg import Raw2dPositions, TrackedObj
 from geometry_msgs.msg import Pose2D
+from std_msgs.msg import UInt8
 
 import numpy as np
 import adskalman.adskalman as adskalman
@@ -133,6 +134,15 @@ class Tracker:
         self.objs = []
         self.pub = rospy.Publisher( '/flymad/tracked', TrackedObj,
                                     tcp_nodelay=True)
+        _ = rospy.Subscriber('/flymad/kill_all',
+                             UInt8,
+                             self.kill_all)
+
+
+    def kill_all(self,msg):
+        if msg.data:
+            for obj in self.objs:
+                obj.kill()
 
     def on_data(self, msg):
         stamp = msg.header.stamp
