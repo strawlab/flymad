@@ -4,8 +4,9 @@ roslib.load_manifest('flymad')
 import rosbag
 
 import pandas as pd
+import numpy as np
 
-def create_df(bname):
+def create_df(bname, calc_vel=True):
     times = []
     x = []
     y = []
@@ -21,12 +22,21 @@ def create_df(bname):
                 theta.append(pt.theta)
                 times.append(t)
 
-    df = pd.DataFrame(
-            {"x":x,
+    df = pd.DataFrame({
+             "x":x,
              "y":y,
-             "theta":theta},
-            index=times
+             "theta":theta,
+             "t":times,
+            },
+            index=(np.array(times)*1000).astype(np.int64),
     )
+
+    if calc_vel:
+        dt = np.gradient(df['t'].values)
+        df['vx'] = np.gradient(df['x'].values) / dt
+        df['vy'] = np.gradient(df['y'].values) / dt
+        df['v'] = np.sqrt( (df['vx'].values**2) + (df['vy'].values**2) )
+
     return df
 
 if __name__ == "__main__":

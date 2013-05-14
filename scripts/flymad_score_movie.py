@@ -30,7 +30,7 @@ class OCRThread(threading.Thread):
 
     CROP = (0, 0, 245 , 35)
     THRESH = 140
-    DT_RE = r"([0-9]{4})([-_ ]{1})([0-9]{2})([-_ ]{1})([0-9]{2})\ ([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{1})([0-9]+)"
+    DT_RE = r"([0-9]{4})([_ ]{1})([0-9]{2})([_ ]{1})([0-9]{2})\ ([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{1})([0-9]+)"
 
     def __init__(self, callback, key, tid):
         threading.Thread.__init__(self)
@@ -54,7 +54,7 @@ class OCRThread(threading.Thread):
         im.save(out)
 
         proc = subprocess.Popen(
-                    ['gocr','-i',out,'-C','0123456789:-+.','-d','0','-a','90', '-s', '10'],
+                    ['gocr','-i',out,'-C','0123456789:+.','-d','0','-a','90', '-s', '10'],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
         )
@@ -72,7 +72,7 @@ class OCRThread(threading.Thread):
                 )
                 #convert to seconds since epoch in UTC
                 now = time.mktime(t.timetuple())+1e-6*t.microsecond
-                print t
+                print t, now
             except Exception, e:
                 err = 'error parsing string %s' % stdout
                 now = np.nan
@@ -150,17 +150,28 @@ class DecoratedVLCWidget(Gtk.Grid):
 class VideoScorer(Gtk.Window):
 
     THREAD_REPEAT = 3
+    KEYS = {
+        "a":"as",
+        "s":"as",
+        "z":"zx",
+        "x":"zx",
+    }
+    KEY_DEFAULTS = {
+        "as":"s",
+        "zx":"x",
+    }
+        
 
     def __init__(self):
         Gtk.Window.__init__(self)
         self.vlc = DecoratedVLCWidget()
-        self.connect("key_press_event",self._on_key_press)
-        self.connect("destroy", self._on_quit)
+        self.connect("key-press-event",self._on_key_press)
+        self.connect("delete-event", self._on_quit)
+        self.connect("destroy", Gtk.main_quit)
         self.add(self.vlc)
 
         self._annots_t = []
-        self._annots_v = []
-        self._annots_vn = []
+        self._annots_v = {k:[] for k in self.KEYS.values()}
         self._pending_lock = threading.Lock()
         self._pending_ocr = {}
 
@@ -172,20 +183,41 @@ class VideoScorer(Gtk.Window):
         Gtk.main()
 
     def _on_quit(self, *args):
-        if self._annots_t:
-            if bname and os.path.exists(bname):
-                from flymadbagconv import create_df
-                df = create_df(bname)
-                print df
+        self.vlc.player.stop()
 
-            df = pd.DataFrame(
-                    {"score":self._annots_v,
-                     "score_n":self._annots_vn},
-                    index=self._annots_t
-            )
-            print df
-            df.to_csv(self.fname+".csv")
-        Gtk.main_quit()
+        bdf = None
+        if bname and os.path.exists(bname):
+            #Update the UI
+            self.vlc.show_result("merging bag file, please wait")
+            while Gtk.events_pending():
+                Gtk.main_iteration()
+            from flymadbagconv import create_df
+            bdf = create_df(bname)
+
+        #temporarily put the times in the annotations dictionary, the
+        #program is closing anyway and it saves a copy
+        self._annots_v["score_t"] = self._annots_t
+        df = pd.DataFrame(
+                self._annots_v,
+                index=(np.array(self._annots_t)*1000).astype(np.int64)
+        )
+
+        if bdf is not None:
+            df = pd.concat((df,bdf),axis=1)
+
+        #fill out default annotations
+        #FIXME: does not work, assignment fails because pandas thinks the
+        #colum contains a float, and fillna doesnt work if i explictly tell it
+        #it contains a np character array
+        #for idx,row in df.iterrows():
+        #    for col in set(self.KEYS.values()):
+        #        row[col] = self.KEY_DEFAULTS[col]
+        #    break
+
+        df.fillna(method='pad').to_csv(self.fname+".csv")
+
+        #keep quitting
+        return False
 
     def _on_processing_finished(self, err, now, key, tid):
         with self._pending_lock:
@@ -196,10 +228,16 @@ class VideoScorer(Gtk.Window):
 
             if len(self._pending_ocr[tid]) == self.THREAD_REPEAT:
                 t = np.nanmin(self._pending_ocr[tid])
+                annot = self.KEYS[key]
                 if not np.isnan(t):
                     self._annots_t.append(t)
-                    self._annots_v.append(key)
-                    self._annots_vn.append(ord(key)) #convert ch to number
+
+                    #this annotation gets the value
+                    self._annots_v[annot].append(key)
+                    #the others get nan, use set() to not duplicate
+                    for other in [i for i in set(self.KEYS.values()) if i != annot]:
+                        self._annots_v[other].append(np.nan)
+
                     GObject.idle_add(self.vlc.show_result, "scored t:%s = %s" % (t,key))
                 else:
                     GObject.idle_add(self.vlc.show_result, "failed to scored %s (no time calculated)" % key)
@@ -212,7 +250,7 @@ class VideoScorer(Gtk.Window):
         tid = int(self.vlc.player.get_time())
         self._pending_ocr[tid] = []
 
-        if key in ["j","k"]:
+        if key in self.KEYS:
             for i in range(self.THREAD_REPEAT):
                 t = OCRThread(self._on_processing_finished, key, tid)
                 self.vlc.player.video_take_snapshot(0,t.input_image(),0,0)
