@@ -1,0 +1,39 @@
+Hi Dan,
+
+Repeating in case you were too tired to remember
+
+1) Plug in your USB hard drive. 
+2) Set up the ros environment
+
+$ source flycave-env
+
+3) to score the movies type the following
+
+$ ./flymad_score_movie.py /media/usbthing/movies/XXX.mp4 /media/usbthing/bags/XXX.bag
+
+or, if it is easier to type short file names
+
+$ rosrun flymad flymad_score_movie.py /media/usbthing/movies/XXX.mp4 /media/usbthing/bags/XXX.bag
+
+This creates a file called XXXX.mp4.csv in the same directory as the mp4 file.
+
+Notes about how I am generating the csv file
+* the velocity (v) column in the spreadsheet is the magnitude of the velocity
+  as computed from vx and vy (which are the derivitive of x and y) It is not
+  the velocity component along theta. I'm not sure if this would be more interesting to you,
+  how often do flies walk sideways? In any case you an compute it youself in the spreadsheet if you wish
+* I could not fill out the first row with the default score values because of a pandas bug. Sorry
+
+
+errors:
+
+Exception: Reindexing only valid with uniquely valued Index objects
+
+- this error seems to happen when i assign two (same or different) score values to a single frame
+- it may also occur when i go back and add values that precede other score values, but i'm not sure.
+
+THANKS JOHN!
+
+
+
+
