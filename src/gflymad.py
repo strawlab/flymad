@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import roslib; roslib.load_manifest('gflymad')
+import roslib; roslib.load_manifest('flymad')
 
 import os.path
 
@@ -34,13 +34,13 @@ class UI:
         self._manager = rosgobject.managers.ROSNodeManager()
         self._build_ui()
         
-        w = self._ui.get_object("gFlyMAD")
+        w = self._ui.get_object("FlyMAD")
         w.connect("delete-event", rosgobject.main_quit)
         w.show_all()
 
-	#Start ros joy_node, so that in manual control mode the joystick can be used
-	global joynode_proc
-	joynode_proc = subprocess.Popen(['rosrun', 'joy', 'joy_node'])
+        #Start ros joy_node, so that in manual control mode the joystick can be used
+        global joynode_proc
+        joynode_proc = subprocess.Popen(['rosrun', 'joy', 'joy_node'])
 
     def _build_ui(self):
         
@@ -63,7 +63,7 @@ class UI:
         nName = "flymad_micro"
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bMicro"),
-#                nodepath=nodepath,
+                # nodepath=nodepath,
                 nodepath=nName,
                 nodemanager=self._manager,
                 package=package,
@@ -115,7 +115,7 @@ class UI:
                 args=calibrationFile + ".filtered.yaml")
                 )
 
-  	self._refs.append( GtkButtonKillNode(
+        self._refs.append( GtkButtonKillNode(
                 widget=self._ui.get_object("bStopTargeter"),
                 nodepath= "/flymad_targeter",
                 nodemanager=self._manager )
@@ -125,13 +125,13 @@ class UI:
         w = self._ui.get_object("bKillObjects")
         w.connect("clicked", self.killer.cb_kill_all_tracked_objects, None)
 
-	w = self._ui.get_object("bRosBagStart")
+        w = self._ui.get_object("bRosBagStart")
         w.connect("clicked", CBRosBagStart, None)
 
-	w = self._ui.get_object("bRosBagStop")
+        w = self._ui.get_object("bRosBagStop")
         w.connect("clicked", CBRosBagStop, None)
 
-	self._refs.append( GtkButtonStartNode(
+        self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bStartManualControll"),
                 nodepath="flymad_joy",
                 nodemanager=self._manager,
@@ -139,7 +139,7 @@ class UI:
                 node_type="flymad_joy")
                 )
 
-  	self._refs.append( GtkButtonKillNode(
+        self._refs.append( GtkButtonKillNode(
                 widget=self._ui.get_object("bStopManualControll"),
                 nodepath= "/flymad_joy",
                 nodemanager=self._manager )
@@ -147,18 +147,14 @@ class UI:
 
         
 def CBstartFlyTrax(widget, event, data=None):
-    #print "In the CBstartFlyTrax callback!"
     subprocess.Popen(['fview', '--plugins=2'])
 
 def CBRosBagStart(widget, event, data=None):
-    #print "In the CBstartFlyTrax callback!"
     global rosbag_proc
     rosbag_proc = subprocess.Popen(['rosbag', 'record', '-a', '-o','/home/flymad/flymad_rosbag/rosbagOut'])
 
 
 def CBRosBagStop(widget, event, data=None):
-    #print "In the CBstartFlyTrax callback!"
-    #subprocess.Popen(['pkill', 'rosbag /flymad_target'])
     global rosbag_proc
     if(rosbag_proc != None):
         rosbag_proc.send_signal(subprocess.signal.SIGINT)
