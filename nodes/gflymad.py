@@ -1,22 +1,20 @@
 #!/usr/bin/env python
 
-import roslib; roslib.load_manifest('flymad')
+import roslib
+roslib.load_manifest('flymad')
 
 import os.path
+import subprocess
 
 import rospy
+import roslib.packages
 import std_msgs.msg
-from std_msgs.msg import UInt8
 
-import rosgobject.wrappers
-
-import rosgobject.managers
 import rosgobject.gtk
+import rosgobject.managers
 from rosgobject.wrappers import *
 
-import subprocess
 from gi.repository import Gtk
-import subprocess
 
 #DIRTY: Global references to the processes launched in callbacks
 #They are kept in order to send a sigterm after the process is not needed any more
@@ -27,7 +25,11 @@ class UI:
     def __init__(self):
         me = os.path.dirname(os.path.abspath(__file__))
         self._ui = Gtk.Builder()
-        self._ui.add_from_file(os.path.join(me,"gflymad2.glade"))
+        self._ui.add_from_file(
+                os.path.join(
+                    roslib.packages.get_pkg_dir('flymad',required=True),
+                    "data","gflymad.glade")
+        )
 
         #Workaround, keep references of all rosgobject elements
         self._refs = []
@@ -165,10 +167,9 @@ def CBRosBagStop(widget, event, data=None):
 class Killer:
     def __init__(self):
         self.pub = rospy.Publisher( '/flymad/kill_all',
-                                    UInt8,)
+                                    std_msgs.msg.UInt8,)
     def cb_kill_all_tracked_objects(self,widget, event, data=None):
-        msg = UInt8(True)
-        self.pub.publish(msg)
+        self.pub.publish(True)
 
 if __name__ == "__main__":
     rospy.init_node("gflyMAD", anonymous=True)
