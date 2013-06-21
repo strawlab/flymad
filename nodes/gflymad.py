@@ -16,11 +16,6 @@ from rosgobject.wrappers import *
 
 from gi.repository import Gtk
 
-#DIRTY: Global references to the processes launched in callbacks
-#They are kept in order to send a sigterm after the process is not needed any more
-rosbag_proc = None
-joynode_proc = None
-
 class UI:
     def __init__(self):
         me = os.path.dirname(os.path.abspath(__file__))
@@ -41,8 +36,8 @@ class UI:
         w.show_all()
 
         #Start ros joy_node, so that in manual control mode the joystick can be used
-        global joynode_proc
-        joynode_proc = subprocess.Popen(['rosrun', 'joy', 'joy_node'])
+        self._joynode_proc = subprocess.Popen(['rosrun', 'joy', 'joy_node'])
+        self._rosbag_proc = None
 
     def _build_ui(self):
         
@@ -51,7 +46,7 @@ class UI:
         calibrationFile = "calibrationOUT"
         
         w = self._ui.get_object("bFlyTrax")
-        w.connect("clicked", CBstartFlyTrax, None)
+        w.connect("clicked", self._on_start_flytrax)
         
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bTracker"),
@@ -125,13 +120,13 @@ class UI:
 
         self.killer = Killer()
         w = self._ui.get_object("bKillObjects")
-        w.connect("clicked", self.killer.cb_kill_all_tracked_objects, None)
+        w.connect("clicked", self.killer.cb_kill_all_tracked_objects)
 
         w = self._ui.get_object("bRosBagStart")
-        w.connect("clicked", CBRosBagStart, None)
+        w.connect("clicked", self._on_rosbag_start)
 
         w = self._ui.get_object("bRosBagStop")
-        w.connect("clicked", CBRosBagStop, None)
+        w.connect("clicked", self._on_rosbag_stop)
 
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bStartManualControll"),
@@ -147,28 +142,21 @@ class UI:
                 nodemanager=self._manager )
                 )
 
-        
-def CBstartFlyTrax(widget, event, data=None):
-    subprocess.Popen(['fview', '--plugins=2'])
+    def _on_start_flytrax(self, widget):
+        subprocess.Popen(['fview', '--plugins=2'])
 
-def CBRosBagStart(widget, event, data=None):
-    global rosbag_proc
-    rosbag_proc = subprocess.Popen(['rosbag', 'record', '-a', '-o','/home/flymad/flymad_rosbag/rosbagOut'])
+    def _on_rosbag_start(self, widget):
+        self._rosbag_proc = subprocess.Popen(['rosbag', 'record', '-a', '-o','/home/flymad/flymad_rosbag/rosbagOut'])
 
-
-def CBRosBagStop(widget, event, data=None):
-    global rosbag_proc
-    if(rosbag_proc != None):
-        rosbag_proc.send_signal(subprocess.signal.SIGINT)
-    else:
-        print('You cant rosbag before starting it!')
-    return False #Consume this event
+    def _on_rosbag_stop(self, widget):
+        if self._rosbag_proc is not None:
+            self._rosbag_proc.send_signal(subprocess.signal.SIGINT)
 
 class Killer:
     def __init__(self):
         self.pub = rospy.Publisher( '/flymad/kill_all',
                                     std_msgs.msg.UInt8,)
-    def cb_kill_all_tracked_objects(self,widget, event, data=None):
+    def cb_kill_all_tracked_objects(self,widget):
         self.pub.publish(True)
 
 if __name__ == "__main__":
