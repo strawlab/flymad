@@ -1,2 +1,4 @@
 python-serial:
   ubuntu: python-serial
+python-adskalman:
+  ubuntu: python-adskalman

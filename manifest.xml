@@ -15,4 +15,5 @@
   <depend package="rosgobject"/>
 
   <rosdep name="python-serial"/>
+  <rosdep name="python-adskalman"/>
 </package>
