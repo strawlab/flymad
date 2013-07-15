@@ -16,6 +16,8 @@ from rosgobject.wrappers import *
 
 from gi.repository import Gtk
 
+DEFAULT_PATH = os.path.expanduser("~/FLYMAD")
+
 class UI:
     def __init__(self):
         me = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +27,9 @@ class UI:
                     roslib.packages.get_pkg_dir('flymad',required=True),
                     "data","gflymad.glade")
         )
+
+        self._fcb = self._ui.get_object("filechooserbutton1")
+        self._fcb.set_filename(DEFAULT_PATH)
 
         #Workaround, keep references of all rosgobject elements
         self._refs = []
@@ -146,7 +151,8 @@ class UI:
         subprocess.Popen(['fview', '--plugins=2'])
 
     def _on_rosbag_start(self, widget):
-        self._rosbag_proc = subprocess.Popen(['rosbag', 'record', '-a', '-o','/home/flymad/flymad_rosbag/rosbagOut'])
+        path = os.path.join( self._fcb.get_filename(), 'rosbagOut' )
+        self._rosbag_proc = subprocess.Popen(['rosbag', 'record', '-a', '-o', path])
 
     def _on_rosbag_stop(self, widget):
         if self._rosbag_proc is not None:
