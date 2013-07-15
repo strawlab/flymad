@@ -17,6 +17,15 @@ from rosgobject.wrappers import *
 from gi.repository import Gtk
 
 DEFAULT_PATH = os.path.expanduser("~/FLYMAD")
+USB_PARAM = '/flymad_micro/port'
+USB_DEFAULT = '/dev/ttyUSB0'
+
+class MyGtkButtonStartNode(GtkButtonStartNode):
+    def __init__(self,*args,**kwargs):
+        entry_widget = kwargs.pop('entry_widget')
+        super(MyGtkButtonStartNode,self).__init__(*args,**kwargs)
+        if entry_widget is not None:
+            entry_widget.set_text('{node_type}'.format(**kwargs))
 
 class UI:
     def __init__(self):
@@ -53,8 +62,9 @@ class UI:
         w = self._ui.get_object("bFlyTrax")
         w.connect("clicked", self._on_start_flytrax)
         
-        self._refs.append( GtkButtonStartNode(
+        self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bTracker"),
+                entry_widget=self._ui.get_object("eTracker"),
                 nodepath="flymad_tracker",
                 nodemanager=self._manager,
                 package=package,
@@ -63,8 +73,9 @@ class UI:
         
 
         nName = "flymad_micro"
-        self._refs.append( GtkButtonStartNode(
+        self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bMicro"),
+                entry_widget=self._ui.get_object("eMicro"),
                 # nodepath=nodepath,
                 nodepath=nName,
                 nodemanager=self._manager,
@@ -72,8 +83,9 @@ class UI:
                 node_type=nName )
                 )
         
-        self._refs.append( GtkButtonStartNode(
+        self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bStartCalibration"),
+                entry_widget=self._ui.get_object("eStartCalibration"),
                 nodepath="generate_calibration",
                 nodemanager=self._manager,
                 package=package,
@@ -88,8 +100,9 @@ class UI:
                 nodemanager=self._manager )
                 )
 
-        self._refs.append( GtkButtonStartNode(
+        self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bCleanCalibration"),
+                entry_widget=self._ui.get_object("eCleanCalibration"),
                 nodepath="filter_calibration",
                 nodemanager=self._manager,
                 package=package,
@@ -98,8 +111,9 @@ class UI:
                 )
 
 
-        self._refs.append( GtkButtonStartNode(
+        self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bCalibrationResults"),
+                entry_widget=self._ui.get_object("eCalibrationResults"),
                 nodepath="CalibrationResults",
                 nodemanager=self._manager,
                 package=package,
@@ -108,8 +122,9 @@ class UI:
                 )
         
                                   
-        self._refs.append( GtkButtonStartNode(
+        self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bTargeter"),
+                entry_widget=self._ui.get_object("eTargeter"),
                 nodepath="flymad_targeter",
                 nodemanager=self._manager,
                 package=package,
@@ -133,8 +148,9 @@ class UI:
         w = self._ui.get_object("bRosBagStop")
         w.connect("clicked", self._on_rosbag_stop)
 
-        self._refs.append( GtkButtonStartNode(
+        self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bStartManualControll"),
+                entry_widget=self._ui.get_object("eStartManualControll"),
                 nodepath="flymad_joy",
                 nodemanager=self._manager,
                 package=package,
