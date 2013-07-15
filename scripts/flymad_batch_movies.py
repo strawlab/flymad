@@ -29,20 +29,22 @@ if __name__ == "__main__":
     print bags
 
     for bag in bags:
+        print 'processing bag file', bag
         btime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
         matching = {}
         for fmf in fmfs:
+            print 'processing fmf', fmf
             try:
                 fmffn = os.path.basename(fmf)
                 genotype,camn,datestr = fmffn.split("_",2)
             except ValueError:
-                #print "invalid fmfname", fmf
+                print "invalid fmfname", fmf
                 continue
 
             try:
                 fmftime = time.strptime(datestr, FMF_DATE_FMT)
             except ValueError:
-                #print "invalid fmffname", fmf
+                print "invalid fmffname", fmf
                 continue
 
             dt = abs(time.mktime(fmftime) - time.mktime(btime))
