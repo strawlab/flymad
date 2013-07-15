@@ -82,6 +82,14 @@ class UI:
                 package=package,
                 node_type=nName )
                 )
+
+        port = rospy.get_param( USB_PARAM, default = USB_DEFAULT )
+        w = self._ui.get_object("eUSBPort")
+        w.set_text(port)
+
+        w = self._ui.get_object("bUSBPort")
+        w.connect("clicked", self._on_send_usb_port)
+        self._on_send_usb_port(w)
         
         self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bStartCalibration"),
@@ -165,6 +173,12 @@ class UI:
 
     def _on_start_flytrax(self, widget):
         subprocess.Popen(['fview', '--plugins=2'])
+
+    def _on_send_usb_port(self, widget):
+        w = self._ui.get_object("eUSBPort")
+        port = w.get_text()
+        print 'setting port to',port
+        rospy.set_param( USB_PARAM, port )
 
     def _on_rosbag_start(self, widget):
         path = os.path.join( self._fcb.get_filename(), 'rosbagOut' )
