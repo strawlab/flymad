@@ -21,7 +21,7 @@ class FlyMADMicro(object):
                                                 tcp_nodelay=True)
         self._send_timezone()
 
-        port = rospy.get_param( '~port', default = '/dev/ttyACM0' )
+        port = rospy.get_param( '~port', default = '/dev/ttyUSB0' )
         try:
             self.ser = serial.Serial(port=port,
                                      timeout=0.1,
