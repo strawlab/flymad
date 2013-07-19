@@ -2,7 +2,7 @@
 # see http://mjo.tc/atelier/2009/02/arduino-cli.html
 
 ARDUINO_DIR = /usr/share/arduino
-BOARD_TAG    = uno
-ARDUINO_PORT = /dev/ttyACM*
+BOARD_TAG    = nano328
+ARDUINO_PORT = /dev/ttyUSB* /dev/ttyACM*
 ARDUINO_LIBS = SPI
 include /usr/share/arduino/Arduino.mk
