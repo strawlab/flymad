@@ -124,7 +124,7 @@ enclosure.make()
 part_assembly = enclosure.get_assembly(explode=(5,5,5))
 part_projection = enclosure.get_projection(show_ref_cube=False)
 
-if 0:
+if 1:
     prog_assembly = SCAD_Prog()
     prog_assembly.fn = 50
     prog_assembly.add(part_assembly)
