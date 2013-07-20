@@ -1,4 +1,4 @@
-PCBNEW-BOARD Version 1 date Sat 20 Jul 2013 04:52:32 PM CEST
+PCBNEW-BOARD Version 1 date Sat 20 Jul 2013 11:37:11 PM CEST
 
 # Created by Pcbnew(2011-05-25)-stable
 
@@ -11,7 +11,7 @@ Links 48
 NoConn 0
 Di 39790 8924 71729 46780
 Ndraw 15
-Ntrack 170
+Ntrack 167
 Nzone 0
 BoardThickness 630
 Nmodule 20
@@ -59,7 +59,7 @@ PadSize 600 600
 PadDrill 320
 Pad2MaskClearance 100
 AuxiliaryAxisOrg 0 0
-PcbPlotParams (pcbplotparams (layerselection 14712833) (usegerberextensions true) (excludeedgelayer true) (linewidth 60) (plotframeref false) (viasonmask false) (mode 1) (useauxorigin false) (hpglpennumber 1) (hpglpenspeed 20) (hpglpendiameter 15) (hpglpenoverlay 0) (pscolor true) (psnegative false) (psa4output false) (plotreference true) (plotvalue true) (plotothertext true) (plotinvisibletext false) (padsonsilk false) (subtractmaskfromsilk false) (outputformat 1) (mirror false) (drillshape 1) (scaleselection 1) (outputdirectory gerbnew/))
+PcbPlotParams (pcbplotparams (layerselection 14712833) (usegerberextensions true) (excludeedgelayer false) (linewidth 60) (plotframeref false) (viasonmask false) (mode 1) (useauxorigin false) (hpglpennumber 1) (hpglpenspeed 20) (hpglpendiameter 15) (hpglpenoverlay 0) (pscolor true) (psnegative false) (psa4output false) (plotreference false) (plotvalue false) (plotothertext false) (plotinvisibletext false) (padsonsilk false) (subtractmaskfromsilk false) (outputformat 1) (mirror false) (drillshape 1) (scaleselection 1) (outputdirectory gerb_10b_3))
 $EndSETUP
 
 $EQUIPOT
@@ -1417,12 +1417,6 @@ Po 0 53000 36000 53047 36000 150 -1
 De 0 0 1 0 0
 Po 0 50000 39000 53000 36000 150 -1
 De 0 0 1 0 400000
-Po 0 51454 20954 52000 21500 150 -1
-De 0 0 1 0 800000
-Po 0 51454 17546 51454 20954 150 -1
-De 0 0 1 0 0
-Po 0 53000 16000 51454 17546 150 -1
-De 0 0 1 0 400000
 Po 0 53500 26500 53500 23250 150 -1
 De 0 0 1 0 800000
 Po 0 52000 28000 53500 26500 150 -1
@@ -1436,7 +1430,7 @@ De 0 0 2 0 800000
 Po 0 41250 19750 42750 19750 150 -1
 De 0 0 2 0 400000
 Po 0 52000 18500 51000 18500 80 -1
-De 15 0 3 0 C00000
+De 0 0 3 0 C00000
 Po 0 45642 35724 43168 33250 80 -1
 De 15 0 4 0 0
 Po 0 48724 35724 45642 35724 80 -1
