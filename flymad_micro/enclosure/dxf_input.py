@@ -72,12 +72,60 @@ def export_POINT():
         else:
             generate_ellipse(vals[groups['10']][0], vals[groups['20']][0], w/2, 0.0, 1.0, 0.0, 0.0)
 
+_LINE_vertex_cache = [] # vertex coords, e.g. [ (x1,y1), (x2,y2), ... ]
+_LINE_connected_cache = [] # lists of indices of connected vertices [ [ 0, 1, 2, 3], [4,5], ... ]
+
+def _add_LINE_vertex( x,y ):
+    tup = (x,y)
+    try:
+        idx = _LINE_vertex_cache.index( tup )
+    except ValueError:
+        _LINE_vertex_cache.append(tup)
+        idx = len(_LINE_vertex_cache)-1
+    return idx
+
+def _add_LINE_connected(idx1, idx2):
+    # simple attempt to join line segments
+    found = False
+    for connected in _LINE_connected_cache:
+        if connected[0] == idx2:
+            connected.insert(0, idx1)
+            found = True
+        elif connected[0] == idx1:
+            connected.insert(0, idx2)
+            found = True
+        elif connected[-1] == idx2:
+            connected.append(idx1)
+            found = True
+        elif connected[-1] == idx1:
+            connected.append(idx2)
+            found = True
+        if found:
+            break
+    if not found:
+        _LINE_connected_cache.append( [idx1, idx2] )
+
+def flush_LINEs():
+    for connected in _LINE_connected_cache:
+        coords = []
+        for idx in connected:
+            xy = _LINE_vertex_cache[idx]
+            coordstr = '%f,%f'%xy
+            coords.append(coordstr)
+        path = 'M ' + ' '.join(coords)
+        attribs = {'d': path, 'style': style}
+        inkex.etree.SubElement(layer, 'path', attribs)
+
 def export_LINE():
     # mandatory group codes : (10, 11, 20, 21) (x1, x2, y1, y2)
     if vals[groups['10']] and vals[groups['11']] and vals[groups['20']] and vals[groups['21']]:
-        path = 'M %f,%f %f,%f' % (vals[groups['10']][0], vals[groups['20']][0], scale*(vals[groups['11']][0] - xmin), height - scale*(vals[groups['21']][0] - ymin))
-        attribs = {'d': path, 'style': style}
-        inkex.etree.SubElement(layer, 'path', attribs)
+        x1 = vals[groups['10']][0]
+        y1 = vals[groups['20']][0]
+        x2 = scale*(vals[groups['11']][0] - xmin)
+        y2 = height - scale*(vals[groups['21']][0] - ymin)
+        idx1 = _add_LINE_vertex(x1,y1)
+        idx2 = _add_LINE_vertex(x2,y2)
+        _add_LINE_connected(idx1,idx2)
 
 def export_SPLINE():
     # see : http://www.mactech.com/articles/develop/issue_25/schneider.html
@@ -499,6 +547,7 @@ while line[0] and (line[1] != 'ENDSEC' or not inENTITIES):
         entity = line[1]
         vals = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
         seqs = []
+flush_LINEs()
 
 if polylines:
     inkex.errormsg(_('%d ENTITIES of type POLYLINE encountered and ignored. Please try to convert to Release 13 format using QCad.') % polylines)
