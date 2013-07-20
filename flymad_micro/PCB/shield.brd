@@ -1298,7 +1298,7 @@ $EndMODULE  SIL-2
 $TEXTPCB
 Te "AnalogWaves"
 nl "strawlab"
-nl "v1.0, August 2012"
+nl "v1.0b, July 2013"
 Po 58748 37957 600 800 120 0
 De 21 1 0 Normal
 $EndTEXTPCB
