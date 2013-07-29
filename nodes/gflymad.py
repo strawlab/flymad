@@ -62,6 +62,9 @@ class UI:
         w = self._ui.get_object("bFlyTrax")
         w.connect("clicked", self._on_start_flytrax)
         
+        w = self._ui.get_object("bTrackem")
+        w.connect("clicked", self._on_start_trackem)
+        
         self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bTracker"),
                 entry_widget=self._ui.get_object("eTracker"),
@@ -172,7 +175,10 @@ class UI:
                 )
 
     def _on_start_flytrax(self, widget):
-        subprocess.Popen(['fview', '--plugins=2'])
+        subprocess.Popen(['fview', '--plugins=3'])
+
+    def _on_start_trackem(self, widget):
+        subprocess.Popen(['fview', '--plugins=1'])
 
     def _on_send_usb_port(self, widget):
         w = self._ui.get_object("eUSBPort")
