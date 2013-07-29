@@ -9,7 +9,7 @@ import numpy as np
 import threading
 
 import cairo
-import flydra.a2.benu as benu
+from benu import benu
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
