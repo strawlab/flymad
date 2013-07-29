@@ -19,9 +19,20 @@ from flymad.msg import MicroPosition
 
 import sys, time
 
-a = int(sys.argv[1])
-b = int(sys.argv[2])
-print a,b
+try:
+    a = int(sys.argv[1])
+except ValueError:
+    print 'input A is hex'
+    a = int(sys.argv[1],16)
+
+try:
+    b = int(sys.argv[2])
+except ValueError:
+    print 'input B is hex'
+    b = int(sys.argv[2],16)
+
+print 'got values',a,b
+print 'hex',hex(a),hex(b)
 
 rospy.init_node('pos')
 pub = rospy.Publisher( '/flymad_micro/position', MicroPosition )
