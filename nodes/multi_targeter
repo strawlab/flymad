@@ -139,13 +139,13 @@ class Targeter:
                 obj = self.current_plan[1]
                 if obj.msg.obj_id == obj_id:
                     self.current_plan = ('idle',None)
+                    print self.current_plan
 
         for obj_id in newly_born_obj_ids:
             self.hit_dict[obj_id] = self.tracked_objects[obj_id]
 
         # --------------------------------------------------
         now = rospy.Time.now()
-        print self.current_plan
 
         if self.current_plan[0] == 'idle':
             oldest_hit_time = self.future
@@ -163,18 +163,21 @@ class Targeter:
                 time_since_last_hit = now - oldest_hit_time
                 if time_since_last_hit > HIT_START_DT:
                     self.current_plan = ('point mirror pre zap',oldest_hit_obj)
+                    print self.current_plan
             
         if self.current_plan[0] == 'point mirror pre zap':
             obj = self.current_plan[1]
             self.point_mirrors_at_obj(obj)
             if self.are_mirrors_on_obj(obj):
                 self.current_plan = ('zap start',obj)
+                print self.current_plan
                 
         if self.current_plan[0] == 'zap start':
             obj = self.current_plan[1]
             self.point_mirrors_at_obj(obj)
             self.pub_laser.publish( 255 )
             self.current_plan = ('zap continue',obj,now)
+            print self.current_plan
 
         if self.current_plan[0] == 'zap continue':
             obj = self.current_plan[1]
@@ -186,6 +189,7 @@ class Targeter:
             if dur_sec > HIT_DURATION:
                 self.pub_laser.publish( 0 )
                 self.current_plan = ('idle',None)
+                print self.current_plan
 
     def get_current_predicted_xy(self,obj):
         now = rospy.Time.now()
@@ -211,7 +215,6 @@ class Targeter:
         dac_pixel_y = self.cal.d2py((aa,ab))
         
         laser_distance = np.sqrt((dac_pixel_x-x)**2 + (dac_pixel_y-y)**2)
-        print 'distance',laser_distance
         if laser_distance < THRESHOLD_DISTANCE_PIXELS:
             return True
         else:
