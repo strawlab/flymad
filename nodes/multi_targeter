@@ -319,6 +319,5 @@ class Targeter:
 if __name__=='__main__':
     cal_fname = rospy.myargv()[1]
     args=rospy.myargv()[2:]
-    print args
     t=Targeter(cal_fname, *args)
     t.run()
