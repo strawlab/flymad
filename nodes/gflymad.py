@@ -149,6 +149,22 @@ class UI:
                 nodemanager=self._manager )
                 )
 
+        self._refs.append( MyGtkButtonStartNode(
+                widget=self._ui.get_object("bViewer"),
+                entry_widget=self._ui.get_object("eViewer"),
+                nodepath="flymad_viewer",
+                nodemanager=self._manager,
+                package=package,
+                node_type="viewer",
+                args=calibrationFile + ".filtered.yaml")
+                )
+
+        self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopViewer"),
+                nodepath= "/flymad_viewer",
+                nodemanager=self._manager )
+                )
+
         self.killer = Killer()
         w = self._ui.get_object("bKillObjects")
         w.connect("clicked", self.killer.cb_kill_all_tracked_objects)

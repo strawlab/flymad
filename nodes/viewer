@@ -177,11 +177,12 @@ class ViewerApp(Gtk.Window):
             ix = msg.posA, msg.posB
             px = self.cal.d2px(ix)
             py = self.cal.d2py(ix)
-            print 'ix,px,py',ix,px,py
             self.pcw.on_dac_pixels( px, py )
 
 if __name__ == "__main__":
-    if len(sys.argv)==2:
+    # THIS IS A HACK! Need to fix argument parsing so that ROS has
+    # first pass at the parameters (e.g. __name:=node_name).
+    if len(sys.argv)>=2:
         cal_fname = sys.argv[1]
     else:
         cal_fname = None
