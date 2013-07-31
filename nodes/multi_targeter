@@ -24,8 +24,8 @@ K_PROPORTIONAL = 1e3/30.0
 HIT_START_FREQ = 10.0 # 10 Hz
 HIT_START_DT = rospy.Duration(1.0/ HIT_START_FREQ)
 HIT_DURATION = 0.010 # 10 msec
-THRESHOLD_DISTANCE_PIXELS = 10.0 # when to claim fly is zapped
 VELOCITY_MODE_THRESHOLD_PIXELS = 20.0 # when to switch from postion to velocity mode
+THRESHOLD_DISTANCE_PIXELS = 10.0
 
 class MaybeTargetedObject:
     def __init__(self,msg,past):
