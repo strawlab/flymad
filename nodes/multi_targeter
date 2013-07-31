@@ -19,11 +19,11 @@ from flymad.util import myint32
 from flymad.constants import FPS
 
 MOTOR_LAG = 0.05
-K_PROPORTIONAL = 1e3
+K_PROPORTIONAL = 1e3/30.0
 
 HIT_START_FREQ = 10.0 # 10 Hz
-HIT_START_DT = rospy.Duration(1. / HIT_START_FREQ)
-HIT_DURATION = rospy.Duration(0.1)
+HIT_START_DT = rospy.Duration(1.0/ HIT_START_FREQ)
+HIT_DURATION = 0.010 # 10 msec
 THRESHOLD_DISTANCE_PIXELS = 10.0
 
 class MaybeTargetedObject:
@@ -39,6 +39,8 @@ class MaybeTargetedObject:
         self.msg = msg
     def get_last_hit_time(self):
         return self.last_hit_time
+    def set_last_hit_time(self,new_hit_time):
+        self.last_hit_time = new_hit_time
 
 class Targeter:
     def __init__(self,cal_fname):
@@ -176,9 +178,13 @@ class Targeter:
 
         if self.current_plan[0] == 'zap continue':
             obj = self.current_plan[1]
+            obj.set_last_hit_time(now)
             laser_start_time  = self.current_plan[2]
             self.point_mirrors_at_obj(obj)
-            if now-laser_start_time > HIT_DURATION:
+            this_duration = now - laser_start_time
+            dur_sec = this_duration.to_sec()
+            if dur_sec > HIT_DURATION:
+                self.pub_laser.publish( 0 )
                 self.current_plan = ('idle',None)
 
     def get_current_predicted_xy(self,obj):
@@ -271,6 +277,6 @@ class Targeter:
             r.sleep() # cycle at 200 Hz
 
 if __name__=='__main__':
-    cal_fname = sys.argv[1]
+    cal_fname = rospy.myargv()[1]
     t=Targeter(cal_fname)
     t.run()
