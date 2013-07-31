@@ -27,9 +27,6 @@ class Targeter:
         _ = rospy.Subscriber('/flymad/tracked',
                              TrackedObj,
                              self.on_tracking)
-        _ = rospy.Subscriber('/flymad/target_object',
-                             Int64,
-                             self.on_target_object)
         _ = rospy.Subscriber('/flymad_micro/position_echo',
                              MicroPosition,
                              self.on_dac)
@@ -67,14 +64,6 @@ class Targeter:
         if this_vels != self.last_vals:
             self.pub_dac_velocity.publish(msg)
             self.last_vals = this_vels
-
-    def on_target_object(self, msg):
-        obj_id = msg.data
-        if obj_id < 0:
-            self.stop_tracking(self.cur_obj_id)
-        else:
-            self.cur_obj_id = obj_id
-            rospy.loginfo('now targeting object %d'%self.cur_obj_id)
 
     def on_tracking(self, msg):
         if self.cur_obj_id is None:
