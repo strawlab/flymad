@@ -15,7 +15,6 @@ from flymad.msg import MicroVelocity, MicroPosition, StampedObject
 
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
-from flymad.constants import FPS
 
 LATENCY = 0.05
 K_PROPORTIONAL = 1e3
@@ -45,7 +44,6 @@ class Targeter:
                                             tcp_nodelay=True)
 
         self.cur_obj_id = None
-        self.lock = threading.Lock()
         self.dacs = 0,0
         self.last_vals = None
         time.sleep(0.4) # give ROS a chance to start up?!
@@ -110,9 +108,8 @@ class Targeter:
             diffa = daca-aa
             diffb = dacb-ab
 
-            dt = 1.0/FPS
-            vela = diffa*dt*K_PROPORTIONAL
-            velb = diffb*dt*K_PROPORTIONAL
+            vela = diffa*K_PROPORTIONAL
+            velb = diffb*K_PROPORTIONAL
 
             if np.isnan(vela) or np.isnan(velb):
                 return
