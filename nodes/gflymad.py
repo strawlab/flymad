@@ -100,7 +100,6 @@ class UI:
                 nodepath="generate_calibration",
                 nodemanager=self._manager,
                 package=package,
-                # node_type="laser_camera_calibration.py",
                 node_type="generate_calibration.py",
                 args=calibrationFile + ".yaml")
                 )
