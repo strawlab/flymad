@@ -15,9 +15,9 @@ from flymad.msg import MicroVelocity, MicroPosition, StampedObject
 
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
+from flymad.constants import FPS
 
 LATENCY = 0.05
-FPS = 30.0
 K_PROPORTIONAL = 1e3
 
 class Targeter:

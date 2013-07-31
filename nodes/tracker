@@ -8,13 +8,12 @@ from std_msgs.msg import UInt8
 
 import numpy as np
 import adskalman.adskalman as adskalman
+from flymad.constants import FPS
 
-FPS = 30.0
 MAX_DIST_PIXELS = 20.0
 MAX_P2 = 25.0
 Qsigma=10.0 # process covariance
 Rsigma=10.0 # observation covariance
-
 
 max_dist_squared = MAX_DIST_PIXELS**2
 
@@ -89,6 +88,7 @@ class TrackedObject:
             unused = xy
 
         else:
+            # remove used observation from list of points
             observation = xy[idx,:]
             N = len(xy)
             unused = xy[ np.arange(N)!=idx ]
@@ -160,12 +160,14 @@ class Tracker:
                 obj.kill()
 
         self.last_framenumber = framenumber
+        # generate 2D array of all 2D candidates
         xy = np.array([(p.x,p.y) for p in msg.points])
 
         if dframes > 1:
             raise NotImplementedError('missing data')
 
         for obj in self.objs:
+            # iff object takes 2D candidate, remove from xy array.
             xy = obj.step( xy, framenumber, self.pub )
 
         # perform births
