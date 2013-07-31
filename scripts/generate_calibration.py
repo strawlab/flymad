@@ -4,6 +4,7 @@ import math
 import numpy as np
 import sys
 import Queue
+import time
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
@@ -81,6 +82,9 @@ def main():
     print 'dac.shape',dac.shape
     print 'pixels.shape',pixels.shape
     save_raw_calibration_data(fname, dac, pixels)
+    if 1:
+        fname2 = time.strftime("%Y%m%d_%H%M%S",time.time())
+        save_raw_calibration_data(fname2, dac, pixels)
 
 if __name__=='__main__':
     main()
