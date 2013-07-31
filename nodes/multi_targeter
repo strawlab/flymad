@@ -4,6 +4,7 @@ import adskalman.adskalman as adskalman
 import sys
 import threading
 import time
+import Queue
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
@@ -17,13 +18,35 @@ from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
 from flymad.constants import FPS
 
-LATENCY = 0.05
+MOTOR_LAG = 0.05
 K_PROPORTIONAL = 1e3
+
+HIT_START_FREQ = 10.0 # 10 Hz
+HIT_START_DT = rospy.Duration(1. / HIT_START_FREQ)
+HIT_DURATION = rospy.Duration(0.1)
+THRESHOLD_DISTANCE_PIXELS = 10.0
+
+class MaybeTargetedObject:
+    def __init__(self,msg,past):
+        self.msg = msg
+        self.last_hit_time = past
+    def __str__(self):
+        s = self.msg.state_vec
+        return 'obj %d at (%.1f,%.1f), last hit %s'%(self.msg.obj_id,s[0],s[1], self.last_hit_time)
+    def __repr__(self):
+        return 'MaybeTargetedObject('+str(self)+')'
+    def update(self,msg):
+        self.msg = msg
+    def get_last_hit_time(self):
+        return self.last_hit_time
 
 class Targeter:
     def __init__(self,cal_fname):
         self.cal = load_calibration(cal_fname)
         rospy.init_node('flymad_targeter')
+        self.past   = rospy.Time.now() - rospy.Duration( 1e6 )
+        self.future = rospy.Time.now() + rospy.Duration( 1e6 )
+
         _ = rospy.Subscriber('/flymad/tracked',
                              TrackedObj,
                              self.on_tracking)
@@ -36,17 +59,25 @@ class Targeter:
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
                                                 MicroVelocity,
                                                 tcp_nodelay=True)
+        self.pub_laser = rospy.Publisher('/flymad_micro/laser',
+                                         UInt8,
+                                         tcp_nodelay=True)
 
         self.pub_targeted = rospy.Publisher('/flymad/targeted',
                                             StampedObject,
                                             tcp_nodelay=True)
 
-        self.cur_obj_id = None
-        self.lock = threading.Lock()
+        self.incoming_data_queue = Queue.Queue()
+        self.tracked_objects = {} # a dict of currently tracked objects
+        self.hit_dict = {} # dict of objects we want to zap
         self.dacs = 0,0
         self.last_vals = None
         time.sleep(0.4) # give ROS a chance to start up?!
         self.stop_tracking(None)
+
+        self.current_plan = ('idle',None) # a 2 (or more length) tuple, with string 
+                                          # as first element, MaybeTrackedObject
+                                          # instance as second element.
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -56,7 +87,7 @@ class Targeter:
 
     def stop_tracking(self,old_obj_id):
         rospy.loginfo('stopped targeting object %s'%old_obj_id)
-        self.cur_obj_id = None
+
         msg = MicroVelocity()
         msg.velA = myint32(0)
         msg.velB = myint32(0)
@@ -66,24 +97,122 @@ class Targeter:
             self.last_vals = this_vels
 
     def on_tracking(self, msg):
-        if self.cur_obj_id is None:
-            self.cur_obj_id = msg.obj_id
-            rospy.loginfo('now targeting object %d'%self.cur_obj_id)
+        # called by ros subscriber thread
+        self.incoming_data_queue.put(msg)
 
-        if self.cur_obj_id != msg.obj_id:
-            return
+    def update(self):
+        '''figure out what to do.
 
-        if not msg.is_living:
-            self.stop_tracking(self.cur_obj_id)
-            return
+        this gets called at a high rate'''
+        # get any new tracking data ------------------------
+        while True:
+            try:
+                msg = self.incoming_data_queue.get_nowait()
+            except Queue.Empty:
+                break
+            # we have new tracking data
+            obj_id = msg.obj_id
+
+            if obj_id not in self.tracked_objects:
+                obj = MaybeTargetedObject( msg, self.past )
+                self.tracked_objects[ obj_id ] = obj
+            else:
+                self.tracked_objects[ obj_id ].update( msg )
+
+            if not msg.is_living:                
+                del self.tracked_objects[ msg.obj_id ]
+
+        # update our list of flies we want to hit ----------
+        # TODO: update this based on where flies are, etc.
+        orig_obj_ids = set(self.hit_dict.keys())
+        cur_obj_ids = set(self.tracked_objects.keys())
+
+        newly_dead_obj_ids = orig_obj_ids - cur_obj_ids
+        newly_born_obj_ids = cur_obj_ids - orig_obj_ids
+
+        for obj_id in newly_dead_obj_ids:
+            del self.hit_dict[obj_id]
+            # abort current plan if it involves this object
+            if self.current_plan[0] != 'idle':
+                obj = self.current_plan[1]
+                if obj.msg.obj_id == obj_id:
+                    self.current_plan = ('idle',None)
+
+        for obj_id in newly_born_obj_ids:
+            self.hit_dict[obj_id] = self.tracked_objects[obj_id]
+
+        # --------------------------------------------------
+        now = rospy.Time.now()
+        print self.current_plan
+
+        if self.current_plan[0] == 'idle':
+            oldest_hit_time = self.future
+            oldest_hit_obj = None
+
+            for obj_id in self.hit_dict:
+                obj = self.hit_dict[obj_id]
+                this_last_hit_time = obj.get_last_hit_time()
+                if this_last_hit_time < oldest_hit_time:
+                    oldest_hit_time = this_last_hit_time
+                    oldest_hit_obj = obj
+
+            if oldest_hit_obj is not None:
+                # now we have the oldest hit fly
+                time_since_last_hit = now - oldest_hit_time
+                if time_since_last_hit > HIT_START_DT:
+                    self.current_plan = ('point mirror pre zap',oldest_hit_obj)
+            
+        if self.current_plan[0] == 'point mirror pre zap':
+            obj = self.current_plan[1]
+            self.point_mirrors_at_obj(obj)
+            if self.are_mirrors_on_obj(obj):
+                self.current_plan = ('zap start',obj)
+                
+        if self.current_plan[0] == 'zap start':
+            obj = self.current_plan[1]
+            self.point_mirrors_at_obj(obj)
+            self.pub_laser.publish( 255 )
+            self.current_plan = ('zap continue',obj,now)
+
+        if self.current_plan[0] == 'zap continue':
+            obj = self.current_plan[1]
+            laser_start_time  = self.current_plan[2]
+            self.point_mirrors_at_obj(obj)
+            if now-laser_start_time > HIT_DURATION:
+                self.current_plan = ('idle',None)
+
+    def get_current_predicted_xy(self,obj):
+        now = rospy.Time.now()
+        msg = obj.msg
+
+        dt = now-msg.header.stamp # time elapsed since we have updated information
+        dt_sec = dt.to_sec()
 
         # calculate fly position in pixel coordinates
         s = msg.state_vec
-        x = s[0] + s[2]*LATENCY
-        y = s[1] + s[3]*LATENCY
+        x = s[0] + s[2]*(dt_sec+MOTOR_LAG)
+        y = s[1] + s[3]*(dt_sec+MOTOR_LAG)
 
         x = int(max(0,x))
         y = int(max(0,y))
+        return x,y
+
+    def are_mirrors_on_obj(self,obj):
+        x,y = self.get_current_predicted_xy(obj)
+
+        aa, ab = self._get_current_dacs()
+        dac_pixel_x = self.cal.d2px((aa,ab))
+        dac_pixel_y = self.cal.d2py((aa,ab))
+        
+        laser_distance = np.sqrt((dac_pixel_x-x)**2 + (dac_pixel_y-y)**2)
+        print 'distance',laser_distance
+        if laser_distance < THRESHOLD_DISTANCE_PIXELS:
+            return True
+        else:
+            return False
+
+    def point_mirrors_at_obj(self,obj):
+        x,y = self.get_current_predicted_xy(obj)
 
         # desired
         try:
@@ -99,9 +228,8 @@ class Targeter:
             diffa = daca-aa
             diffb = dacb-ab
 
-            dt = 1.0/FPS
-            vela = diffa*dt*K_PROPORTIONAL
-            velb = diffb*dt*K_PROPORTIONAL
+            vela = diffa*K_PROPORTIONAL
+            velb = diffb*K_PROPORTIONAL
 
             if np.isnan(vela) or np.isnan(velb):
                 return
@@ -133,11 +261,14 @@ class Targeter:
 
         msg = StampedObject()
         msg.header.stamp = rospy.Time.now()
-        msg.obj_id = self.cur_obj_id
+        msg.obj_id = obj.msg.obj_id
         self.pub_targeted.publish(msg)
 
     def run(self):
-        rospy.spin()
+        r = rospy.Rate(200) # 200hz
+        while not rospy.is_shutdown():
+            self.update()
+            r.sleep() # cycle at 200 Hz
 
 if __name__=='__main__':
     cal_fname = sys.argv[1]
