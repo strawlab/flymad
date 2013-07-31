@@ -44,7 +44,7 @@ class UI:
         self._refs = []
         self._manager = rosgobject.managers.ROSNodeManager()
         self._build_ui()
-        
+
         w = self._ui.get_object("FlyMAD")
         w.connect("delete-event", rosgobject.main_quit)
         w.show_all()
@@ -54,17 +54,17 @@ class UI:
         self._rosbag_proc = None
 
     def _build_ui(self):
-        
+
         nodepath = "gflymad"
         package = "flymad"
         calibrationFile = "calibrationOUT"
-        
+
         w = self._ui.get_object("bFlyTrax")
         w.connect("clicked", self._on_start_flytrax)
-        
+
         w = self._ui.get_object("bTrackem")
         w.connect("clicked", self._on_start_trackem)
-        
+
         self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bTracker"),
                 entry_widget=self._ui.get_object("eTracker"),
@@ -73,7 +73,7 @@ class UI:
                 package=package,
                 node_type="tracker" )
                 )
-        
+
 
         nName = "flymad_micro"
         self._refs.append( MyGtkButtonStartNode(
@@ -93,7 +93,7 @@ class UI:
         w = self._ui.get_object("bUSBPort")
         w.connect("clicked", self._on_send_usb_port)
         self._on_send_usb_port(w)
-        
+
         self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bStartCalibration"),
                 entry_widget=self._ui.get_object("eStartCalibration"),
@@ -104,7 +104,7 @@ class UI:
                 node_type="generate_calibration.py",
                 args=calibrationFile + ".yaml")
                 )
-                
+
         self._refs.append( GtkButtonKillNode(
                 widget=self._ui.get_object("bStopCalibration"),
                 nodepath= "/generate_calibration",
@@ -131,8 +131,8 @@ class UI:
                 node_type="laser_camera_calibration.py",
                 args=calibrationFile + ".filtered.yaml" )
                 )
-        
-                                  
+
+
         self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bTargeter"),
                 entry_widget=self._ui.get_object("eTargeter"),
