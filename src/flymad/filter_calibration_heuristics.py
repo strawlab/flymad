@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
-import os, sys
+import os, sys, time
 
 import roslib; roslib.load_manifest('flymad')
 from flymad.laser_camera_calibration import read_raw_calibration_data, \
@@ -33,6 +33,9 @@ def main():
         dac[:,c]=0
 
     save_raw_calibration_data(fname_out, dac, pixels)
+    if 1:
+        fname2 = time.strftime("cal_%Y%m%d_%H%M%S.filtered.out",time.time())
+        save_raw_calibration_data(fname2, dac, pixels)
 
 if __name__=='__main__':
     main()
