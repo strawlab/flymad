@@ -3,6 +3,8 @@ import numpy as np
 import os, sys, time
 
 import roslib; roslib.load_manifest('flymad')
+import rospy
+
 from flymad.laser_camera_calibration import read_raw_calibration_data, \
      save_raw_calibration_data
 

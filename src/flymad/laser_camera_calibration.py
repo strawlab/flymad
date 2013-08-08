@@ -4,6 +4,9 @@ from scipy.interpolate import griddata, CloughTocher2DInterpolator, LinearNDInte
 import json
 import yaml
 
+import roslib; roslib.load_manifest('flymad')
+import rospy
+
 def to_plain(arr):
     """Convert numpy arrays to pure-Python types. Useful for saving to JSON"""
     if arr.ndim==1:
