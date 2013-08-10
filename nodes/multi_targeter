@@ -24,8 +24,8 @@ K_PROPORTIONAL = 1e3/30.0
 HIT_START_FREQ = 10.0 # 10 Hz
 HIT_START_DT = rospy.Duration(1.0/ HIT_START_FREQ)
 HIT_DURATION = 0.010 # 10 msec
+THRESHOLD_DISTANCE_PIXELS = 10.0 # when to claim fly is zapped
 VELOCITY_MODE_THRESHOLD_PIXELS = 20.0 # when to switch from postion to velocity mode
-THRESHOLD_DISTANCE_PIXELS = 10.0
 
 class MaybeTargetedObject:
     def __init__(self,msg,past):
@@ -115,7 +115,7 @@ class Targeter:
     def update(self):
         '''figure out what to do.
 
-        this gets called at a high rate'''
+this gets called at a high rate'''
         # get any new tracking data ------------------------
         while True:
             try:
@@ -155,9 +155,9 @@ class Targeter:
 
         #we only put objects into the hit_dict if they are in the right part of the arena
         for obj_id in newly_born_obj_ids:
-        s=self.tracked_objects[obj_id].msg.state_vec
-        if self.border_x_1 <= s[1] <= self.border_x_2 and self.border_y_1 <= s[0] <= self.border_y_2:
-            self.hit_dict[obj_id] = self.tracked_objects[obj_id]
+            s=self.tracked_objects[obj_id].msg.state_vec
+            if self.border_x_1 <= s[1] <= self.border_x_2 and self.border_y_1 <= s[0] <= self.border_y_2:
+                self.hit_dict[obj_id] = self.tracked_objects[obj_id]
         
         #we put objects out of the hit_dict if they get out of the right part of the arena
         for obj_id in self.hit_dict.keys():
