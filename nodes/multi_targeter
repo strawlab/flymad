@@ -115,7 +115,7 @@ class Targeter:
     def update(self):
         '''figure out what to do.
 
-this gets called at a high rate'''
+	this gets called at a high rate'''
         # get any new tracking data ------------------------
         while True:
             try:
@@ -158,6 +158,7 @@ this gets called at a high rate'''
             s=self.tracked_objects[obj_id].msg.state_vec
             if self.border_x_1 <= s[1] <= self.border_x_2 and self.border_y_1 <= s[0] <= self.border_y_2:
                 self.hit_dict[obj_id] = self.tracked_objects[obj_id]
+        
         
         #we put objects out of the hit_dict if they get out of the right part of the arena
         for obj_id in self.hit_dict.keys():
