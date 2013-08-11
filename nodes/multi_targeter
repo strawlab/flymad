@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 import Queue
+import Image
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
@@ -44,20 +45,27 @@ class MaybeTargetedObject:
         self.last_hit_time = new_hit_time
 
 class Targeter:
-    def __init__(self,cal_fname,border_x_1=0,border_x_2=500, border_y_1=0, border_y_2=500):
+    def __init__(self, cal_fname, border_x_1=0, border_x_2=500, 
+                 border_y_1=0, border_y_2=500, mask_image=None):
         self.cal = load_calibration(cal_fname)
         rospy.init_node('flymad_targeter')
         self.past = rospy.Time.now() - rospy.Duration( 1e6 )
         self.future = rospy.Time.now() + rospy.Duration( 1e6 )
-        #borders in left handed coordinate system
-        self.border_x_1 = int(border_x_1)
-        self.border_x_2 = int(border_x_2)
-        self.border_y_1 = int(border_y_1)
-        self.border_y_2 = int(border_y_2)
-        print self.border_x_1
-        print self.border_x_2
-        print self.border_y_1
-        print self.border_y_2
+
+        if mask_image is None:
+            #borders in left handed coordinate system
+            self.in_target_area = (lambda state_vec:
+                ((int(border_x_1) <= state_vec[1] <= int(border_x_2)) and
+                 (int(border_y_1) <= state_vec[0] <= int(border_y_2))) )
+        else:
+            img = Image.open(mask_image)
+            assert img.size == (500, 500)
+            assert img.mode == 'RGB'
+            # we are only picking the red channel for masking
+            mask = np.asarray(img)[:,:,0] >= 255 
+            self.in_target_area = (lambda state_vec:
+                mask[np.clip(int(state_vec[0]+0.5), 0, img.size[0]),
+                     np.clip(int(state_vec[1]+0.5), 0, img.size[1])] )
 
         _ = rospy.Subscriber('/flymad/tracked',
                              TrackedObj,
@@ -155,15 +163,13 @@ class Targeter:
 
         #we only put objects into the hit_dict if they are in the right part of the arena
         for obj_id in newly_born_obj_ids:
-            s=self.tracked_objects[obj_id].msg.state_vec
-            if self.border_x_1 <= s[1] <= self.border_x_2 and self.border_y_1 <= s[0] <= self.border_y_2:
+            if self.in_target_area(s):
                 self.hit_dict[obj_id] = self.tracked_objects[obj_id]
-        
         
         #we put objects out of the hit_dict if they get out of the right part of the arena
         for obj_id in self.hit_dict.keys():
             s=self.hit_dict[obj_id].msg.state_vec
-            if not self.border_x_1 <= s[1] <= self.border_x_2 or not self.border_y_1 <= s[0] <= self.border_y_2 :
+            if not self.in_target_area(s):
                 del self.hit_dict[obj_id]
                 if obj_id in newly_born_obj_ids:
                     newly_born_obj_ids.remove(obj_id)
@@ -176,7 +182,7 @@ class Targeter:
         #we put objects in the hit_dict if they get to the right part of the arena
         for obj_id in cur_obj_ids:
             s=self.tracked_objects[obj_id].msg.state_vec
-            if self.border_x_1 <= s[1] <= self.border_x_2 and self.border_y_1 <= s[0] <= self.border_y_2:
+            if self.in_target_area(s):
                 self.hit_dict[obj_id]=self.tracked_objects[obj_id]
 
         # --------------------------------------------------
