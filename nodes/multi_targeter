@@ -45,8 +45,8 @@ class MaybeTargetedObject:
         self.last_hit_time = new_hit_time
 
 class Targeter:
-    def __init__(self, cal_fname, border_x_1=0, border_x_2=500, 
-                 border_y_1=0, border_y_2=500, mask_image=None):
+    def __init__(self, cal_fname, borders_x=(0, 500), 
+                 borders_y=(0, 500), mask_image=None):
         self.cal = load_calibration(cal_fname)
         rospy.init_node('flymad_targeter')
         self.past = rospy.Time.now() - rospy.Duration( 1e6 )
@@ -55,8 +55,8 @@ class Targeter:
         if mask_image is None:
             #borders in left handed coordinate system
             self.in_target_area = (lambda state_vec:
-                ((int(border_x_1) <= state_vec[1] <= int(border_x_2)) and
-                 (int(border_y_1) <= state_vec[0] <= int(border_y_2))) )
+                ((int(borders_x[0]) <= state_vec[1] <= int(borders_x[1])) and
+                 (int(borders_y[0]) <= state_vec[0] <= int(borders_y[1]))) )
         else:
             img = Image.open(mask_image)
             assert img.size == (500, 500)
@@ -324,7 +324,18 @@ class Targeter:
             r.sleep() # cycle at 200 Hz
 
 if __name__=='__main__':
-    cal_fname = rospy.myargv()[1]
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--borders_x', nargs=2, metavar=('X0','X1'),
+                            default=(0, 500), help='borders for targeting')
+    parser.add_argument('--borders_y', nargs=2, metavar=('Y0','Y1'),
+                            default=(0, 500), help='borders for targeting')
+    parser.add_argument('--mask_image', default=None,
+                            help='mask image for targeting')
+
     args=rospy.myargv()[2:]
-    t=Targeter(cal_fname, *args)
+    parsed = vars(parser.parse_args(args))
+
+    t = Targeter(cal_fname, **parsed)
     t.run()
+
