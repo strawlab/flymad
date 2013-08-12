@@ -83,7 +83,7 @@ def main():
     print 'pixels.shape',pixels.shape
     save_raw_calibration_data(fname, dac, pixels)
     if 1:
-        fname2 = time.strftime("cal_%Y%m%d_%H%M%S.out",time.time())
+        fname2 = time.strftime("cal_%Y%m%d_%H%M%S.out")
         save_raw_calibration_data(fname2, dac, pixels)
 
 if __name__=='__main__':

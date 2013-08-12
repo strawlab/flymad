@@ -36,7 +36,7 @@ def main():
 
     save_raw_calibration_data(fname_out, dac, pixels)
     if 1:
-        fname2 = time.strftime("cal_%Y%m%d_%H%M%S.filtered.out",time.time())
+        fname2 = time.strftime("cal_%Y%m%d_%H%M%S.filtered.out")
         save_raw_calibration_data(fname2, dac, pixels)
 
 if __name__=='__main__':
