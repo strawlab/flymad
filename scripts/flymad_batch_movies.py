@@ -18,7 +18,7 @@ if __name__ == "__main__":
     FMF_DATE_FMT = "%Y%m%d_%H%M%S.fmf"
 
     destdir = os.path.expanduser("~/movies")
-    inputfmf = os.path.expanduser("/media/DBATH_1TB/please_make_mp4s")
+    inputfmf = os.path.expanduser("/media/DBATH_1TB/please_make_mp4s") 
     print inputfmf
     inputbags = os.path.expanduser("~/flymad_rosbag/")
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     print bags
 
     for bag in bags:
-        print 'processing bag file', bag
+        #print 'processing bag file', bag
         btime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
         matching = {}
         for fmf in fmfs:
@@ -71,6 +71,7 @@ if __name__ == "__main__":
                         destfn
                 )
             except:
+                print "ERROR making movie:", bag
                 pass
 
             shutil.rmtree(tmpdir)

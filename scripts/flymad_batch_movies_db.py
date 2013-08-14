@@ -2,7 +2,6 @@
 
 import time
 import os.path
-import os.environ
 import glob
 import tempfile
 import shutil
@@ -19,27 +18,33 @@ if __name__ == "__main__":
     FMF_DATE_FMT = "%Y%m%d_%H%M%S.fmf"
 
     destdir = os.path.expanduser("~/movies")
-    inputfmf = os.path("/media/DBATH 1TB/please_make_mp4s")
+    inputfmf = os.path.expanduser("/media/DBATH_1TB/please_make_mp4s") 
+    print inputfmf
     inputbags = os.path.expanduser("~/flymad_rosbag/")
 
     fmfs = glob.glob(inputfmf+"/*.fmf")
     bags = glob.glob(inputbags+"/*.bag")
+    
+    print fmfs
+    print bags
 
     for bag in bags:
+        #print 'processing bag file', bag
         btime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
         matching = {}
         for fmf in fmfs:
+            print 'processing fmf', fmf
             try:
                 fmffn = os.path.basename(fmf)
                 genotype,camn,datestr = fmffn.split("_",2)
             except ValueError:
-                #print "invalid fmfname", fmf
+                print "invalid fmfname", fmf
                 continue
 
             try:
                 fmftime = time.strptime(datestr, FMF_DATE_FMT)
             except ValueError:
-                #print "invalid fmffname", fmf
+                print "invalid fmffname", fmf
                 continue
 
             dt = abs(time.mktime(fmftime) - time.mktime(btime))
@@ -57,17 +62,18 @@ if __name__ == "__main__":
             )
 
             print "making",destfn
-            try:
-                ok = make_movie(
-                        matching["wide"],
-                        matching["zoom"],
-                        bag,
-                        tmpdir,
-                        destfn
-                )
-            except:
+            #try:
+            ok = make_movie(
+                    matching["wide"],
+                    matching["zoom"],
+                    bag,
+                    tmpdir,
+                    destfn
+            )
+            """"except:
+                print "error making movie:", bag
                 pass
-
+"""
             shutil.rmtree(tmpdir)
 
 
