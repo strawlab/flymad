@@ -20,7 +20,7 @@ def create_df(bname, calc_vel=True):
             if len(msg.points) == 1:
                 pt = msg.points[0]
                 x.append(pt.x)
-                y.append(pt.x)
+                y.append(pt.y)
                 theta.append(pt.theta)
                 times.append(t)
 
