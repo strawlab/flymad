@@ -21,7 +21,7 @@ import pandas as pd
 import Image
 import ImageChops
 
-import vlc
+import flymad.vlc as vlc
 
 # Create a single vlc.Instance() to be shared by (possible) multiple players.
 instance = vlc.Instance("--no-snapshot-preview --snapshot-format png")
