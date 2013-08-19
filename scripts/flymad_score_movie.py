@@ -268,16 +268,15 @@ class VideoScorer(Gtk.Window):
         return False
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-       print "You must provide a movie file name (and optionally a bag file name)"
+    if len(sys.argv) < 3:
+       print "You must provide a movie file name and a bag file name"
        sys.exit(1)
 
     fname = sys.argv[1]
+    bname = sys.argv[2]
 
-    try:
-        bname = sys.argv[2]
-    except IndexError:
-        bname = ''
+    assert os.path.exists(bname)
+    assert os.path.exists(fname)
 
     if not os.path.isfile(fname):
         print "movie file must exist"
