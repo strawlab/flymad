@@ -183,8 +183,9 @@ class VideoScorer(Gtk.Window):
         self.connect("destroy", Gtk.main_quit)
         self.add(self.vlc)
 
-        self._annots_t = []
-        self._annots_v = {k:[] for k in self.KEYS.values()}
+        #annots[time] = value
+        self._annots = {}
+
         self._pending_lock = threading.Lock()
         self._pending_ocr = {}
 
@@ -198,36 +199,38 @@ class VideoScorer(Gtk.Window):
     def _on_quit(self, *args):
         self.vlc.player.stop()
 
-        bdf = None
-        if bname and os.path.exists(bname):
-            #Update the UI
-            self.vlc.show_result("merging bag file, please wait")
-            while Gtk.events_pending():
-                Gtk.main_iteration()
-            from flymadbagconv import create_df
-            bdf = create_df(bname)
+        #Update the UI
+        self.vlc.show_result("merging bag file, please wait")
+        while Gtk.events_pending():
+            Gtk.main_iteration()
+        bdf = bagconv.create_df(bname)
 
-        #temporarily put the times in the annotations dictionary, the
-        #program is closing anyway and it saves a copy
-        self._annots_v["score_t"] = self._annots_t
+        cols = set(self.KEYS.values())
+
+        dfd = {k:[] for k in cols}
+        idx = []
+        for t in sorted(self._annots):
+            idx.append(t)
+            key = self._annots[t]
+            thiscol = self.KEYS[key]
+            for col in cols:
+                dfd[col].append( key if thiscol == col else np.nan )
+
         df = pd.DataFrame(
-                self._annots_v,
-                index=(np.array(self._annots_t)*1000).astype(np.int64)
+                dfd,
+                index=(np.array(idx)*bagconv.SECOND_TO_NANOSEC).astype(np.int64)
         )
 
-        if bdf is not None:
-            df = pd.concat((df,bdf),axis=1)
+        final = pd.concat((df,bdf),axis=1)
+#        print "annot index", df.index,
+#        print " unique ",df.index.is_unique
+#        print "bag index", bdf.index,
+#        print " unique ", bdf.index.is_unique
+#        print "annots", self._annots
+#        print "dfd", dfd
+#        print "idx", idx
 
-        #fill out default annotations
-        #FIXME: does not work, assignment fails because pandas thinks the
-        #colum contains a float, and fillna doesnt work if i explictly tell it
-        #it contains a np character array
-        #for idx,row in df.iterrows():
-        #    for col in set(self.KEYS.values()):
-        #        row[col] = self.KEY_DEFAULTS[col]
-        #    break
-
-        df.fillna(method='pad').to_csv(self.fname+".csv")
+        final.fillna(method='pad').to_csv(self.fname+".csv")
 
         #keep quitting
         return False
@@ -243,14 +246,7 @@ class VideoScorer(Gtk.Window):
                 t = np.nanmin(self._pending_ocr[tid])
                 annot = self.KEYS[key]
                 if not np.isnan(t):
-                    self._annots_t.append(t)
-
-                    #this annotation gets the value
-                    self._annots_v[annot].append(key)
-                    #the others get nan, use set() to not duplicate
-                    for other in [i for i in set(self.KEYS.values()) if i != annot]:
-                        self._annots_v[other].append(np.nan)
-
+                    self._annots[t] = key
                     GObject.idle_add(self.vlc.show_result, "scored t:%s = %s" % (t,key))
                 else:
                     GObject.idle_add(self.vlc.show_result, "failed to scored %s (no time calculated)" % key)
