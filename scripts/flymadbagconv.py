@@ -8,6 +8,8 @@ import rosbag
 import pandas as pd
 import numpy as np
 
+SECOND_TO_NANOSEC = 1e9
+
 def create_df(bname, calc_vel=True):
     times = []
     x = []
@@ -30,8 +32,10 @@ def create_df(bname, calc_vel=True):
              "theta":theta,
              "t":times,
             },
-            index=(np.array(times)*1000).astype(np.int64),
+            index=(np.array(times)*SECOND_TO_NANOSEC).astype(np.int64),
     )
+    if not df.index.is_unique:
+        print "DUPLICATE INDICES (TIMES) IN DATAFRAME"
 
     if calc_vel:
         dt = np.gradient(df['t'].values)
