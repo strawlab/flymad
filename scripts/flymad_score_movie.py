@@ -32,7 +32,10 @@ class OCRThread(threading.Thread):
 
     CROP = (0, 0, 245 , 35)
     THRESH = 140
-    DT_RE = r"([0-9]{4})([_ ]{1})([0-9]{2})([_ ]{1})([0-9]{2})\ ([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{1})([0-9]+)"
+    #spaces are sometime spuriously detected, dots are often not detected. Drop
+    #both and adjust the regex to not need them
+    #2013-08-1411:00:30092675+02:00
+    DT_RE = r"([0-9]{4})([_ ]{1})([0-9]{2})([_ ]{1})([0-9]{2})([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
 
     def __init__(self, callback, key, tid):
         threading.Thread.__init__(self)
@@ -66,6 +69,8 @@ class OCRThread(threading.Thread):
         if proc.returncode == 0:
             err = ''
             try:
+                #remove spaces
+                stdout = stdout.replace(' ','')
                 y,_,m,_,d,H,_,M,_,S,_,ms = re.match(self.DT_RE,stdout).groups()
                 t = datetime.datetime(
                         int(y),int(m),int(d),
@@ -74,9 +79,10 @@ class OCRThread(threading.Thread):
                 )
                 #convert to seconds since epoch in UTC
                 now = time.mktime(t.timetuple())+1e-6*t.microsecond
-                print t, now
+                print stdout.replace('\n','')," = ",t, now
             except Exception, e:
                 err = 'error parsing string %s' % stdout
+                print err
                 now = np.nan
         else:
             err = stderr
