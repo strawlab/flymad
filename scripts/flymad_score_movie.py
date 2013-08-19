@@ -21,6 +21,7 @@ import pandas as pd
 import Image
 import ImageChops
 
+import roslib; roslib.load_manifest('flymad')
 import flymad.vlc as vlc
 
 # Create a single vlc.Instance() to be shared by (possible) multiple players.
