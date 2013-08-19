@@ -23,6 +23,7 @@ import ImageChops
 
 import roslib; roslib.load_manifest('flymad')
 import flymad.vlc as vlc
+import flymad.conv as bagconv
 
 # Create a single vlc.Instance() to be shared by (possible) multiple players.
 instance = vlc.Instance("--no-snapshot-preview --snapshot-format png")
