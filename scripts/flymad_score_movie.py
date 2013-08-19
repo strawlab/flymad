@@ -158,6 +158,7 @@ class DecoratedVLCWidget(Gtk.Grid):
 class VideoScorer(Gtk.Window):
 
     THREAD_REPEAT = 3
+    #maps keys to which colum in the dataframe they are stored
     KEYS = {
         "a":"as",
         "s":"as",
@@ -172,7 +173,7 @@ class VideoScorer(Gtk.Window):
         "zx":"x",
         "cv":"v",
     }
-        
+
 
     def __init__(self):
         Gtk.Window.__init__(self)
