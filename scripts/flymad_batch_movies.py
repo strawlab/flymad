@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     destdir = os.path.expanduser("~/movies")
     inputfmf = os.path.expanduser("/media/DBATH_1TB/please_make_mp4s") 
-    print inputfmf
+    #print inputfmf
     inputbags = os.path.expanduser("~/flymad_rosbag/")
 
     fmfs = glob.glob(inputfmf+"/*.fmf")
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         btime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
         matching = {}
         for fmf in fmfs:
-            print 'processing fmf', fmf
+            #print 'processing fmf', fmf
             try:
                 fmffn = os.path.basename(fmf)
                 genotype,camn,datestr = fmffn.split("_",2)
