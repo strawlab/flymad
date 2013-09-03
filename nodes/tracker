@@ -168,7 +168,7 @@ class Tracker:
         xy = np.array([(p.x,p.y) for p in msg.points])
 
         if dframes > 1:
-            raise NotImplementedError('missing data')
+            rospy.logwarn('missing data')
 
         for obj in self.objs:
             # iff object takes 2D candidate, remove from xy array.
