@@ -101,7 +101,7 @@ class TrackedObject:
         p2 = P[0,0] + P[1,1] # poor man's trace
         #print 'p2',p2
         if p2 > MAX_P2:
-            self.is_living = False
+            self.kill()
 
         if not self.isinitial:
             # don't bother publishing first point
