@@ -34,7 +34,7 @@ get_next_obj_id = static_obj_ids.get_next
 
 class TrackedObject:
     def __init__(self,x,y):
-        self.obj_id = get_next_obj_id()
+        self.obj_id = None
         dt = 1.0/FPS
 
         # process model
@@ -105,6 +105,10 @@ class TrackedObject:
 
         if not self.isinitial:
             # don't bother publishing first point
+
+            if self.obj_id is None:
+                self.obj_id = get_next_obj_id()
+
             msg = TrackedObj()
             msg.obj_id = self.obj_id
             msg.header.stamp = rospy.Time.now()
