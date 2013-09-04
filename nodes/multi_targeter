@@ -150,16 +150,9 @@ class Targeter:
         cur_obj_ids = set(self.tracked_objects.keys())
 
         newly_dead_obj_ids = orig_obj_ids - cur_obj_ids
-        newly_born_obj_ids = cur_obj_ids - orig_obj_ids
+        newly_born_obj_ids = cur_obj_ids - orig_obj_ids 
 
-        for obj_id in newly_dead_obj_ids:
-            del self.hit_dict[obj_id]
-            # abort current plan if it involves this object
-            if self.current_plan[0] != 'idle':
-                obj = self.current_plan[1]
-                if obj.msg.obj_id == obj_id:
-                    self.current_plan = ('idle',None)
-                    print self.current_plan
+        
 
         #we only put objects into the hit_dict if they are in the right part of the arena
         for obj_id in newly_born_obj_ids:
@@ -171,19 +164,28 @@ class Targeter:
             s=self.hit_dict[obj_id].msg.state_vec
             if not self.in_target_area(s):
                 del self.hit_dict[obj_id]
+                #we have to somehow abort the current plan
                 if obj_id in newly_born_obj_ids:
                     newly_born_obj_ids.remove(obj_id)
-                    if self.current_plan[0] != 'idle':
-                        obj = self.current_plan[1]
-                        if obj.msg.obj_id == obj_id:
-                            self.current_plan = ('idle',None)
-                            print self.current_plan
+                if obj_id in newly_dead_obj_ids:
+                    newly_dead_obj_ids.remove(obj_id)
+                
 
         #we put objects in the hit_dict if they get to the right part of the arena
         for obj_id in cur_obj_ids:
             s=self.tracked_objects[obj_id].msg.state_vec
             if self.in_target_area(s):
                 self.hit_dict[obj_id]=self.tracked_objects[obj_id]
+
+        for obj_id in newly_dead_obj_ids:
+            del self.hit_dict[obj_id]
+            # abort current plan if it involves this object
+            if self.current_plan[0] != 'idle':
+                obj = self.current_plan[1]
+                if obj.msg.obj_id == obj_id:
+                    self.current_plan = ('idle',None)
+                    self.point_mirrors_at_nothing()
+
 
         # --------------------------------------------------
         now = rospy.Time.now()
@@ -203,23 +205,20 @@ class Targeter:
                 # now we have the oldest hit fly
                 time_since_last_hit = now - oldest_hit_time
                 if time_since_last_hit > HIT_START_DT:
-                    self.current_plan = ('point mirror pre zap',oldest_hit_obj)
-                    print self.current_plan
+                    self.set_current_plan('point mirror pre zap',oldest_hit_obj)
 
         if self.current_plan[0] == 'point mirror pre zap':
             obj = self.current_plan[1]
             self.point_mirrors_at_obj(obj)
             laser_distance = self.get_laser_distance(obj)
             if laser_distance < THRESHOLD_DISTANCE_PIXELS:
-                self.current_plan = ('zap start',obj)
-                print self.current_plan
+                self.set_current_plan('zap start',obj)
 
         if self.current_plan[0] == 'zap start':
             obj = self.current_plan[1]
             self.point_mirrors_at_obj(obj)
-            self.pub_laser.publish( 250 )
-            self.current_plan = ('zap continue',obj,now)
-            print self.current_plan
+            self.pub_laser.publish( 255 )
+            self.set_current_plan('zap continue',obj,now)
 
         if self.current_plan[0] == 'zap continue':
             obj = self.current_plan[1]
@@ -229,9 +228,16 @@ class Targeter:
             this_duration = now - laser_start_time
             dur_sec = this_duration.to_sec()
             if dur_sec > HIT_DURATION:
-                self.pub_laser.publish( 0 )
-                self.current_plan = ('idle',None)
-                print self.current_plan
+                self.pub_laser.publish( 255 )
+                if self.current_plan[0] != 'idle':
+                    print obj
+                    self.set_current_plan('idle',None)
+
+
+    def set_current_plan(self, *args):
+        self.current_plan = args
+        print self.current_plan
+
 
     def get_current_predicted_xy(self,obj):
         now = rospy.Time.now()
@@ -261,12 +267,25 @@ class Targeter:
 
     def point_mirrors_at_obj(self,obj):
         x,y = self.get_current_predicted_xy(obj)
+        self.point_mirrors_at_xy(x,y,obj.msg.obj_id)
 
+    def point_mirrors_at_nothing(self):
+        self.point_mirrors_at_xy(250,250,0)
+
+    def point_mirrors_at_xy(self,x,y,obj_id):
         # desired
+        bad_data = False
         try:
             daca = self.cal.p2da[y,x]
             dacb = self.cal.p2db[y,x]
         except IndexError:
+            bad_data = True
+        else:
+            if np.isnan( daca ) or np.isnan( dacb ):
+                bad_data = True
+        
+        if bad_data:
+            # Hmm, should we do something more?
             return
 
         aa, ab = self._get_current_dacs()
@@ -277,15 +296,24 @@ class Targeter:
 
         if laser_distance < VELOCITY_MODE_THRESHOLD_PIXELS:
             # velocity mode
+            print "velocity_mode"
 
             diffa = daca-aa
             diffb = dacb-ab
 
-            vela = diffa*K_PROPORTIONAL
-            velb = diffb*K_PROPORTIONAL
+            if (diffa**2 + diffb**2) < 1:
+                print 'vel zero'
+                vela = 0
+                velb = 0
+            else:
+                vela = diffa*K_PROPORTIONAL
+                velb = diffb*K_PROPORTIONAL
+                print str(vela) + "vela" 
+                print str(velb) + "velb" 
 
             if np.isnan(vela) or np.isnan(velb):
                 return
+
             msg = MicroVelocity()
             msg.velA = myint32(vela)
             msg.velB = myint32(velb)
@@ -296,6 +324,7 @@ class Targeter:
                 self.last_vals = this_vels
         else:
             # position mode
+            print "position_mode"
             a = int(np.round(daca))
             b = int(np.round(dacb))
             msg = MicroPosition()
@@ -314,14 +343,18 @@ class Targeter:
 
         msg = StampedObject()
         msg.header.stamp = rospy.Time.now()
-        msg.obj_id = obj.msg.obj_id
+        msg.obj_id = obj_id
         self.pub_targeted.publish(msg)
 
     def run(self):
         r = rospy.Rate(200) # 200hz
-        while not rospy.is_shutdown():
+        startall = time.time()
+        while not rospy.is_shutdown() and time.time() - startall < 600:
             self.update()
             r.sleep() # cycle at 200 Hz
+        self.pub_laser.publish( 0 )
+        exit()    
+
 
 if __name__=='__main__':
     import argparse

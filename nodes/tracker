@@ -11,7 +11,7 @@ import adskalman.adskalman as adskalman
 from flymad.constants import FPS
 
 MAX_DIST_PIXELS = 20.0
-MAX_P2 = 25.0
+MAX_P2 = 5000
 Qsigma=10.0 # process covariance
 Rsigma=10.0 # observation covariance
 

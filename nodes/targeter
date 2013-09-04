@@ -21,8 +21,8 @@ K_PROPORTIONAL = 1e3/30.0
 
 class Targeter:
     def __init__(self,cal_fname, border_x_1=0, border_x_2=500, border_y_1=0, border_y_2=500):
-        rospy.init_node('flymad_targeter')
         self.cal = load_calibration(cal_fname)
+        rospy.init_node('flymad_targeter')
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
                                                 MicroVelocity,
                                                 tcp_nodelay=True)
@@ -53,6 +53,9 @@ class Targeter:
         self.pub_laser = rospy.Publisher('/flymad_micro/laser',
                                          UInt8,
                                          tcp_nodelay=True)
+	self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
+                                                MicroVelocity,
+                                                tcp_nodelay=True)
 
         self.pub_targeted = rospy.Publisher('/flymad/targeted',
                                             StampedObject,
@@ -125,6 +128,10 @@ class Targeter:
             msg = MicroVelocity()
             msg.velA = myint32(vela)
             msg.velB = myint32(velb)
+
+            position = MicroPosition
+            if msg.velA is None:
+                msg.posA = 0
 
             this_vels = msg.velA, msg.velB
             if this_vels != self.last_vals:
