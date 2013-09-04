@@ -115,6 +115,7 @@ class TrackedObject:
             msg.header.frame_id = "pixels"
             msg.framenumber = framenumber
             msg.state_vec = map(float,xhat) # convert from numpy
+            msg.covariance_diagonal = map(float, np.diag(P) )
             msg.is_living = self.is_living
             pub.publish(msg)
         else:
