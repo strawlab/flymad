@@ -14,6 +14,7 @@ import shutil
 import re
 import time
 import datetime
+import glob
 
 import numpy as np
 import pandas as pd
@@ -268,20 +269,34 @@ class VideoScorer(Gtk.Window):
         return False
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-       print "You must provide a movie file name and a bag file name"
+    if len(sys.argv) < 2:  
+       print "You must provide an input directory"
        sys.exit(1)
 
-    fname = sys.argv[1]
-    bname = sys.argv[2]
+    BAG_DATE_FMT = "rosbagOut_%Y-%m-%d-%H-%M-%S.bag"
+    MP4_DATE_FMT = "%Y%m%d_%H%M%S.mp4"
 
-    assert os.path.exists(bname)
-    assert os.path.exists(fname)
+    inputmp4s = glob.glob(sys.argv[1] + "/*.mp4")
+    inputbags = glob.glob(sys.argv[1] + "/*.bag")
 
-    if not os.path.isfile(fname):
-        print "movie file must exist"
-        sys.exit(2)
+    for mp4 in inputmp4s:
+        fname = mp4
+		
+        mp4fn = os.path.basename(mp4)
+        genotype,datestr = mp4fn.split("_",1)
+        mp4time = time.strptime(datestr, MP4_DATE_FMT)
+        for bag in inputbags:
+        	if  mp4time == time.strptime(os.path.basename(bag), BAG_DATE_FMT):
+        	    bname = bag
+        	else:
+        		continue
 
-    p = VideoScorer()
-    p.main(fname, bname)
+        assert os.path.exists(bname)
+        assert os.path.exists(fname)
 
+        if not os.path.isfile(fname):
+            print "movie file must exist. give input dir, not dir/"
+            sys.exit(2)
+
+        p = VideoScorer()
+        p.main(fname, bname)
