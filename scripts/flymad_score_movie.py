@@ -15,6 +15,7 @@ import re
 import time
 import datetime
 import glob
+import zipfile
 
 import numpy as np
 import pandas as pd
@@ -93,9 +94,9 @@ class OCRThread(threading.Thread):
         else:
             err = stderr
 
-        shutil.rmtree(self._tdir)
+        self._cb(err, now, out, self._key, self._tid)
 
-        self._cb(err, now, self._key, self._tid)
+        shutil.rmtree(self._tdir)
 
 
 class VLCWidget(Gtk.DrawingArea):
@@ -194,6 +195,9 @@ class VideoScorer(Gtk.Window):
         self.connect("destroy", Gtk.main_quit)
         self.add(self.vlc)
 
+        self._faildir = tempfile.mkdtemp(prefix='img')
+        self._failures = {}
+
         #annots[time] = value
         self._annots = {}
 
@@ -243,10 +247,23 @@ class VideoScorer(Gtk.Window):
 
         final.fillna(method='pad').to_csv(self.fname+".csv")
 
+        if self._failures:
+            dlg = Gtk.MessageDialog(self, 0, Gtk.MessageType.QUESTION,
+                Gtk.ButtonsType.YES_NO, "Incomplete Scoring")
+            dlg.format_secondary_text(
+                "%d frames failed to score. Do you wish to save these frames "\
+                "for analysis?" % len(self._failures))
+            rsp = dlg.run()
+            if rsp == Gtk.ResponseType.YES:
+                with zipfile.ZipFile(self.fname+"_scorefail.zip", 'w') as myzip:
+                    for v in self._failures.values():
+                        myzip.write(v)
+            dlg.destroy()
+
         #keep quitting
         return False
 
-    def _on_processing_finished(self, err, now, key, tid):
+    def _on_processing_finished(self, err, now, ocrimg, key, tid):
         with self._pending_lock:
             if err:
                 GObject.idle_add(self.vlc.show_result, err)
@@ -261,6 +278,10 @@ class VideoScorer(Gtk.Window):
                     GObject.idle_add(self.vlc.show_result, "scored t:%s = '%s'" % (t,key))
                 else:
                     GObject.idle_add(self.vlc.show_result, "failed to scored '%s' (no time calculated)" % key)
+
+                    outimg = os.path.join(self._faildir,"%s.ppm" % tid)
+                    shutil.copyfile(ocrimg,outimg)
+                    self._failures[tid] = outimg
 
     def _on_key_press(self, widget, event):
         key = Gdk.keyval_name(event.keyval)
