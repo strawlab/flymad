@@ -107,7 +107,7 @@ class VLCWidget(Gtk.DrawingArea):
 class DecoratedVLCWidget(Gtk.Grid):
 
     def __init__(self, *p):
-        Gtk.Grid.__init__(self)
+        Gtk.Grid.__init__(self,margin=5,column_spacing=5,row_spacing=5)
 
         self._vlc_widget = VLCWidget(*p)
         self._vlc_widget.props.hexpand = True
