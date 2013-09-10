@@ -108,12 +108,11 @@ class OCRThread(threading.Thread):
             except Exception, e:
                 err = 'error parsing string %s' % stdout
                 print err
-                dt = None
                 now = np.nan
         else:
             err = stderr
 
-        self._cb(err, dt, now, out, self._key, self._tid)
+        self._cb(err, now, out, self._key, self._tid)
 
         shutil.rmtree(self._tdir)
 
@@ -287,7 +286,7 @@ class VideoScorer(Gtk.Window):
         #keep quitting
         return False
 
-    def _on_processing_finished(self, err, dt, now, ocrimg, key, tid):
+    def _on_processing_finished(self, err, now, ocrimg, key, tid):
         with self._pending_lock:
 
             self._pending_ocr[tid].append(now)
@@ -297,6 +296,7 @@ class VideoScorer(Gtk.Window):
                 annot = self.KEYS[key]
                 if not np.isnan(t):
                     self._annots[t] = key
+                    dt = datetime.datetime.fromtimestamp(t)
                     GObject.idle_add(self.vlc.show_result, "%s = '%s'" % (dt,key))
                 else:
                     GObject.idle_add(self.vlc.show_result, "failed to scored '%s' (no time calculated)" % key)
