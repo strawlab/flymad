@@ -101,18 +101,19 @@ class OCRThread(threading.Thread):
             try:
                 #remove spaces
                 stdout = stdout.replace(' ','')
-                t = self.run_regex(stdout)
+                dt = self.run_regex(stdout)
                 #convert to seconds since epoch in UTC
-                now = time.mktime(t.timetuple())+1e-6*t.microsecond
-                print stdout.replace('\n','')," = ",t, now
+                now = time.mktime(dt.timetuple())+1e-6*dt.microsecond
+                print stdout.replace('\n','')," = ",dt, now
             except Exception, e:
                 err = 'error parsing string %s' % stdout
-                print err,e
+                print err
+                dt = None
                 now = np.nan
         else:
             err = stderr
 
-        self._cb(err, now, out, self._key, self._tid)
+        self._cb(err, dt, now, out, self._key, self._tid)
 
         shutil.rmtree(self._tdir)
 
@@ -286,7 +287,7 @@ class VideoScorer(Gtk.Window):
         #keep quitting
         return False
 
-    def _on_processing_finished(self, err, now, ocrimg, key, tid):
+    def _on_processing_finished(self, err, dt, now, ocrimg, key, tid):
         with self._pending_lock:
             if err:
                 GObject.idle_add(self.vlc.show_result, err)
@@ -298,7 +299,7 @@ class VideoScorer(Gtk.Window):
                 annot = self.KEYS[key]
                 if not np.isnan(t):
                     self._annots[t] = key
-                    GObject.idle_add(self.vlc.show_result, "scored t:%s = '%s'" % (t,key))
+                    GObject.idle_add(self.vlc.show_result, "%s = '%s'" % (dt,key))
                 else:
                     GObject.idle_add(self.vlc.show_result, "failed to scored '%s' (no time calculated)" % key)
 
