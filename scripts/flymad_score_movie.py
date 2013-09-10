@@ -249,9 +249,9 @@ class VideoScorer(Gtk.Window):
                 annot = self.KEYS[key]
                 if not np.isnan(t):
                     self._annots[t] = key
-                    GObject.idle_add(self.vlc.show_result, "scored t:%s = %s" % (t,key))
+                    GObject.idle_add(self.vlc.show_result, "scored t:%s = '%s'" % (t,key))
                 else:
-                    GObject.idle_add(self.vlc.show_result, "failed to scored %s (no time calculated)" % key)
+                    GObject.idle_add(self.vlc.show_result, "failed to scored '%s' (no time calculated)" % key)
 
     def _on_key_press(self, widget, event):
         key = Gdk.keyval_name(event.keyval)
