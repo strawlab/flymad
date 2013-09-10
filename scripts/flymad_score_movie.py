@@ -32,7 +32,10 @@ instance = vlc.Instance("--no-snapshot-preview --snapshot-format png")
 class OCRThread(threading.Thread):
 
     CROP = (0, 0, 245 , 35)
-    THRESH = 140
+
+    #set to zero to let gocr auto-threshold the image
+    THRESH = 0#140
+
     #spaces are sometime spuriously detected, dots are often not detected. Drop
     #both and adjust the regex to not need them
     #2013-08-1411:00:30092675+02:00
@@ -56,11 +59,13 @@ class OCRThread(threading.Thread):
         im = im.crop(self.CROP)
 
         # Converts to black and white
-        im = im.point(lambda p: p > self.THRESH and 255)  
+        if self.THRESH > 0:
+            im = im.point(lambda p: p > self.THRESH and 255)  
+
         im.save(out)
 
         proc = subprocess.Popen(
-                    ['gocr','-i',out,'-C','0123456789:+.','-d','0','-a','90', '-s', '10'],
+                    ['gocr','-i',out,'-C','0123456789:+.','-d','0','-a','80', '-s', '10'],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
         )
