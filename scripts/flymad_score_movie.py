@@ -115,14 +115,14 @@ class DecoratedVLCWidget(Gtk.Grid):
         self.player = self._vlc_widget.player
         self.attach(self._vlc_widget,0,0,5,1)
 
-        for i,(stock, callback) in enumerate((
-            (Gtk.STOCK_MEDIA_PLAY, lambda b: self.player.play()),
-            (Gtk.STOCK_MEDIA_PAUSE, lambda b: self.player.pause()),
-            (Gtk.STOCK_MEDIA_NEXT, lambda b: self.player.next_frame()),
-            (Gtk.STOCK_MEDIA_STOP, lambda b: self.player.stop()),
+        for i,(stock, func) in enumerate((
+            (Gtk.STOCK_MEDIA_PLAY, self.player.play),
+            (Gtk.STOCK_MEDIA_PAUSE, self.player.pause),
+            (Gtk.STOCK_MEDIA_NEXT, self.player.next_frame),
+            (Gtk.STOCK_MEDIA_STOP, self.player.stop),
             )):
             b = Gtk.Button(stock=stock)
-            b.connect("clicked", callback)
+            b.connect("clicked", self._on_click_player_command, func)
             b.props.hexpand = False
             b.props.halign = Gtk.Align.START
             self.attach(b,i,1,1,1)
@@ -141,6 +141,10 @@ class DecoratedVLCWidget(Gtk.Grid):
         self.attach(self._lbl,1,2,4,1)
 
         GObject.timeout_add(50,self._update_slider)
+
+    def _on_click_player_command(self, btn, func):
+        func()
+        self._update_slider()
 
     def _slider_changed(self, scale):
         if not self._scale_changing_by_us:
