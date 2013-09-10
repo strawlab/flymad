@@ -16,6 +16,7 @@ import time
 import datetime
 import glob
 import zipfile
+import argparse
 
 import numpy as np
 import pandas as pd
@@ -32,32 +33,54 @@ instance = vlc.Instance("--no-snapshot-preview --snapshot-format png")
 
 class OCRThread(threading.Thread):
 
-    CROP = (0, 0, 245 , 35)
-
     #set to zero to let gocr auto-threshold the image
     THRESH = 0#140
 
     #spaces are sometime spuriously detected, dots are often not detected. Drop
     #both and adjust the regex to not need them
     #2013-08-1411:00:30092675+02:00
+    DT_CROP = (0, 0, 245 , 35)
     DT_RE = r"([0-9]{4})([_ ]{1})([0-9]{2})([_ ]{1})([0-9]{2})([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
 
-    def __init__(self, callback, key, tid):
+    T_CROP = (85, 0, 245 , 35)
+    T_RE = r"([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
+
+    def __init__(self, callback, key, tid, force_date):
         threading.Thread.__init__(self)
         self._cb = callback
         self._key = key
         self._tid = tid
         self._tdir = tempfile.mkdtemp(prefix='img')
 
+        self._force_date = force_date
+        self._crop = self.T_CROP if self._force_date else self.DT_CROP
+        self._re = re.compile(self.T_RE if self._force_date else self.DT_RE)
+
     def input_image(self, fn="in.png"):
         return os.path.join(self._tdir, fn)
+
+    def run_regex(self, stdout):
+        if self._force_date:
+            y,m,d = self._force_date
+            H,_,M,_,S,_,ms = self._re.match(stdout).groups()
+        else:
+            y,_,m,_,d,H,_,M,_,S,_,ms = self._re.match(stdout).groups()
+
+        t = datetime.datetime(
+                int(y),int(m),int(d),
+                int(H),int(M),int(S),
+                int(float("0."+ms)*1e6), #us
+        )
+
+        return t
+
 
     def run(self):
         img = self.input_image()
         out = self.input_image("in.ppm")
 
         im = Image.open(img)
-        im = im.crop(self.CROP)
+        im = im.crop(self._crop)
 
         # Converts to black and white
         if self.THRESH > 0:
@@ -78,18 +101,13 @@ class OCRThread(threading.Thread):
             try:
                 #remove spaces
                 stdout = stdout.replace(' ','')
-                y,_,m,_,d,H,_,M,_,S,_,ms = re.match(self.DT_RE,stdout).groups()
-                t = datetime.datetime(
-                        int(y),int(m),int(d),
-                        int(H),int(M),int(S),
-                        int(float("0."+ms)*1e6), #us
-                )
+                t = self.run_regex(stdout)
                 #convert to seconds since epoch in UTC
                 now = time.mktime(t.timetuple())+1e-6*t.microsecond
                 print stdout.replace('\n','')," = ",t, now
             except Exception, e:
                 err = 'error parsing string %s' % stdout
-                print err
+                print err,e
                 now = np.nan
         else:
             err = stderr
@@ -187,7 +205,7 @@ class VideoScorer(Gtk.Window):
     }
 
 
-    def __init__(self):
+    def __init__(self, force_date):
         Gtk.Window.__init__(self)
         self.vlc = DecoratedVLCWidget()
         self.connect("key-press-event",self._on_key_press)
@@ -203,6 +221,11 @@ class VideoScorer(Gtk.Window):
 
         self._pending_lock = threading.Lock()
         self._pending_ocr = {}
+
+        if force_date:
+            self._force_date = map(int,args.force_date.split('/'))
+        else:
+            self._force_date = tuple()
 
     def main(self, fname, bagname):
         self.fname = fname
@@ -293,22 +316,33 @@ class VideoScorer(Gtk.Window):
 
         if key in self.KEYS:
             for i in range(self.THREAD_REPEAT):
-                t = OCRThread(self._on_processing_finished, key, tid)
+                t = OCRThread(self._on_processing_finished, key, tid, self._force_date)
                 self.vlc.player.video_take_snapshot(0,t.input_image(),0,0)
                 t.start()
             return True
         return False
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:  
-       print "You must provide an input directory"
-       sys.exit(1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('directory', metavar='/moviedir', nargs=1)
+    parser.add_argument('--force-date', metavar='YYYY/MM/DD',
+                help='force the date of the events, only extract the time '\
+                     'from the video')
+
+    args = parser.parse_args()
+
+    if args.force_date:
+        try:
+            y,m,d = map(int,args.force_date.split('/'))
+        except:
+            parser.error("could not parse date string: %s" % args.force_date)
 
     BAG_DATE_FMT = "rosbagOut_%Y-%m-%d-%H-%M-%S.bag"
     MP4_DATE_FMT = "%Y%m%d_%H%M%S.mp4"
 
-    inputmp4s = glob.glob(sys.argv[1] + "/*.mp4")
-    inputbags = glob.glob(sys.argv[1] + "/*.bag")
+    directory = args.directory[0]
+    inputmp4s = glob.glob(directory + "/*.mp4")
+    inputbags = glob.glob(directory + "/*.bag")
 
     for mp4 in inputmp4s:
         fname = mp4
@@ -329,5 +363,5 @@ if __name__ == '__main__':
             print "movie file must exist. give input dir, not dir/"
             sys.exit(2)
 
-        p = VideoScorer()
+        p = VideoScorer(args.force_date)
         p.main(fname, bname)
