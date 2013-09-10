@@ -183,7 +183,7 @@ class DecoratedVLCWidget(Gtk.Grid):
         return True
 
     def show_result(self, r):
-        self._lbl.set_text(r.strip())
+        self._lbl.set_markup(r.strip())
         return False
 
 class VideoScorer(Gtk.Window):
@@ -289,8 +289,6 @@ class VideoScorer(Gtk.Window):
 
     def _on_processing_finished(self, err, dt, now, ocrimg, key, tid):
         with self._pending_lock:
-            if err:
-                GObject.idle_add(self.vlc.show_result, err)
 
             self._pending_ocr[tid].append(now)
 
