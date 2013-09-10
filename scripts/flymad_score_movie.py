@@ -113,11 +113,12 @@ class DecoratedVLCWidget(Gtk.Grid):
         self._vlc_widget.props.hexpand = True
         self._vlc_widget.props.vexpand = True
         self.player = self._vlc_widget.player
-        self.attach(self._vlc_widget,0,0,4,1)
+        self.attach(self._vlc_widget,0,0,5,1)
 
         for i,(stock, callback) in enumerate((
             (Gtk.STOCK_MEDIA_PLAY, lambda b: self.player.play()),
             (Gtk.STOCK_MEDIA_PAUSE, lambda b: self.player.pause()),
+            (Gtk.STOCK_MEDIA_NEXT, lambda b: self.player.next_frame()),
             (Gtk.STOCK_MEDIA_STOP, lambda b: self.player.stop()),
             )):
             b = Gtk.Button(stock=stock)
