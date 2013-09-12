@@ -10,6 +10,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
+from trackingparams import Kalman
+
+REPLACE_XY = False
+
 if len(sys.argv) !=2:
     print 'call flymad_velocity with directory. example: "home/user/foo/filedir"'
     exit()	
@@ -29,12 +33,30 @@ for csvfile in sorted(glob.glob(sys.argv[1] + "/*.csv")):
         print "invalid filename:", csvfilefn
         continue 
     df = pd.read_csv(csvfile)
+
+    if REPLACE_XY:
+        nx,ny,nvx,nvy,nv = "x","y","vx","vy","v"
+    else:
+        nx,ny,nvx,nvy,nv = "sx","sy","svx","svy","sv"
+
+    #smooth the positions, and recalculate the velocitys based on this. if
+    #REPLACE_XY is true, the old columns (x,y,vx,vy,v) are replaced, otherwise
+    #new colums with the smoothed values are added (sx,sy,svx,svy,sv).
+    kf = Kalman()
+    smoothed = kf.smooth(df['x'], df['y'])
+    df[nx] = smoothed[:,0]
+    df[ny] = smoothed[:,1]
+    dt = np.gradient(df['tracked_t'].values)
+    df[nvx] = np.gradient(df[nx].values) / dt
+    df[nvy] = np.gradient(df[nx].values) / dt
+    df[nv] = np.sqrt( (df[nvx].values**2) + (df[nvy].values**2) )
+
     df['laser_state'] = df['laser_state'].fillna(value=0)
     lasermask = df[df['laser_state'] == 1]
     df = df.iloc[range(0,len(df),2)] #delete duplicated values... silly bug.
     df['tracked_t'] = df['tracked_t'] - np.min(lasermask['tracked_t'].values)
     df = df.drop('Unnamed: 0',1)   
-    
+
     #ROTATE by pi if orientation is east
     df['zx'][df['zx'] == 'z'] = math.pi
     df['zx'][df['zx'] == 'x'] = 0
