@@ -70,11 +70,13 @@ if __name__ == '__main__':
             csvfile2fn = os.path.basename(csvfile2)
             try:
                 experimentID2,date2,time2 = csvfile2fn.split("_",2)
+                genotype2,laser2,repID2 = experimentID2.split("-",2)
+                repID2 = repID2 + "_" + date2
             except:
                 continue
             if csvfile2fn in filelist:
                 continue 
-            elif experimentID2 == experimentID:
+            elif repID2 == repID:
                 print "    concatenating:", csvfile2fn
                 filelist.append(csvfile2fn)
                 csv2df = pd.read_csv(csvfile2)
@@ -82,25 +84,36 @@ if __name__ == '__main__':
                 df = pd.concat([df, csv2df])
             else:
                 continue
-        #MATCH COLUMN NAMES (OLD VS NEW mad_score_movie)
-        if date >= 20130827:
-            df.drop('as')
-            df.rename(columns={'tracked_t': 't', 'laser_state': 'as'}, inplace=True)   
-        #FILL NAN WITH 'V', 'X' AND 'S'
+  
+        #convert 'V', 'X' AND 'S' to 1 or 0
         df['zx'] = df['zx'].astype(object).fillna('x')
         df['as'] = df['as'].astype(object).fillna('s')
         df['cv'] = df['cv'].astype(object).fillna('v')
-        df['zx'][df['zx']=='z'] = 1
-        df['cv'][df['cv']=='c'] = 1
-        df['as'][df['as']=='a'] = 1
-        df['zx'][df['zx']=='x'] = 0
-        df['cv'][df['cv']=='v'] = 0
-        df['as'][df['as']=='s'] = 0
+        df['as'].fillna(value='s')
+        df['cv'].fillna(value='v')        
+        df['zx'][df['zx'] == 'z'] = 1
+        df['cv'][df['cv'] == 'c'] = 1
+        df['as'][df['as'] == 'a'] = 1
+        df['zx'][df['zx'] == 'x'] = 0
+        df['cv'][df['cv'] == 'v'] = 0
+        df['as'][df['as'] == 's'] = 0
+        
+        #MATCH COLUMN NAMES (OLD VS NEW mad_score_movie)
+        datenum = int(date)
+        if datenum >= 20130827:
+            df = df.drop('as',axis=1)
+            df = df.rename(columns={'tracked_t':'t', 'laser_state':'as'}) #, inplace=False
+            df['as'] = df['as'].fillna(value=0)
+        else:
+            pass           
     
-        #MAKE POSITIONS INTO INTEGERS
-        df['x'] = (df['x'] + 0.5).astype(int)
-        df['y'] = (df['y'] + 0.5).astype(int)        
-        df[['theta','v','vx','vy','x','y','zx','as','cv']] = df[['theta','v','vx','vy','x','y','zx','as','cv']].astype(float)                     
+        #MAKE POSITIONS INTO INTEGERS      
+        #df['x'] = (df['x'] + 0.5).astype(int)
+        #df['y'] = (df['y'] + 0.5).astype(int) 
+        df[['t','theta','v','vx','vy','x','y','zx','as','cv']] = df[['t','theta','v','vx','vy','x','y','zx','as','cv']].astype(float)
+          
+        #df['x'][np.isfinite(df['x'])] = (df['x'][np.isfinite(df['x'])] + 0.5).astype(int)
+        #df['y'][np.isfinite(df['y'])] = (df['y'][np.isfinite(df['y'])] + 0.5).astype(int)
         #CALCULATE DISTANCE FROM TARGETs, KEEP MINIMUM AS dtarget
         dist = DataFrame.copy(df, deep=True)
         dist['x0'] = df['x'] - targets.ix[0,'x']
@@ -126,7 +139,8 @@ if __name__ == '__main__':
             df['t'] = df['t'] - np.max(lasermask['t'].values)#laser off time =0               
         else:  
             print "No laser detected. Default start time = -120."
-            df['t'] = df['t'] - np.min(df['t'].values) - 120 
+            df['t'] = df['t'] - np.min(df['t'].values) - 120
+            continue  # throw out for now !!!!!!!!!!!!!!!!!!!!!11 
         #bin to  5 second bins:
         df = df[np.isfinite(df['t'])]
         df['t'] = df['t'] * 0.2
@@ -149,9 +163,13 @@ if __name__ == '__main__':
     dfmean = pooldf.groupby(['Genotype', 'lasergroup', 't'], as_index=False).mean()
     dfstd = pooldf.groupby(['Genotype', 'lasergroup', 't'], as_index=False).std()
     dfn = pooldf.groupby(['Genotype', 'lasergroup','t'],  as_index=False).count()
+    dfn.to_csv((sys.argv[1] + "/outputs/n.csv"))
+    #dfsem = (dfstd[['zx','dtarget']]).values/(np.sqrt((dfn[['zx', 'dtarget']]).values))
+    #dfsem = (dfstd).values / (np.sqrt((dfn).values))
     dfmean.sort(['t'])
 
     dfmean.to_csv((sys.argv[1] + "/outputs/means.csv"))
+
 
 
 
