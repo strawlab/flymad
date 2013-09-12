@@ -28,7 +28,7 @@ class Kalman:
 
     def smooth(self, x, y):
 
-        y = np.c_[x.values,y.values]
+        y = np.c_[x,y]
         initx = np.array([y[0,0],y[0,1],0,0])
         initV = 0*np.eye(4)
 
