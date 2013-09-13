@@ -19,7 +19,7 @@ from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
 from flymad.constants import FPS
 
-MOTOR_LAG = 0.05
+MOTOR_LAG = 0.015
 K_PROPORTIONAL = 1e3/30.0
 
 HIT_START_FREQ = 10.0 # 10 Hz
@@ -59,7 +59,7 @@ class Targeter:
                  (int(borders_y[0]) <= state_vec[0] <= int(borders_y[1]))) )
         else:
             img = Image.open(mask_image)
-            assert img.size == (500, 500)
+            assert img.size == (600, 600)
             assert img.mode == 'RGB'
             # we are only picking the red channel for masking
             mask = np.asarray(img)[:,:,0] >= 255 
@@ -205,15 +205,15 @@ class Targeter:
                 # now we have the oldest hit fly
                 time_since_last_hit = now - oldest_hit_time
                 if time_since_last_hit > HIT_START_DT:
-                    self.set_current_plan('point mirror pre zap',oldest_hit_obj)
+                    self.set_current_plan('point mirror pre zap',oldest_hit_obj, now)
 
         if self.current_plan[0] == 'point mirror pre zap':
             obj = self.current_plan[1]
             self.point_mirrors_at_obj(obj)
             laser_distance = self.get_laser_distance(obj)
-            if laser_distance < THRESHOLD_DISTANCE_PIXELS:
+            if laser_distance < THRESHOLD_DISTANCE_PIXELS or (now - self.current_plan[2] ) > rospy.Duration(0.5):
                 self.set_current_plan('zap start',obj)
-
+            
         if self.current_plan[0] == 'zap start':
             obj = self.current_plan[1]
             self.point_mirrors_at_obj(obj)
