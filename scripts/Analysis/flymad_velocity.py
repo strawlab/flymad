@@ -11,15 +11,13 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
-from trackingparams import Kalman
+import flymad_analysis
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version == "1.7.1"
 assert pd.__version__ == "0.11.0"
 
 SECOND_TO_NANOSEC = 1e9
-
-REPLACE_XY = True
 
 if len(sys.argv) !=2:
     print 'call flymad_velocity with directory. example: "home/user/foo/filedir"'
@@ -47,55 +45,15 @@ for csvfile in sorted(glob.glob(sys.argv[1] + "/*.csv")):
     #pandas doesn't know how to resample columns with type 'object'. Which is
     #fair. so fix up the scoring colums, and their meanings now
     #ROTATE by pi if orientation is east
-    df['zx'][df['zx'] == 'z'] = math.pi
-    df['zx'][df['zx'] == 'x'] = 0
-    df['zx'] = df['zx'].astype(np.float64)
+    flymad_analysis.fix_scoring_colums(df,
+                    valmap={'zx':{'z':math.pi,'x':0},
+                            'as':{'a':1,'s':0}})
 
-    df['as'][df['as'] == 'a'] = 1
-    df['as'][df['as'] == 's'] = 0
-    df['as'] = df['as'].astype(np.float64)
+    #resample to 10ms (mean) and set a proper time index on the df
+    df = flymad_analysis.fixup_index_and_resample(df, '10L')
 
-    #tracked_t was the floating point timestamp, which when roundtripped through csv
-    #could lose precision. The index is guarenteed to be unique, so recreate tracked_t
-    #from the index (which is seconds since epoch)
-    tracked_t = df.index.values.astype(np.float64) / SECOND_TO_NANOSEC
-    df['tracked_t'] = tracked_t
-    #but, you should not need to use tracked_t now anyway, because this dataframe
-    #has a datetime index...
-    #
-    #YAY pandas
-    df['time'] = df.index.values.astype('datetime64[ns]')
-    df.set_index(['time'], inplace=True)
-    #
-    #now resample to 10ms (mean)
-    df = df.resample('10L')
-
-    #we need dt in seconds to calculate velocity. numpy returns nanoseconds here
-    #because this is an array of type datetime64[ns] and I guess it retains the
-    #nano part when casting
-    dt = np.gradient(df.index.values.astype('float64')/SECOND_TO_NANOSEC)
-
-    if REPLACE_XY:
-        nx,ny,nvx,nvy,nv = "x","y","vx","vy","v"
-    else:
-        nx,ny,nvx,nvy,nv = "sx","sy","svx","svy","sv"
-
-    #smooth the positions, and recalculate the velocitys based on this. if
-    #REPLACE_XY is true, the old columns (x,y,vx,vy,v) are replaced, otherwise
-    #new colums with the smoothed values are added (sx,sy,svx,svy,sv).
-    kf = Kalman()
-    smoothed = kf.smooth(df['x'].values, df['y'].values)
-    _x = smoothed[:,0]
-    _y = smoothed[:,1]
-    _vx = np.gradient(_x) / dt
-    _vy = np.gradient(_y) / dt
-    _v = np.sqrt( (_vx**2) + (_vy**2) )
-
-    df[nx] = _x
-    df[ny] = _y
-    df[nvx] = _vx
-    df[nvy] = _vy
-    df[nv] = _v
+    #smooth the positions, and recalculate the velocitys based on this.
+    dt = flymad_analysis.kalman_smooth_dataframe(df)
 
     df['laser_state'] = df['laser_state'].fillna(value=0)
 
@@ -123,14 +81,13 @@ for csvfile in sorted(glob.glob(sys.argv[1] + "/*.csv")):
     
     df['orientation'][np.isfinite(df['orientation'])] = np.unwrap(df['orientation'][np.isfinite(df['orientation'])]) 
     #MAXIMUM SPEED = 300:
-    flyingmask = df['v'] >= 300
-    df.ix[flyingmask, 'v'] = np.nan    
+    df[df['v'] >= 300]['v'] = np.nan
 
     #CALCULATE FORWARD VELOCITY
     df['Vtheta'] = np.arctan2(df['vy'], df['vx'])
     df['Vfwd'] = (np.cos(df['orientation'] - df['Vtheta'])) * df['v']
     df['Afwd'] = np.gradient(df['Vfwd'].values) / dt
-    df['dorientation'] = np.gradient(df['orientation'].values) / dt 
+    df['dorientation'] = np.gradient(df['orientation'].values) / dt
     
     #the resampling above, using the default rule of 'mean' will, if the laser
     #was on any time in that bin, increase the mean > 0.
