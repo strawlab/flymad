@@ -6,13 +6,14 @@ import threading
 import time
 import Queue
 import Image
+import json
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
 
 from flymad.msg import Raw2dPositions, TrackedObj
 from geometry_msgs.msg import Pose2D
-from std_msgs.msg import UInt8, Int64
+from std_msgs.msg import UInt8, Int64, String
 from flymad.msg import MicroVelocity, MicroPosition, StampedObject
 
 from flymad.laser_camera_calibration import load_calibration
@@ -26,6 +27,16 @@ HIT_START_FREQ = 10.0 # 10 Hz
 HIT_DURATION = 0.010 # 10 msec
 THRESHOLD_DISTANCE_PIXELS = 10.0 # when to claim fly is zapped
 VELOCITY_MODE_THRESHOLD_PIXELS = 20.0 # when to switch from postion to velocity mode
+
+def to_serializable(obj):
+    if isinstance(obj, MaybeTargetedObject):
+        result = 'obj %d'%obj.msg.obj_id
+    elif isinstance(obj, rospy.Time ):
+        result = obj.to_sec()
+    else:
+        result = obj
+    return result
+
 
 class MaybeTargetedObject:
     def __init__(self,msg,past):
@@ -72,6 +83,8 @@ class Targeter:
         _ = rospy.Subscriber('/flymad_micro/position_echo',
                              MicroPosition,
                              self.on_dac)
+        self.pub_plan = rospy.Publisher('/multi_targeter/plan',
+                                        String)
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
                                                 MicroPosition,
                                                 tcp_nodelay=True)
@@ -182,7 +195,7 @@ class Targeter:
             if self.current_plan[0] != 'idle':
                 obj = self.current_plan[1]
                 if obj.msg.obj_id == obj_id:
-                    self.current_plan = ('idle',None)
+                    self.set_current_plan('idle',None)
                     self.point_mirrors_at_nothing()
 
 
@@ -237,9 +250,18 @@ class Targeter:
 
 
     def set_current_plan(self, *args):
+                
         self.current_plan = args
         print self.current_plan
 
+        if self.current_plan[0] != 'idle':
+            obj = self.current_plan[1]
+            to_serialize = [ to_serializable(element) for element in self.current_plan ]
+        else:
+            to_serialize = self.current_plan
+
+        msg = String( json.dumps( to_serialize ) )
+        self.pub_plan.publish(msg)
 
     def get_current_predicted_xy(self,obj):
         now = rospy.Time.now()
