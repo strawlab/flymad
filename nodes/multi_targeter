@@ -23,7 +23,6 @@ MOTOR_LAG = 0.01
 K_PROPORTIONAL = 1e3/30.0
 
 HIT_START_FREQ = 10.0 # 10 Hz
-HIT_START_DT = rospy.Duration(1.0/ HIT_START_FREQ)
 HIT_DURATION = 0.010 # 10 msec
 THRESHOLD_DISTANCE_PIXELS = 10.0 # when to claim fly is zapped
 VELOCITY_MODE_THRESHOLD_PIXELS = 20.0 # when to switch from postion to velocity mode
@@ -204,7 +203,10 @@ class Targeter:
             if oldest_hit_obj is not None:
                 # now we have the oldest hit fly
                 time_since_last_hit = now - oldest_hit_time
-                if time_since_last_hit > HIT_START_DT:
+                HIT_START_FREQ2 = HIT_START_FREQ * len(self.hit_dict)/float(len(self.tracked_objects))
+                if time_since_last_hit >  rospy.Duration(1.0/ HIT_START_FREQ2):
+                    print 'time_since_last_hit greater than'
+                    print rospy.Duration(1.0/ HIT_START_FREQ2)
                     self.set_current_plan('point mirror pre zap',oldest_hit_obj, now)
 
         if self.current_plan[0] == 'point mirror pre zap':
