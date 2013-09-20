@@ -19,7 +19,7 @@ from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
 from flymad.constants import FPS
 
-MOTOR_LAG = 0.015
+MOTOR_LAG = 0.01
 K_PROPORTIONAL = 1e3/30.0
 
 HIT_START_FREQ = 10.0 # 10 Hz
