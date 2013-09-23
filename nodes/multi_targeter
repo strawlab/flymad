@@ -6,7 +6,6 @@ import threading
 import time
 import Queue
 import Image
-import json
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
@@ -14,7 +13,7 @@ import rospy
 from flymad.msg import Raw2dPositions, TrackedObj
 from geometry_msgs.msg import Pose2D
 from std_msgs.msg import UInt8, Int64, String
-from flymad.msg import MicroVelocity, MicroPosition, StampedObject
+from flymad.msg import MicroVelocity, MicroPosition, StampedObject, Plan
 
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
@@ -28,15 +27,18 @@ HIT_DURATION = 0.010 # 10 msec
 THRESHOLD_DISTANCE_PIXELS = 10.0 # when to claim fly is zapped
 VELOCITY_MODE_THRESHOLD_PIXELS = 20.0 # when to switch from postion to velocity mode
 
-def to_serializable(obj):
-    if isinstance(obj, MaybeTargetedObject):
-        result = 'obj %d'%obj.msg.obj_id
-    elif isinstance(obj, rospy.Time ):
-        result = obj.to_sec()
+def str_to_code(plan):
+    if plan=='idle':
+        code = 0
+    elif plan=="point mirror pre zap":
+        code = 1
+    elif plan=="zap start":
+        code = 2
+    elif plan=="zap continue":
+        code = 3
     else:
-        result = obj
-    return result
-
+        raise ValueError('unknown plan: %r'%plan)
+    return code
 
 class MaybeTargetedObject:
     def __init__(self,msg,past):
@@ -84,7 +86,7 @@ class Targeter:
                              MicroPosition,
                              self.on_dac)
         self.pub_plan = rospy.Publisher('/multi_targeter/plan',
-                                        String)
+                                        Plan)
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
                                                 MicroPosition,
                                                 tcp_nodelay=True)
@@ -107,9 +109,9 @@ class Targeter:
         time.sleep(0.4) # give ROS a chance to start up?!
         self.stop_tracking(None)
 
-        self.current_plan = ('idle',None) # a 2 (or more length) tuple, with string
+        self.current_plan = ('idle',None,rospy.Time.now())  # a 3 tuple, with string
                                           # as first element, MaybeTrackedObject
-                                          # instance as second element.
+                                          # instance as second element, timestamp as third element.
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -189,18 +191,19 @@ class Targeter:
             if self.in_target_area(s):
                 self.hit_dict[obj_id]=self.tracked_objects[obj_id]
 
+        now = rospy.Time.now()
+
         for obj_id in newly_dead_obj_ids:
             del self.hit_dict[obj_id]
             # abort current plan if it involves this object
             if self.current_plan[0] != 'idle':
                 obj = self.current_plan[1]
                 if obj.msg.obj_id == obj_id:
-                    self.set_current_plan('idle',None)
+                    self.current_plan = ('idle',None,now)
                     self.point_mirrors_at_nothing()
 
 
         # --------------------------------------------------
-        now = rospy.Time.now()
 
         if self.current_plan[0] == 'idle':
             oldest_hit_time = self.future
@@ -227,7 +230,7 @@ class Targeter:
             self.point_mirrors_at_obj(obj)
             laser_distance = self.get_laser_distance(obj)
             if laser_distance < THRESHOLD_DISTANCE_PIXELS or (now - self.current_plan[2] ) > rospy.Duration(0.5):
-                self.set_current_plan('zap start',obj)
+                self.set_current_plan('zap start',obj,now)
             
         if self.current_plan[0] == 'zap start':
             obj = self.current_plan[1]
@@ -246,7 +249,7 @@ class Targeter:
                 self.pub_laser.publish( 255 )
                 if self.current_plan[0] != 'idle':
                     print obj
-                    self.set_current_plan('idle',None)
+                    self.set_current_plan('idle',None,now)
 
 
     def set_current_plan(self, *args):
@@ -254,13 +257,16 @@ class Targeter:
         self.current_plan = args
         print self.current_plan
 
-        if self.current_plan[0] != 'idle':
-            obj = self.current_plan[1]
-            to_serialize = [ to_serializable(element) for element in self.current_plan ]
-        else:
-            to_serialize = self.current_plan
+        obj = self.current_plan[1]
 
-        msg = String( json.dumps( to_serialize ) )
+        msg = Plan()
+        msg.plan_code = str_to_code(self.current_plan[0])
+        if obj is not None:
+            msg.obj_id = obj.msg.obj_id
+        else:
+            msg.obj_id = 0
+        msg.stamp = self.current_plan[2]
+
         self.pub_plan.publish(msg)
 
     def get_current_predicted_xy(self,obj):
