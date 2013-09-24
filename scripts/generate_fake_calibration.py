@@ -34,6 +34,8 @@ def main():
     dacb = dacb.ravel().astype(np.uint16)
     dac = np.array([daca,dacb])
     pixels = fc.pixels_for_dac( dac )
+
+    pixels[:,3]=np.nan
     print 'dac.shape',dac.shape
     print 'pixels.shape',pixels.shape
     save_raw_calibration_data(fname, dac, pixels)
