@@ -133,7 +133,7 @@ class UI:
                 nodepath="CalibrationResults",
                 nodemanager=self._manager,
                 package=package,
-                node_type="laser_camera_calibration.py",
+                node_type="plot_calibration.py",
                 args=calibrationFile + ".filtered.yaml" )
                 )
 
