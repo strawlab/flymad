@@ -17,8 +17,16 @@ def to_plain(arr):
         raise NotImplementedError('')
 
 def save_raw_calibration_data(fname,dac,pixels):
+    # convert pixels to integer values
+    pixels_int = pixels.astype(np.int)
+    bad_cond = np.isnan(pixels)
+    pixels_int[bad_cond] = -9223372036854775808
+
+    # create dictionary to save as JSON
     to_save = {'dac':to_plain(dac),
-               'pixels':to_plain(pixels.astype(np.int))}
+               'pixels':to_plain(pixels_int)}
+
+    # save it
     fd = open(fname,mode='w')
     json.dump(to_save,fd) # JSON is valid YAML. And faster.
     fd.close()
