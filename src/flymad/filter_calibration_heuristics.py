@@ -27,6 +27,7 @@ def main():
 
     args = parser.parse_args(args)
     fname_in = args.fname_in
+    out_dir = os.path.dirname(os.path.abspath(fname_in))
 
     fname_out = os.path.splitext(fname_in)[0] + '.filtered.yaml'
     dac_in, pixels_in = read_raw_calibration_data(fname_in)
@@ -74,7 +75,8 @@ def main():
     save_raw_calibration_data(fname_out, dac, pixels)
     if 1:
         fname2 = time.strftime("cal_%Y%m%d_%H%M%S.filtered.out")
-        save_raw_calibration_data(fname2, dac, pixels)
+        full_path = os.path.join(out_dir, fname2)
+        save_raw_calibration_data(full_path, dac, pixels)
 
 if __name__=='__main__':
     main()
