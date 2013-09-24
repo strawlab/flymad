@@ -57,6 +57,11 @@ class Calibration:
     def __init__(self, dac, pixels):
         self.dac = dac
         self.pixels = pixels
+
+        good_cond = ~np.isnan(self.pixels)
+        n_good_pixels = np.sum(good_cond)
+        if n_good_pixels==0:
+            raise ValueError('the calibration has zero valid pixels')
         pix_h = np.max(pixels[1,:])+1
         pix_w = np.max(pixels[0,:])+1
 
