@@ -12,6 +12,7 @@ def main():
 
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument('fname_in', type=str, help='input filename')
     parser.add_argument('--hotspot', nargs=2, metavar=('hotspot_x','hotspot_y'),
                         default=(None, None), help='the (X,Y) location of the laser reflection')
     parser.add_argument('--hotspot-radius', type=float,
@@ -22,10 +23,10 @@ def main():
     parser.add_argument('--center-radius', type=float,
                         default=300.0, help='the radius of the laser reflection')
 
-    fname_in = rospy.myargv()[1]
-    args=rospy.myargv()[2:]
+    args=rospy.myargv()[1:]
 
     args = parser.parse_args(args)
+    fname_in = args.fname_in
 
     fname_out = os.path.splitext(fname_in)[0] + '.filtered.yaml'
     dac_in, pixels_in = read_raw_calibration_data(fname_in)
