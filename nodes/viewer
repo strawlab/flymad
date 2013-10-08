@@ -33,8 +33,6 @@ class PixelCoordWidget(Gtk.DrawingArea):
         Gtk.DrawingArea.__init__(self)
         self.lock = threading.Lock()
         with self.lock:
-            self.w = 640
-            self.h = 480
             self.laser_x = np.nan
             self.laser_y = np.nan
             self.pts_x = np.array([])
@@ -44,9 +42,39 @@ class PixelCoordWidget(Gtk.DrawingArea):
             self.living_objs = {}
         self.backbuf = None
 
-        self.connect('draw', self.on_draw)
-        self.connect('configure-event', self.on_resize)
         GLib.timeout_add(1000/self.UPDATE_FREQ, self.on_update)
+
+    def do_configure_event(self,event):
+        with self.lock:
+            self.w = event.width
+            self.h = event.height
+
+        if self.backbuf is not None:
+            self.backbuf.finish()
+            self.backbuf = None
+
+        self.backbuf = cairo.ImageSurface(
+            cairo.FORMAT_ARGB32,
+            self.get_allocated_width(),
+            self.get_allocated_height())
+
+        self.on_update()
+
+        return False
+
+    def do_draw(self, context):
+        if self.backbuf is not None:
+            context.set_source_surface(self.backbuf, 0.0, 0.0)
+            context.paint()
+        else:
+            print 'invalid back buffer'
+        return False
+
+    def do_get_preferred_width(self):
+        return 640, 640
+
+    def do_get_preferred_height(self):
+        return 480, 480
 
     def on_data(self, msg):
         x = np.array([p.x for p in msg.points])
@@ -70,32 +98,6 @@ class PixelCoordWidget(Gtk.DrawingArea):
         with self.lock:
             self.laser_x = px
             self.laser_y = py
-
-    def on_resize(self,widget,event):
-        with self.lock:
-            self.w = event.width
-            self.h = event.height
-
-        if self.backbuf is not None:
-            self.backbuf.finish()
-            self.backbuf = None
-
-        self.backbuf = cairo.ImageSurface(
-            cairo.FORMAT_ARGB32,
-            widget.get_allocated_width(),
-            widget.get_allocated_height())
-
-        self.on_update()
-
-        return False
-
-    def on_draw(self, widget, context):
-        if self.backbuf is not None:
-            context.set_source_surface(self.backbuf, 0.0, 0.0)
-            context.paint()
-        else:
-            print 'invalid back buffer'
-        return False
 
     def on_update(self):
         bb = self.backbuf
@@ -146,7 +148,6 @@ class ViewerApp(Gtk.Window):
             rospy.loginfo('starting viewer with no calibration')
             self.cal = None
         self.set_title ("FlyMAD Viewer")
-        self.set_default_size(640,480)
 
         rospy.init_node('viewer')
 
