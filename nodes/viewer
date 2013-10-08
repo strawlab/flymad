@@ -13,9 +13,9 @@ import cairo
 from benu import benu
 
 from flymad.laser_camera_calibration import load_calibration
-from flymad.msg import Raw2dPositions, TrackedObj
+from flymad.msg import Raw2dPositions, TrackedObj, MicroPosition
 from geometry_msgs.msg import Pose2D
-from flymad.msg import MicroPosition
+from std_msgs.msg import Int64
 
 class PixelCoordWidget(Gtk.DrawingArea):
     UPDATE_FREQ = 30
@@ -71,14 +71,22 @@ class PixelCoordWidget(Gtk.DrawingArea):
         self.pts_y = y
 
     def on_tracking(self, msg):
+        new,old = [],[]
+
+        obj_id = msg.obj_id
         if msg.is_living:
+            if obj_id not in self.living_objs:
+                new.append(obj_id)    
             xy = (msg.state_vec[0],msg.state_vec[1])
-            self.living_objs[msg.obj_id] = xy
+            self.living_objs[obj_id] = xy
         else:
             try:
-                del self.living_objs[msg.obj_id]
+                del self.living_objs[obj_id]
+                old.append(obj_id)
             except KeyError:
                 pass
+
+        return new,old
 
     def on_dac_pixels(self,px,py):
         self.laser_x = px
@@ -144,8 +152,10 @@ class ViewerApp(Gtk.Window):
         hb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         hb.pack_start(box, True, True, 0)
 
-        store = Gtk.ListStore(int)
-        tv = Gtk.TreeView(store)
+        self._store_rowrefs = {}
+        self._store = Gtk.ListStore(int)
+
+        tv = Gtk.TreeView(self._store)
         tv.append_column(
             Gtk.TreeViewColumn("Object ID", Gtk.CellRendererText(), text=0))
         tv.connect("row-activated", self.on_row_dbl_clicked)
@@ -163,14 +173,28 @@ class ViewerApp(Gtk.Window):
         self._subtra = rosgobject.Subscriber('/flymad/tracked', TrackedObj)
         self._subtra.connect("message", self.on_tracking)
 
+        self._pub = rospy.Publisher('/flymad/target_object', Int64)
+
     def on_row_dbl_clicked(self, treeview, treepath, treecolumn):
         obj_id = treeview.get_model()[treepath][0]
+        self._pub.publish(obj_id)
 
     def on_data(self, sub, msg):
         self.pcw.on_data(msg)
 
     def on_tracking(self, sub, msg):
-        self.pcw.on_tracking(msg)
+        new,old = self.pcw.on_tracking(msg)
+
+        if old:
+            for obj_id in old:
+                rowref = self._store_rowrefs.get(obj_id)
+                if rowref is not None and self._store.iter_is_valid(rowref):
+                    self._store.remove(rowref)
+                    del self._store_rowrefs[obj_id]
+
+        if new:
+            for obj_id in new:
+                self._store_rowrefs[obj_id] = self._store.append((obj_id,))
 
     def on_dac(self, sub, msg):
         if self.cal is not None:
