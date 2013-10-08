@@ -1,0 +1,8 @@
+<launch>
+
+  <node name="flymad_micro" pkg="flymad" type="flymad_micro" />
+  <node name="tracker" pkg="flymad" type="tracker" args="$(find flymad)/data/calibration/flymad2.yaml" />
+  <node name="viewer" pkg="flymad" type="viewer" args="$(find flymad)/data/calibration/flymad2.yaml" />
+  <node name="$(anon fview)" pkg="flymad" type="launch_fview_wide.sh" />
+
+</launch>
