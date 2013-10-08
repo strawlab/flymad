@@ -159,6 +159,7 @@ class ViewerApp(Gtk.Window):
         tv.append_column(
             Gtk.TreeViewColumn("Object ID", Gtk.CellRendererText(), text=0))
         tv.connect("row-activated", self.on_row_dbl_clicked)
+        tv.props.headers_visible = False
         hb.pack_start(tv,False,False,0)
 
         self.add(hb)
