@@ -10,8 +10,9 @@ import numpy as np
 import adskalman.adskalman as adskalman
 from flymad.constants import FPS
 
+FPS = 30
 MAX_DIST_PIXELS = 20.0
-MAX_P2 = 5000
+MAX_P2 = 250
 Qsigma=10.0 # process covariance
 Rsigma=10.0 # observation covariance
 

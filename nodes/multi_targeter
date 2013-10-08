@@ -19,11 +19,12 @@ from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
 from flymad.constants import FPS
 
-MOTOR_LAG = 0.01
+MOTOR_LAG = 0.015
 K_PROPORTIONAL = 1e3/30.0
 
 HIT_START_FREQ = 10.0 # 10 Hz
-HIT_DURATION = 0.010 # 10 msec
+HIT_DURATION = 0.10 # 10 msec
+HIT_START_DT = rospy.Duration(1.0/ HIT_START_FREQ)
 THRESHOLD_DISTANCE_PIXELS = 10.0 # when to claim fly is zapped
 VELOCITY_MODE_THRESHOLD_PIXELS = 20.0 # when to switch from postion to velocity mode
 
@@ -174,15 +175,25 @@ class Targeter:
                 self.hit_dict[obj_id] = self.tracked_objects[obj_id]
         
         #we put objects out of the hit_dict if they get out of the right part of the arena
+        now = rospy.Time.now()
+
         for obj_id in self.hit_dict.keys():
             s=self.hit_dict[obj_id].msg.state_vec
             if not self.in_target_area(s):
                 del self.hit_dict[obj_id]
-                #we have to somehow abort the current plan
+                #we have to somehow abort the current plan, add abort current plan
                 if obj_id in newly_born_obj_ids:
                     newly_born_obj_ids.remove(obj_id)
                 if obj_id in newly_dead_obj_ids:
                     newly_dead_obj_ids.remove(obj_id)
+                print self.current_plan[0]
+                if self.current_plan[0] != 'idle':
+                    obj = self.current_plan[1]
+                    if obj.msg.obj_id == obj_id:
+                        self.set_current_plan('idle',None,now)
+                        print obj
+                if len(self.hit_dict) == 0:
+                        self.point_mirrors_at_nothing()
                 
 
         #we put objects in the hit_dict if they get to the right part of the arena
@@ -191,7 +202,6 @@ class Targeter:
             if self.in_target_area(s):
                 self.hit_dict[obj_id]=self.tracked_objects[obj_id]
 
-        now = rospy.Time.now()
 
         for obj_id in newly_dead_obj_ids:
             del self.hit_dict[obj_id]
@@ -199,8 +209,10 @@ class Targeter:
             if self.current_plan[0] != 'idle':
                 obj = self.current_plan[1]
                 if obj.msg.obj_id == obj_id:
-                    self.current_plan = ('idle',None,now)
-                    self.point_mirrors_at_nothing()
+                    self.set_current_plan('idle',None,now)
+                    print obj
+            if len(self.hit_dict) == 0:
+                        self.point_mirrors_at_nothing()
 
 
         # --------------------------------------------------
@@ -219,23 +231,21 @@ class Targeter:
             if oldest_hit_obj is not None:
                 # now we have the oldest hit fly
                 time_since_last_hit = now - oldest_hit_time
-                HIT_START_FREQ2 = HIT_START_FREQ * len(self.hit_dict)/float(len(self.tracked_objects))
-                if time_since_last_hit >  rospy.Duration(1.0/ HIT_START_FREQ2):
-                    print 'time_since_last_hit greater than'
-                    print rospy.Duration(1.0/ HIT_START_FREQ2)
+                if time_since_last_hit >  HIT_START_DT:
                     self.set_current_plan('point mirror pre zap',oldest_hit_obj, now)
 
         if self.current_plan[0] == 'point mirror pre zap':
             obj = self.current_plan[1]
             self.point_mirrors_at_obj(obj)
             laser_distance = self.get_laser_distance(obj)
-            if laser_distance < THRESHOLD_DISTANCE_PIXELS or (now - self.current_plan[2] ) > rospy.Duration(0.5):
+            print 'laser_distance' + str(laser_distance)
+            if laser_distance < THRESHOLD_DISTANCE_PIXELS:
                 self.set_current_plan('zap start',obj,now)
             
         if self.current_plan[0] == 'zap start':
             obj = self.current_plan[1]
             self.point_mirrors_at_obj(obj)
-            self.pub_laser.publish( 255 )
+            #self.pub_laser.publish( 255 )
             self.set_current_plan('zap continue',obj,now)
 
         if self.current_plan[0] == 'zap continue':
@@ -246,7 +256,7 @@ class Targeter:
             this_duration = now - laser_start_time
             dur_sec = this_duration.to_sec()
             if dur_sec > HIT_DURATION:
-                self.pub_laser.publish( 255 )
+                #self.pub_laser.publish( 255 )
                 if self.current_plan[0] != 'idle':
                     print obj
                     self.set_current_plan('idle',None,now)
@@ -260,12 +270,16 @@ class Targeter:
         obj = self.current_plan[1]
 
         msg = Plan()
-        msg.plan_code = str_to_code(self.current_plan[0])
+        msg.plan_code = int(str_to_code(self.current_plan[0]))
         if obj is not None:
             msg.obj_id = obj.msg.obj_id
+            if np.isnan(self.get_laser_distance(obj)) is False:
+                msg.distance = int(self.get_laser_distance(obj))
         else:
             msg.obj_id = 0
         msg.stamp = self.current_plan[2]
+        msg.number = int(len(self.tracked_objects))
+        msg.numberhit = int(len(self.hit_dict))
 
         self.pub_plan.publish(msg)
 
@@ -338,8 +352,8 @@ class Targeter:
             else:
                 vela = diffa*K_PROPORTIONAL
                 velb = diffb*K_PROPORTIONAL
-                print str(vela) + "vela" 
-                print str(velb) + "velb" 
+                #print str(vela) + "vela" 
+                #print str(velb) + "velb" 
 
             if np.isnan(vela) or np.isnan(velb):
                 return

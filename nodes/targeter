@@ -113,7 +113,7 @@ class Targeter:
         except IndexError:
             return
 
-        if 1:
+        if 0:
             # velocity mode
             aa, ab = self._get_current_dacs()
 
