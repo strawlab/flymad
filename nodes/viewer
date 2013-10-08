@@ -24,12 +24,6 @@ class PixelCoordWidget(Gtk.DrawingArea):
     UPDATE_FREQ = 30
     def __init__ (self):
         super(PixelCoordWidget,self).__init__()
-        _ = rospy.Subscriber('/flymad/raw_2d_positions',
-                             Raw2dPositions,
-                             self.on_data)
-        _ = rospy.Subscriber('/flymad/tracked',
-                             TrackedObj,
-                             self.on_tracking)
         Gtk.DrawingArea.__init__(self)
         self.lock = threading.Lock()
         with self.lock:
@@ -151,16 +145,25 @@ class ViewerApp(Gtk.Window):
 
         rospy.init_node('viewer')
 
-        box = Gtk.Box()
-        box.set_orientation(Gtk.Orientation.VERTICAL)
-        box.set_spacing(5)
-        self.add(box)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
 
         cal_fname_label = Gtk.Label("Calibration: %s"%cal_fname)
         box.pack_start(cal_fname_label,False,False,0)
 
         self.pcw = PixelCoordWidget()
         box.pack_start(self.pcw,True,True,0)
+
+        hb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+        hb.pack_start(box, True, True, 0)
+
+        store = Gtk.ListStore(int)
+        tv = Gtk.TreeView(store)
+        tv.append_column(
+            Gtk.TreeViewColumn("Object ID", Gtk.CellRendererText(), text=0))
+        tv.connect("row-activated", self.on_row_dbl_clicked)
+        hb.pack_start(tv,False,False,0)
+
+        self.add(hb)
 
         self.connect_after('destroy', Gtk.main_quit)
         self.show_all()
@@ -169,9 +172,25 @@ class ViewerApp(Gtk.Window):
                              MicroPosition,
                              self.on_dac)
 
+        _ = rospy.Subscriber('/flymad/raw_2d_positions',
+                             Raw2dPositions,
+                             self.on_data)
+        _ = rospy.Subscriber('/flymad/tracked',
+                             TrackedObj,
+                             self.on_tracking)
+
         rosthread = threading.Thread(name="ros spin thread", target=rospy.spin)
         rosthread.daemon = True
         rosthread.start()
+
+    def on_row_dbl_clicked(self, treeview, treepath, treecolumn):
+        obj_id = treeview.get_model()[treepath][0]
+
+    def on_data(self, msg):
+        self.pcw.on_data(msg)
+
+    def on_tracking(self, msg):
+        self.pcw.on_tracking(msg)
 
     def on_dac(self,msg):
         if self.cal is not None:
