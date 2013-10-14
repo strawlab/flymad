@@ -23,7 +23,7 @@ MOTOR_LAG = 0.015
 K_PROPORTIONAL = 1e3/30.0
 
 HIT_START_FREQ = 10.0 # 10 Hz
-HIT_DURATION = 0.10 # 10 msec
+HIT_DURATION = 0.010 # 10 msec
 HIT_START_DT = rospy.Duration(1.0/ HIT_START_FREQ)
 THRESHOLD_DISTANCE_PIXELS = 10.0 # when to claim fly is zapped
 VELOCITY_MODE_THRESHOLD_PIXELS = 20.0 # when to switch from postion to velocity mode

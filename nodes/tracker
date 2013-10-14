@@ -12,7 +12,7 @@ from flymad.constants import FPS
 
 FPS = 30
 MAX_DIST_PIXELS = 20.0
-MAX_P2 = 250
+MAX_P2 = 50
 Qsigma=10.0 # process covariance
 Rsigma=10.0 # observation covariance
 
