@@ -1,0 +1,436 @@
+#!/usr/bin/env python
+import numpy as np
+import adskalman.adskalman as adskalman
+import sys
+import threading
+import time
+import Queue
+import Image
+
+import roslib; roslib.load_manifest('flymad')
+import rospy
+
+from flymad.msg import Raw2dPositions, TrackedObj
+from geometry_msgs.msg import Pose2D, Vector3
+from std_msgs.msg import UInt8, Int64, String
+from flymad.msg import MicroVelocity, MicroPosition, StampedObject, Plan
+
+
+from flymad.laser_camera_calibration import load_calibration
+from flymad.util import myint32
+from flymad.constants import FPS
+from flymad.hitutils import HitBox, HitImage
+
+MOTOR_LAG       = 0.015
+
+HIT_START_FREQ  = 10.0 # 10 Hz
+HIT_DURATION    = 5 # 10 msec
+HIT_START_DT    = rospy.Duration(1.0/ HIT_START_FREQ)
+
+THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
+
+def str_to_code(plan):
+    if plan=='idle':
+        code = 0
+    elif plan=="point mirror pre zap":
+        code = 1
+    elif plan=="zap start":
+        code = 2
+    elif plan=="zap continue":
+        code = 3
+    else:
+        raise ValueError('unknown plan: %r'%plan)
+    return code
+
+TTL_MODES = set(("zap start","zap continue"))
+
+class MaybeTargetedObject:
+    def __init__(self,msg,past):
+        self.msg = msg
+        self.last_hit_time = past
+    def __str__(self):
+        s = self.msg.state_vec
+        return 'obj %d at (%.1f,%.1f), last hit %s'%(self.msg.obj_id,s[0],s[1], self.last_hit_time)
+    def __repr__(self):
+        return 'MaybeTargetedObject('+str(self)+')'
+    def update(self,msg):
+        self.msg = msg
+    def get_last_hit_time(self):
+        return self.last_hit_time
+    def set_last_hit_time(self,new_hit_time):
+        self.last_hit_time = new_hit_time
+
+class Targeter:
+    def __init__(self, cal_fname, borders_x, borders_y):
+        self.cal = load_calibration(cal_fname)
+        self.past = rospy.Time.now() - rospy.Duration( 1e6 )
+        self.future = rospy.Time.now() + rospy.Duration( 1e6 )
+
+        if None in (borders_x, borders_y):
+            self.hitmanager = HitImage()
+        else:
+            self.hitmanager = HitBox(borders_x, borders_y)
+
+        self.incoming_data_queue = Queue.Queue()
+        self.tracked_objects = {} # a dict of currently tracked objects
+        self.hit_dict = {} # dict of objects we want to zap
+        self.dacs = 0,0
+        self.last_vals = None
+
+        self.zoom_misses = 0
+
+        self.plan_lock = threading.Lock()
+        self.current_plan = ('idle',None,rospy.Time.now())  # a 3 tuple, with string
+                                          # as first element, MaybeTrackedObject
+                                          # instance as second element, timestamp as third element.
+
+
+        self.pub_plan = rospy.Publisher('/multi_targeter/plan',
+                                        Plan)
+        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
+                                                MicroPosition,
+                                                tcp_nodelay=True)
+        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
+                                                MicroVelocity,
+                                                tcp_nodelay=True)
+        self.pub_laser = rospy.Publisher('/flymad_micro/laser',
+                                         UInt8,
+                                         tcp_nodelay=True)
+
+        self.pub_targeted = rospy.Publisher('/flymad/targeted',
+                                            StampedObject,
+                                            tcp_nodelay=True)
+
+        self.stop_tracking(None)
+
+        _ = rospy.Subscriber('/flymad/tracked',
+                             TrackedObj,
+                             self.on_tracking)
+        _ = rospy.Subscriber('/flymad_micro/position_echo',
+                             MicroPosition,
+                             self.on_dac)
+        _ = rospy.Subscriber('/flymad/laser_head_delta',
+                             Vector3,
+                             self.on_head_delta)
+
+    def in_target_area(self, state_vec):
+        return self.hitmanager.in_area(int(state_vec[0]), int(state_vec[1]))
+
+    def on_dac(self,msg):
+        self.dacs = msg.posA, msg.posB
+
+    def stop_tracking(self,old_obj_id):
+        rospy.loginfo('stopped targeting object %s'%old_obj_id)
+
+        msg = MicroVelocity()
+        msg.velA = myint32(0)
+        msg.velB = myint32(0)
+        this_vels = msg.velA, msg.velB
+        if this_vels != self.last_vals:
+            self.pub_dac_velocity.publish(msg)
+            self.last_vals = this_vels
+
+    def on_head_delta(self,msg):
+        """
+        the realtime tracking is done here, whenever we get a tracking message. The
+        experimental logic (i.e. tracking fly membership in the hit dict, etc)
+        is done in update.
+
+        realtime tracking is done using the through the lens camera only
+        """
+
+        dx = msg.x
+        dy = msg.y
+
+        with self.plan_lock:
+            plan,plan_obj,plan_now = self.current_plan
+
+        if plan not in TTL_MODES:
+            return
+
+        if np.abs(dx) > 300:
+            self.zoom_misses += 1
+
+        if self.zoom_misses > 10:
+            #we have lost the fly, or have a bad estimate
+            #go back to pre zap (which uses the wide camera)
+            #TODO: add some hysteresis here
+            self.set_current_plan('point mirror pre zap',
+                                  plan_obj,
+                                  rospy.Time.now(),
+                                  reason='dx=%.1f'%dx)
+
+        PX = -0.4
+        PY = -0.4
+        a,b = self.last_vals
+        cmdA = a+(PX*dx)
+        cmdB = b+(PY*dy)
+
+        self.send_dac(cmdA, cmdB, plan_obj.msg.obj_id)
+
+    def on_tracking(self, msg):
+        #update the position of all objects
+        with self.plan_lock:
+            obj_id = msg.obj_id
+            if obj_id not in self.tracked_objects:
+                obj = MaybeTargetedObject( msg, self.past )
+                self.tracked_objects[ obj_id ] = obj
+            else:
+                self.tracked_objects[ obj_id ].update( msg )
+
+            if not msg.is_living:
+                del self.tracked_objects[ msg.obj_id ]
+
+            plan,plan_obj,plan_now = self.current_plan
+
+        if (plan == 'point mirror pre zap') and (plan_obj is not None) and(obj_id == plan_obj.msg.obj_id):
+            #point at the updated position
+            self.point_mirrors_at_msg(msg)
+
+    def update(self):
+        with self.plan_lock:
+            # update our list of flies we want to hit ----------
+            orig_obj_ids    = set(self.hit_dict.keys())
+            cur_obj_ids     = set(self.tracked_objects.keys())
+
+        newly_dead_obj_ids = orig_obj_ids - cur_obj_ids
+        newly_born_obj_ids = cur_obj_ids - orig_obj_ids 
+
+#        #we only put objects into the hit_dict if they are in the right part of the arena
+#        for obj_id in newly_born_obj_ids:
+#	    s=self.tracked_objects[obj_id].msg.state_vec
+#            if self.in_target_area(s):
+#                self.hit_dict[obj_id] = self.tracked_objects[obj_id]
+        
+        now = rospy.Time.now()
+
+        #we put objects out of the hit_dict if they get out of the right part of the arena
+        for obj_id in self.hit_dict.keys():
+            s = self.hit_dict[obj_id].msg.state_vec
+            if not self.in_target_area(s):
+                del self.hit_dict[obj_id]
+                #we have to somehow abort the current plan, add abort current plan
+                if obj_id in newly_born_obj_ids:
+                    newly_born_obj_ids.remove(obj_id)
+                if obj_id in newly_dead_obj_ids:
+                    newly_dead_obj_ids.remove(obj_id)
+                if self.current_plan[0] != 'idle':
+                    obj = self.current_plan[1]
+                    if obj.msg.obj_id == obj_id:
+                        self.set_current_plan('idle',None,now,
+                                reason='left area'
+                        )
+                if len(self.hit_dict) == 0:
+                        self.point_mirrors_at_nothing()
+                
+
+        #we put objects in the hit_dict if they get to the right part of the arena
+        for obj_id in cur_obj_ids:
+            s=self.tracked_objects[obj_id].msg.state_vec
+            if self.in_target_area(s):
+                self.hit_dict[obj_id]=self.tracked_objects[obj_id]
+
+
+        for obj_id in newly_dead_obj_ids:
+            del self.hit_dict[obj_id]
+            # abort current plan if it involves this object
+            if self.current_plan[0] != 'idle':
+                obj = self.current_plan[1]
+                if obj.msg.obj_id == obj_id:
+                    self.set_current_plan('idle',None,now,
+                            reason='obj_id died'
+                    )
+            if len(self.hit_dict) == 0:
+                self.point_mirrors_at_nothing()
+
+
+        # --------------------------------------------------
+
+        if self.current_plan[0] == 'idle':
+            oldest_hit_time = self.future
+            oldest_hit_obj = None
+
+            for obj_id in self.hit_dict:
+                obj = self.hit_dict[obj_id]
+                this_last_hit_time = obj.get_last_hit_time()
+                if this_last_hit_time < oldest_hit_time:
+                    oldest_hit_time = this_last_hit_time
+                    oldest_hit_obj = obj
+
+            if oldest_hit_obj is not None:
+                # now we have the oldest hit fly
+                time_since_last_hit = now - oldest_hit_time
+                if time_since_last_hit >  HIT_START_DT:
+                    self.set_current_plan('point mirror pre zap',oldest_hit_obj,now,
+                            reason='your turn'
+                    )
+
+        if self.current_plan[0] == 'point mirror pre zap':
+            obj = self.current_plan[1]
+            laser_distance = self.get_laser_distance(obj)
+            if laser_distance < THRESHOLD_DISTANCE_PIXELS:
+                self.set_current_plan('zap start',obj,now,
+                        reason='close (%.1f)' % laser_distance
+                )
+            
+        if self.current_plan[0] == 'zap start':
+            #targeting handled by through the lens tracking
+            #self.pub_laser.publish( 255 )
+            self.set_current_plan('zap continue',obj,now,
+                        reason='laser on'
+            )
+
+        if self.current_plan[0] == 'zap continue':
+            #targeting handled by through the lens tracking, decide if
+            #we have hit the fly for long enough
+
+            obj = self.current_plan[1]
+            obj.set_last_hit_time(now)
+            laser_start_time = self.current_plan[2]
+            this_duration = now - laser_start_time
+            dur_sec = this_duration.to_sec()
+
+            if dur_sec > HIT_DURATION:
+                #self.pub_laser.publish( 255 )
+                if self.current_plan[0] != 'idle':
+                    self.set_current_plan('idle',None,now,
+                            reason='hit complete'
+                    )
+
+    def set_current_plan(self,plan,obj,now,reason=''):
+        with self.plan_lock:
+            if plan == 'zap start':
+                self.zoom_misses = 0
+            self.current_plan = (plan,obj,now)
+
+        print "{0:<30s}({1:<10s}) : {2:s}".format(plan,reason,repr(obj))
+
+        msg = Plan()
+        msg.plan_code = int(str_to_code(plan))
+        if obj is not None:
+            msg.obj_id = obj.msg.obj_id
+            if np.isnan(self.get_laser_distance(obj)) is False:
+                msg.distance = int(self.get_laser_distance(obj))
+        else:
+            msg.obj_id = 0
+
+        msg.stamp = now
+        msg.number = int(len(self.tracked_objects))
+        msg.numberhit = int(len(self.hit_dict))
+
+        self.pub_plan.publish(msg)
+
+    def get_msg_xy(self,msg,predict=False):
+        """return the object position, optionally predicting
+        the fly position from its velocity inorder to cancel out motor lag"""
+        s = msg.state_vec
+
+        if predict:
+            now = rospy.Time.now()
+
+            dt = now-msg.header.stamp # time elapsed since we have updated information
+            dt_sec = dt.to_sec()
+
+            xp = s[2]*(dt_sec+MOTOR_LAG)
+            yp = s[3]*(dt_sec+MOTOR_LAG)
+        else:
+            xp = 0
+            yp = 0
+
+        x = int(max(0,s[0] + xp))
+        y = int(max(0,s[1] + yp))
+
+        return x,y
+
+    def get_laser_distance(self,obj):
+        x,y = self.get_msg_xy(obj.msg)
+
+        aa, ab = self.dacs
+        dac_pixel_x = self.cal.d2px((aa,ab))
+        dac_pixel_y = self.cal.d2py((aa,ab))
+
+        laser_distance = np.sqrt((dac_pixel_x-x)**2 + (dac_pixel_y-y)**2)
+
+        return laser_distance
+
+    def point_mirrors_at_msg(self,msg):
+        x,y = self.get_msg_xy(msg)
+        self.point_mirrors_at_xy(x,y,msg.obj_id)
+
+    def point_mirrors_at_nothing(self):
+        self.point_mirrors_at_xy(250,250,0)
+
+    def point_mirrors_at_xy(self,x,y,obj_id):
+        # desired
+        bad_data = False
+        try:
+            daca = self.cal.p2da[y,x]
+            dacb = self.cal.p2db[y,x]
+        except IndexError:
+            bad_data = True
+        else:
+            if np.isnan( daca ) or np.isnan( dacb ):
+                bad_data = True
+        
+        if bad_data:
+            # Hmm, should we do something more?
+            return
+
+        self.send_dac(daca,dacb,obj_id)
+
+    def send_dac(self,daca,dacb,obj_id):
+
+        # position mode
+        a = int(np.round(daca))
+        b = int(np.round(dacb))
+        msg = MicroPosition()
+        msg.posA = a
+        msg.posB = b
+        assert msg.posA==a
+        assert msg.posB==b
+        this_vals = msg.posA, msg.posB
+        if this_vals != self.last_vals:
+            try:
+                self.pub_dac_position.publish(msg)
+                self.last_vals = this_vals
+                print msg
+            except:
+                print "EEEEEEEEEEEEERRRR"
+
+        ix = msg.posA, msg.posB
+        px = self.cal.d2px(ix)
+        py = self.cal.d2py(ix)
+
+        msg = StampedObject()
+        msg.header.stamp = rospy.Time.now()
+        msg.obj_id = obj_id
+        self.pub_targeted.publish(msg)
+
+    def run(self):
+        r = rospy.Rate(100)
+        startall = time.time()
+        while not rospy.is_shutdown() and time.time() - startall < 600:
+            self.update()
+            r.sleep()
+        self.pub_laser.publish( 0 )
+        exit()    
+
+
+if __name__=='__main__':
+    cal_fname = rospy.myargv()[1]
+    args=rospy.myargv()[2:]
+
+    rospy.init_node('flymad_targeter')
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--borders_x', nargs=2, metavar=('X0','X1'),
+                            default=None, help='borders for targeting')
+    parser.add_argument('--borders_y', nargs=2, metavar=('Y0','Y1'),
+                            default=None, help='borders for targeting')
+
+    parsed = vars(parser.parse_args(args))
+
+    t = Targeter(cal_fname, **parsed)
+    t.run()
+
