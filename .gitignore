@@ -4,7 +4,7 @@ src/flymad/msg
 *.yaml
 *.bag
 *.pyc
-*.*~
+*~
 flymad_micro/build-cli/*.o
 flymad_micro/build-cli/*.cpp
 flymad_micro/build-cli/*.d
