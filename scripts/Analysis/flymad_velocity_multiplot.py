@@ -20,8 +20,8 @@ assert pd.__version__ == "0.11.0"
 
 SECOND_TO_NANOSEC = 1e9
 
-CTRL_GENOTYPE = 'ctrl'
-EXP_GENOTYPE = 'MW'
+CTRL_GENOTYPE = 'ctrl' #black
+EXP_GENOTYPE = 'MW' #blue
 
 if len(sys.argv) !=2:
     print 'call flymad_velocity with directory. example: "home/user/foo/filedir"'
@@ -192,14 +192,14 @@ ctrlstd = df2std[df2std['Genotype']== CTRL_GENOTYPE]
 fig2 = plt.figure()
 #velocity overlay:
 ax4 = fig2.add_subplot(1,1,1)
-ax4.plot(MWmean['align'].values, MWmean['Vfwd'].values, 'b-', zorder=1, lw=3)
+ax4.plot(MWmean['align'].values, MWmean['Vfwd'].values, 'b-', zorder=10, lw=3)
 trans = mtransforms.blended_transform_factory(ax4.transData, ax4.transAxes)
-ax4.fill_between(MWmean['align'].values, (MWmean['Vfwd'] + MWstd['Vfwd']).values, (MWmean['Vfwd'] - MWstd['Vfwd']).values, color='b', alpha=0.1, zorder=2)
+ax4.fill_between(MWmean['align'].values, (MWmean['Vfwd'] + MWstd['Vfwd']).values, (MWmean['Vfwd'] - MWstd['Vfwd']).values, color='b', alpha=0.1, zorder=5)
 plt.axhline(y=0, color='k')
-ax4.fill_between(MWmean['align'].values, 0, 1, where=MWmean['laser_state'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
-ax4.plot(ctrlmean['align'].values, ctrlmean['Vfwd'].values, 'r-', zorder=1, lw=3)
-ax4.fill_between(ctrlmean['align'].values, (ctrlmean['Vfwd'] + ctrlstd['Vfwd']).values, (ctrlmean['Vfwd'] - ctrlstd['Vfwd']).values, color='r', alpha=0.1, zorder=3)
-ax4.fill_between(ctrlmean['align'].values, 0, 1, where=ctrlmean['laser_state'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
+ax4.fill_between(MWmean['align'].values, 0, 1, where=MWmean['laser_state'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=1)
+ax4.plot(ctrlmean['align'].values, ctrlmean['Vfwd'].values, 'k-', zorder=11, lw=3)
+ax4.fill_between(ctrlmean['align'].values, (ctrlmean['Vfwd'] + ctrlstd['Vfwd']).values, (ctrlmean['Vfwd'] - ctrlstd['Vfwd']).values, color='k', alpha=0.1, zorder=6)
+ax4.fill_between(ctrlmean['align'].values, 0, 1, where=ctrlmean['laser_state'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=1)
 ax4.set_xlabel('Time (s)')
 ax4.set_ylabel('Fwd Velocity (pixels/s) +/- STD')
 """
