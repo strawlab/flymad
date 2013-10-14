@@ -22,8 +22,9 @@ if __name__ == '__main__':
         print 'call with directory. example: "home/user/foo/filedir"'
         exit()	
     
-    CTRL_GENOTYPE = 'uasstoptrpmyc'
-    EXP_GENOTYPE = 'wGP'
+    CTRL_GENOTYPE = 'uasstoptrpmyc' #black
+    EXP_GENOTYPE = 'wGP' #blue
+    EXP_GENOTYPE2 = '40347' #purple
     
     # OPEN IMAGE of background  (.png)
     image_file = str(glob.glob(sys.argv[1] + "/*.png"))[2:-2]
@@ -129,8 +130,6 @@ if __name__ == '__main__':
         df['dtarget'] = dist.ix[:,'d0':'d3'].min(axis=1)               
         df = df.sort(columns='t', ascending=True, axis=0)
         
-        
-        
         #ALIGN BY LASER OFF TIME (=t0)
         if (df['as']==1).any():
             lasermask = df[df['as']==1]
@@ -138,7 +137,7 @@ if __name__ == '__main__':
         else:  
             print "No laser detected. Default start time = -120."
             df['t'] = df['t'] - np.min(df['t'].values) - 120
-            continue  # throw out for now !!!!!!!!!!!!!!!!!!!!!11\
+            continue  # throw out for now !!!!
              
         #bin to  5 second bins:
         df = df[np.isfinite(df['t'])]
@@ -161,26 +160,34 @@ if __name__ == '__main__':
     # half-assed, uninformed danno's tired method of grouping for plots:
     
     expdf = pooldf[pooldf['Genotype'] == EXP_GENOTYPE]
+    exp2df = pooldf[pooldf['Genotype'] == EXP_GENOTYPE2]
     ctrldf = pooldf[pooldf['Genotype']== CTRL_GENOTYPE]
     
     expmean = expdf.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].mean()
+    exp2mean = exp2df.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].mean()
     ctrlmean = ctrldf.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].mean()
     
     expstd = expdf.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].std()
+    exp2std = exp2df.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].std()
     ctrlstd = ctrldf.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].std()
     
     expn = expdf.groupby(['Genotype', 'lasergroup','t'],  as_index=False)[['zx', 'dtarget', 'as']].count()
+    exp2n = exp2df.groupby(['Genotype', 'lasergroup','t'],  as_index=False)[['zx', 'dtarget', 'as']].count()
     ctrln = ctrldf.groupby(['Genotype', 'lasergroup','t'],  as_index=False)[['zx', 'dtarget', 'as']].count()
     
     expn.to_csv((sys.argv[1] + "/outputs/expn.csv"))
     
     expzxsem = ((expstd['zx']).values) / (np.sqrt(expn['zx'].values))
     expdtargetsem = (expstd['dtarget'].values)/(np.sqrt(expn['dtarget'].values))
+
+    exp2zxsem = ((exp2std['zx']).values) / (np.sqrt(exp2n['zx'].values))
+    exp2dtargetsem = (exp2std['dtarget'].values)/(np.sqrt(exp2n['dtarget'].values))
     
     ctrlzxsem = ((ctrlstd['zx']).values) / (np.sqrt(ctrln['zx'].values))
     ctrldtargetsem = (ctrlstd['dtarget'].values)/(np.sqrt(ctrln['dtarget'].values)) 
     
     expmean.to_csv((sys.argv[1] + "/outputs/expmeans.csv"))
+    exp2mean.to_csv((sys.argv[1] + "/outputs/exp2means.csv"))
     ctrlmean.to_csv((sys.argv[1] + "/outputs/ctrlmeans.csv"))
 
 
@@ -190,15 +197,22 @@ if __name__ == '__main__':
       
     fig = plt.figure()
     #WING EXTENSION:
-    ax = fig.add_subplot(2,1,1)
+    ax = fig.add_subplot(1,1,1)
+    
     ax.plot(expmean['t'].values, expmean['zx'].values, 'b-', zorder=1, lw=3)
     trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-    ax.fill_between(expmean['t'].values, (expmean['zx'] + expzxsem).values, (expmean['zx'] - expzxsem).values, color='b', alpha=0.1, zorder=2)
+    ax.fill_between(expmean['t'].values, (expmean['zx'] + expzxsem).values, (expmean['zx'] - expzxsem).values, color='b', alpha=0.1, zorder=4)
     plt.axhline(y=0, color='k')
-    ax.fill_between(expmean['t'].values, 0, 1, where=expmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
-    ax.plot(ctrlmean['t'].values, ctrlmean['zx'].values, 'r-', zorder=1, lw=3)
-    ax.fill_between(ctrlmean['t'].values, (ctrlmean['zx'] + ctrlzxsem).values, (ctrlmean['zx'] - ctrlzxsem).values, color='r', alpha=0.1, zorder=3)
-    ax.fill_between(ctrlmean['t'].values, 0, 1, where=ctrlmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
+    
+    ax.fill_between(expmean['t'].values, 0, 1, where=expmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=1)
+    
+    ax.plot(ctrlmean['t'].values, ctrlmean['zx'].values, 'k-', zorder=1, lw=3)
+    ax.fill_between(ctrlmean['t'].values, (ctrlmean['zx'] + ctrlzxsem).values, (ctrlmean['zx'] - ctrlzxsem).values, color='k', alpha=0.1, zorder=3)
+    #ax.fill_between(ctrlmean['t'].values, 0, 1, where=ctrlmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
+    
+    ax.plot(exp2mean['t'].values, exp2mean['zx'].values, color='purple', zorder=1, lw=3)
+    ax.fill_between(exp2mean['t'].values, (exp2mean['zx'] + exp2zxsem).values, (exp2mean['zx'] - exp2zxsem).values, color='purple', alpha=0.1, zorder=2)
+        
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Wing Ext. Index, +/- SEM')
     ax.set_title('Wing Extension', size=12)
@@ -206,7 +220,7 @@ if __name__ == '__main__':
     ax.set_xlim([-120,480])
     ax.set_xticks([-60,0,60,120,180,240,300,360,420,480])
 
-  
+    """  
       
     #DISTANCE TO TARGETS:
     ax2 = fig.add_subplot(2,1,2)
@@ -223,7 +237,7 @@ if __name__ == '__main__':
     ax2.set_ylim([20,120])
     ax2.set_xlim([-120,480])
     ax2.set_xticks([-60,0,60,120,180,240,300,360,420,480])
-
+    """
     
     plt.subplots_adjust(bottom=0.1, top=0.94, hspace=0.38)
     plt.savefig((sys.argv[1] + "/outputs/following_and_WingExt.png"))
