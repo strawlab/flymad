@@ -1,0 +1,205 @@
+#!/usr/bin/env python
+import numpy as np
+import adskalman.adskalman as adskalman
+import sys
+import threading
+import time
+
+import roslib; roslib.load_manifest('flymad')
+import rospy
+
+from flymad.msg import Raw2dPositions, TrackedObj
+from geometry_msgs.msg import Pose2D, Vector3
+from std_msgs.msg import UInt8, Int64
+from flymad.msg import MicroVelocity, MicroPosition, StampedObject
+
+from flymad.laser_camera_calibration import load_calibration
+from flymad.util import myint32
+
+LATENCY = 0.05
+K_PROPORTIONAL = 1e3/30.0
+
+class Targeter:
+    def __init__(self,cal_fname, border_x_1=0, border_x_2=500, border_y_1=0, border_y_2=500):
+        self.cal = load_calibration(cal_fname)
+        rospy.init_node('flymad_targeter')
+        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
+                                                MicroVelocity,
+                                                tcp_nodelay=True)
+        self.cur_obj_id = None
+        self.dacs = 0,0
+        self.last_vals = None
+        self.stop_tracking(None)
+        self.border_x_1 = int(border_x_1)
+        self.border_x_2 = int(border_x_2)
+        self.border_y_1 = int(border_y_1)
+        self.border_y_2 = int(border_y_2)
+
+        _ = rospy.Subscriber('/flymad/tracked',
+                             TrackedObj,
+                             self.on_tracking)
+        _ = rospy.Subscriber('/flymad/target_object',
+                             Int64,
+                             self.on_target_object)
+        _ = rospy.Subscriber('/flymad_micro/position_echo',
+                             MicroPosition,
+                             self.on_dac)
+        _ = rospy.Subscriber('/flymad/laser_head_delta',
+                             Vector3,
+                             self.on_head_delta)
+
+        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
+                                                MicroPosition,
+                                                tcp_nodelay=True)
+        self.pub_laser = rospy.Publisher('/flymad_micro/laser',
+                                         UInt8,
+                                         tcp_nodelay=True)
+        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
+                                                MicroVelocity,
+                                                tcp_nodelay=True)
+        self.pub_targeted = rospy.Publisher('/flymad/targeted',
+                                            StampedObject,
+                                            tcp_nodelay=True)
+
+        self._track_lock = threading.Lock()
+        self._track_mode = 'W' #W or F (wide or fine)
+        self._track_wait = 0
+
+    def on_dac(self,msg):
+        self.dacs = msg.posA, msg.posB
+
+    def on_head_delta(self,msg):
+        dx = msg.x
+        dy = msg.y
+
+        with self._track_lock:
+            if self._track_mode != 'F':
+                return
+
+            if np.abs(dx) > 300:
+                print "give up"
+                self._track_mode = 'W'
+                self._track_wait = 0
+                return
+
+        #A = xdir
+        #B = ydir
+
+        PX = -0.4
+        PY = -0.4
+
+        a,b = self.last_vals
+        A = -10.0*np.sign(dx)
+        B = -10.0*np.sign(dy)
+
+        #left = +ve dx
+        #up = +vedy
+
+        print "%+.1f,%+.1f %+.1f,%+.1f vs. %+.1f,%+.1f" % (a,b,a+A,b+B,PX*dx,PY*dy)
+
+        cmdA = a+A
+        cmdA = a+(PX*dx)
+
+        cmdB = b+(B)
+        cmdB = b+(PY*dy)
+
+        self.send_dac(cmdA, cmdB)
+
+    def _get_current_dacs(self):
+        return self.dacs
+
+    def stop_tracking(self,old_obj_id):
+        rospy.loginfo('stopped targeting object %s'%old_obj_id)
+        self.cur_obj_id = None
+        msg = MicroVelocity()
+        msg.velA = myint32(0)
+        msg.velB = myint32(0)
+        this_vels = msg.velA, msg.velB
+        if this_vels != self.last_vals:
+            self.pub_dac_velocity.publish(msg)
+            self.last_vals = this_vels
+
+    def start_tracking(self,obj_id):
+        with self._track_lock:
+            self._track_mode = 'W' #W or F (wide or fine)
+            self._track_wait = 0
+            self.cur_obj_id = obj_id
+            rospy.loginfo('now targeting object %d'%self.cur_obj_id)
+
+    def on_target_object(self, msg):
+        obj_id = msg.data
+        if obj_id < 0:
+            self.stop_tracking(self.cur_obj_id)
+        else:
+            self.start_tracking(obj_id)
+
+    def on_tracking(self, msg):
+        with self._track_lock:
+            if self._track_mode != 'W':
+                return
+            if self._track_wait < 10:
+                print "wait"
+                self._track_wait += 1
+            else:
+                self._track_mode = 'F'
+                return
+
+        if self.cur_obj_id is None:
+            self.start_tracking(msg.obj_id)
+
+        if self.cur_obj_id != msg.obj_id:
+            return
+
+        if not msg.is_living:
+            self.stop_tracking(self.cur_obj_id)
+            return
+
+        # calculate fly position in pixel coordinates
+        s = msg.state_vec
+        x = s[0] + s[2]*LATENCY
+        y = s[1] + s[3]*LATENCY
+
+        x = int(max(0,x))
+        y = int(max(0,y))
+
+        # desired
+        try:
+            daca = self.cal.p2da[y,x]
+            dacb = self.cal.p2db[y,x]
+        except IndexError:
+            return
+
+        self.send_dac(daca,dacb)
+
+    def send_dac(self,daca,dacb):
+
+        # position mode
+        a = int(np.round(daca))
+        b = int(np.round(dacb))
+        msg = MicroPosition()
+        msg.posA = a
+        msg.posB = b
+        assert msg.posA==a
+        assert msg.posB==b
+        this_vals = msg.posA, msg.posB
+        if this_vals != self.last_vals:
+            self.pub_dac_position.publish(msg)
+            self.last_vals = this_vals
+
+        ix = msg.posA, msg.posB
+        px = self.cal.d2px(ix)
+        py = self.cal.d2py(ix)
+
+        msg = StampedObject()
+        msg.header.stamp = rospy.Time.now()
+        msg.obj_id = self.cur_obj_id
+        self.pub_targeted.publish(msg)
+
+    def run(self):
+        rospy.spin()
+
+if __name__=='__main__':
+    cal_fname = rospy.myargv()[1]
+    args = rospy.myargv()[2:]
+    t=Targeter(cal_fname, *args)
+    t.run()
