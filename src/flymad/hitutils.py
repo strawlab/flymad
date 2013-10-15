@@ -32,26 +32,35 @@ class HitImage(object):
         rospy.Subscriber('/flyman/geom_image_size',
                         geometry_msgs.msg.Point32,
                         self._on_image_size)
+        self._poly = []
         rospy.Subscriber('/flymad/geom_poly',
                         geometry_msgs.msg.Polygon,
                         self._on_image_poly)
 
     def _on_image_origin(self, msg):
         self._origin = msg.data
+        self._maybe_update()
 
     def _on_image_size(self, msg):
         self._size = (msg.x, msg.y)
+        self._maybe_update()
 
     def _on_image_poly(self, msg):
+        self._poly = msg.points
+        self._maybe_update()
+
+    def _maybe_update(self):
         if not self._size:
             return
         if not self._origin:
+            return
+        if not self._poly:
             return
 
         with self._img_lock:
             img = np.zeros((self._size[1], self._size[0]), dtype=np.uint8)
             poly = []
-            for pt in msg.points:
+            for pt in self._poly:
                 poly.append( (pt.x,pt.y) )
             cv2.fillPoly(img,[np.array(poly, np.int32)],255)
             self._img = img
