@@ -14,13 +14,13 @@ from std_msgs.msg import UInt8, Int64
 from flymad.msg import MicroVelocity, MicroPosition, StampedObject
 
 from flymad.laser_camera_calibration import load_calibration
-from flymad.util import myint32
+from flymad.util import myint32, myint16
 
 LATENCY = 0.05
 K_PROPORTIONAL = 1e3/30.0
 
 class Targeter:
-    def __init__(self,cal_fname, border_x_1=0, border_x_2=500, border_y_1=0, border_y_2=500):
+    def __init__(self, cal_fname):
         self.cal = load_calibration(cal_fname)
         rospy.init_node('flymad_targeter')
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
@@ -30,10 +30,6 @@ class Targeter:
         self.dacs = 0,0
         self.last_vals = None
         self.stop_tracking(None)
-        self.border_x_1 = int(border_x_1)
-        self.border_x_2 = int(border_x_2)
-        self.border_y_1 = int(border_y_1)
-        self.border_y_2 = int(border_y_2)
 
         _ = rospy.Subscriber('/flymad/tracked',
                              TrackedObj,
@@ -82,26 +78,16 @@ class Targeter:
                 self._track_wait = 0
                 return
 
-        #A = xdir
-        #B = ydir
-
-        PX = -0.4
-        PY = -0.4
-
         a,b = self.last_vals
-        A = -10.0*np.sign(dx)
-        B = -10.0*np.sign(dy)
 
         #left = +ve dx
-        #up = +vedy
-
-        print "%+.1f,%+.1f %+.1f,%+.1f vs. %+.1f,%+.1f" % (a,b,a+A,b+B,PX*dx,PY*dy)
-
-        cmdA = a+A
+        #up   = +ve dy
+        PX = -0.4
+        PY = -0.4
         cmdA = a+(PX*dx)
-
-        cmdB = b+(B)
         cmdB = b+(PY*dy)
+
+        print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)" % (a,b,cmdA,cmdB,dx,dy)
 
         self.send_dac(cmdA, cmdB)
 
@@ -174,13 +160,7 @@ class Targeter:
     def send_dac(self,daca,dacb):
 
         # position mode
-        a = int(np.round(daca))
-        b = int(np.round(dacb))
-        msg = MicroPosition()
-        msg.posA = a
-        msg.posB = b
-        assert msg.posA==a
-        assert msg.posB==b
+        msg = MicroPosition(myint16(daca), myint16(dacb))
         this_vals = msg.posA, msg.posB
         if this_vals != self.last_vals:
             self.pub_dac_position.publish(msg)
