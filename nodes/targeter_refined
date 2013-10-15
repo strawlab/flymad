@@ -186,10 +186,6 @@ class Targeter:
             self.pub_dac_position.publish(msg)
             self.last_vals = this_vals
 
-        #ix = msg.posA, msg.posB
-        #px = self.cal.d2px(ix)
-        #py = self.cal.d2py(ix)
-
         msg = StampedObject()
         msg.header.stamp = rospy.Time.now()
         msg.obj_id = self.cur_obj_id
