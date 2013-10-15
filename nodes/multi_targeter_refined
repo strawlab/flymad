@@ -21,10 +21,7 @@ PRINT_STATE = False
 
 MOTOR_LAG       = 0.015
 
-HIT_START_FREQ  = 10.0 # 10 Hz
 HIT_DURATION    = 1 # 10 msec
-HIT_START_DT    = rospy.Duration(1.0/ HIT_START_FREQ)
-
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
 
 def str_to_code(plan):
@@ -240,6 +237,7 @@ class Targeter:
                             self.send_dac(cmdA, cmdB, obj.obj_id)
 
                             if obj.should_laser():
+                                print '!',repr(obj)
                                 obj.update_laser(now)
 
     def on_tracking(self, msg):
@@ -280,19 +278,23 @@ class Targeter:
             with self.plan_lock:
                 plan,plan_obj_id = self.current_plan
 
-                t = []
+                to_hit = []
                 for obj in self.tracked_objects.values():
                     #if we are not currently lasering that fly, and it is in the area and
                     #not been hit lately
                     if (plan_obj_id != obj.obj_id) and obj.should_laser():
-                        t.append( obj )
+                        to_hit.append( obj )
                     else:
                         obj.reset_laser()
 
-                    if t:
-                        #t[0] now contains the object hit least recently (see __cmp__)
-                        t.sort()
-                        self.set_current_plan('point mirror', t[0].obj_id, reason='your turn')
+                if to_hit:
+                    #t[0] now contains the object hit least recently (see __cmp__)
+                    to_hit.sort()
+                    self.set_current_plan('point mirror', to_hit[0].obj_id,
+                                reason='your turn')
+                else:
+                    #turn off the laser (turning it on is handled by the head_delta callback
+                    print '0'
 
     def set_current_plan(self,plan,obj_id,reason=''):
         assert isinstance(obj_id, int)
@@ -304,20 +306,12 @@ class Targeter:
         if PRINT_STATE:
             print "{0:<15s}({1:<10s}) : {2:s}".format(plan,reason,repr(self.tracked_objects.get(obj_id)))
 
-        #msg = Plan()
-        #msg.plan_code = int(str_to_code(plan))
-        #if obj is not None:
-        #    msg.obj_id = obj.msg.obj_id
-        #    if np.isnan(self.get_laser_distance(obj)) is False:
-        #        msg.distance = int(self.get_laser_distance(obj))
-        #else:
-        #    msg.obj_id = 0
-
-        #msg.stamp = now
-        #msg.number = int(len(self.tracked_objects))
-        #msg.numberhit = int(len(self.hit_dict))
-
-        #self.pub_plan.publish(msg)
+        msg = Plan()
+        msg.plan_code = int(str_to_code(plan))
+        msg.obj_id = obj_id
+        msg.stamp = rospy.Time().now()
+        msg.number = int(len(self.tracked_objects))
+        self.pub_plan.publish(msg)
 
     def get_obj_xy(self,obj,predict=False):
         """return the object position, optionally predicting
