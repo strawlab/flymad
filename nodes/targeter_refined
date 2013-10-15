@@ -13,8 +13,9 @@ from flymad.msg import MicroVelocity, MicroPosition, StampedObject
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32, myint16
 
-LATENCY = 0.05
-K_PROPORTIONAL = 1e3/30.0
+LATENCY     = 0.05
+LASER_POWER_ON  = 0
+LASER_POWER_OFF = 0
 
 class Targeter:
     def __init__(self, cal_fname):
@@ -23,9 +24,24 @@ class Targeter:
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
                                                 MicroVelocity,
                                                 tcp_nodelay=True)
-        self.cur_obj_id = None
-        self.dacs = 0,0
-        self.last_vals = None
+        self.cur_obj_id = 0
+        self.dacs       = 0,0
+        self.last_vals  = 0,0,LASER_POWER_OFF #a,b,laser
+
+        self._track_lock = threading.Lock()
+        self._track_mode = 'W' #W or F (wide or fine)
+        self._track_wait = 0
+
+        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
+                                                MicroPosition,
+                                                tcp_nodelay=True)
+        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
+                                                MicroVelocity,
+                                                tcp_nodelay=True)
+        self.pub_targeted = rospy.Publisher('/flymad/targeted',
+                                            StampedObject,
+                                            tcp_nodelay=True)
+
         self.stop_tracking(None)
 
         _ = rospy.Subscriber('/flymad/tracked',
@@ -40,23 +56,6 @@ class Targeter:
         _ = rospy.Subscriber('/flymad/laser_head_delta',
                              Vector3,
                              self.on_head_delta)
-
-        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
-                                                MicroPosition,
-                                                tcp_nodelay=True)
-        self.pub_laser = rospy.Publisher('/flymad_micro/laser',
-                                         UInt8,
-                                         tcp_nodelay=True)
-        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
-                                                MicroVelocity,
-                                                tcp_nodelay=True)
-        self.pub_targeted = rospy.Publisher('/flymad/targeted',
-                                            StampedObject,
-                                            tcp_nodelay=True)
-
-        self._track_lock = threading.Lock()
-        self._track_mode = 'W' #W or F (wide or fine)
-        self._track_wait = 0
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -75,7 +74,7 @@ class Targeter:
                 self._track_wait = 0
                 return
 
-        a,b = self.last_vals
+        a,b,_ = self.last_vals
 
         #left = +ve dx
         #up   = +ve dy
@@ -86,7 +85,7 @@ class Targeter:
 
         print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)" % (a,b,cmdA,cmdB,dx,dy)
 
-        self.send_dac(cmdA, cmdB)
+        self.send_dac(cmdA, cmdB, LASER_POWER_ON)
 
     def _get_current_dacs(self):
         return self.dacs
@@ -94,13 +93,7 @@ class Targeter:
     def stop_tracking(self,old_obj_id):
         rospy.loginfo('stopped targeting object %s'%old_obj_id)
         self.cur_obj_id = None
-        msg = MicroVelocity()
-        msg.velA = myint32(0)
-        msg.velB = myint32(0)
-        this_vels = msg.velA, msg.velB
-        if this_vels != self.last_vals:
-            self.pub_dac_velocity.publish(msg)
-            self.last_vals = this_vels
+        self.turnoff_laser()
 
     def start_tracking(self,obj_id):
         with self._track_lock:
@@ -152,13 +145,20 @@ class Targeter:
         except IndexError:
             return
 
-        self.send_dac(daca,dacb)
+        self.send_dac(daca, dacb, LASER_POWER_OFF)
 
-    def send_dac(self,daca,dacb):
+    def turnoff_laser(self):
+        a,b,_ = self.last_vals
+        msg = MicroPosition(a, b, LASER_POWER_OFF)
+        this_vals = msg.posA, msg.posB, msg.laser
+        self.pub_dac_position.publish(msg)
+        self.last_vals = this_vals
+
+    def send_dac(self, daca, dacb, laser_power):
 
         # position mode
-        msg = MicroPosition(myint16(daca), myint16(dacb))
-        this_vals = msg.posA, msg.posB
+        msg = MicroPosition(myint16(daca), myint16(dacb), laser_power)
+        this_vals = msg.posA, msg.posB, msg.laser
         if this_vals != self.last_vals:
             self.pub_dac_position.publish(msg)
             self.last_vals = this_vals

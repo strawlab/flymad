@@ -19,6 +19,9 @@ PRINT_TIME  = False
 PRINT_DAC   = False
 PRINT_STATE = False
 
+LASER_POWER_ON  = 255 #0 -> 255
+LASER_POWER_OFF = 0
+
 MOTOR_LAG       = 0.015
 
 HIT_DURATION    = 1 # 10 msec
@@ -145,7 +148,8 @@ class Targeter:
         else:
             self.hitmanager = HitBox(borders_x, borders_y)
 
-        self.dacs = 0,0
+        self.dacs       = 0,0
+        self.last_vals  = 0,0,LASER_POWER_OFF #a,b,laser
 
         self.zoom_misses = 0
 
@@ -153,9 +157,6 @@ class Targeter:
         self.plan_lock      = threading.Lock()
         self.current_plan   = ('idle',-1) #(plan name, obj_id)
         self.tracked_objects = {} # a dict of currently tracked objects
-
-        self.dac_lock       = threading.Lock()
-        self.last_vals      = None
 
         self.pub_plan = rospy.Publisher('/multi_targeter/plan',
                                         Plan)
@@ -165,15 +166,10 @@ class Targeter:
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
                                                 MicroVelocity,
                                                 tcp_nodelay=True)
-        self.pub_laser = rospy.Publisher('/flymad_micro/laser',
-                                         UInt8,
-                                         tcp_nodelay=True)
-
         self.pub_targeted = rospy.Publisher('/flymad/targeted',
                                             StampedObject,
                                             tcp_nodelay=True)
 
-        self.last_vals = None
         self.point_mirrors_at_nothing()
 
         _ = rospy.Subscriber('/flymad/tracked',
@@ -231,14 +227,17 @@ class Targeter:
                         if not miss:
                             PX = -0.4
                             PY = -0.4
-                            a,b = self.last_vals
+                            a,b,_ = self.last_vals
                             cmdA = a+(PX*dx)
                             cmdB = b+(PY*dy)
-                            self.send_dac(cmdA, cmdB, obj.obj_id)
 
+                            laser_power = LASER_POWER_OFF
                             if obj.should_laser():
-                                print '!',repr(obj)
                                 obj.update_laser(now)
+                                laser_power = LASER_POWER_ON
+
+                            self.send_dac(cmdA, cmdB, laser_power, obj.obj_id)
+
 
     def on_tracking(self, msg):
         with Timer('trck'):
@@ -293,8 +292,8 @@ class Targeter:
                     self.set_current_plan('point mirror', to_hit[0].obj_id,
                                 reason='your turn')
                 else:
-                    #turn off the laser (turning it on is handled by the head_delta callback
-                    print '0'
+                    #turn off the laser (turning it on is handled by the head_delta callback)
+                    self.turnoff_laser()
 
     def set_current_plan(self,plan,obj_id,reason=''):
         assert isinstance(obj_id, int)
@@ -375,13 +374,20 @@ class Targeter:
             # Hmm, should we do something more?
             return
 
-        self.send_dac(daca,dacb,obj_id)
+        self.send_dac(daca, dacb, LASER_POWER_OFF, obj_id)
 
-    def send_dac(self,daca,dacb,obj_id):
+    def turnoff_laser(self):
+        a,b,_ = self.last_vals
+        msg = MicroPosition(a, b, LASER_POWER_OFF)
+        this_vals = msg.posA, msg.posB, msg.laser
+        self.pub_dac_position.publish(msg)
+        self.last_vals = this_vals
+
+    def send_dac(self, daca, dacb, laser_power, obj_id):
 
         # position mode
-        msg = MicroPosition(myint16(daca), myint16(dacb))
-        this_vals = msg.posA, msg.posB
+        msg = MicroPosition(myint16(daca), myint16(dacb), laser_power)
+        this_vals = msg.posA, msg.posB, msg.laser
         if this_vals != self.last_vals:
             self.pub_dac_position.publish(msg)
             self.last_vals = this_vals
@@ -396,13 +402,13 @@ class Targeter:
 
     def run(self):
         r = rospy.Rate(5)
-        startall = time.time()
-        while not rospy.is_shutdown() and time.time() - startall < 600:
+
+        while not rospy.is_shutdown():
             self.update()
             r.sleep()
-        self.pub_laser.publish( 0 )
-        exit()    
 
+        #turn off the laser, etc
+        self.pub_dac_position.publish(MicroPosition())
 
 if __name__=='__main__':
     rospy.init_node('flymad_targeter')
