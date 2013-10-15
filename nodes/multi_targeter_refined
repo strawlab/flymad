@@ -44,6 +44,30 @@ def str_to_code(plan):
 
 TTL_MODES = set(("zap start","zap continue"))
 
+class _Timer(object):
+    def __init__(self, name=None):
+        self.name = name
+
+    def __enter__(self):
+        self.tstart = time.time()
+
+    def __exit__(self, type, value, traceback):
+        if self.name:
+            print '[%s]' % self.name,
+        print 'elapsed: %.3fms' % (1000.0*(time.time() - self.tstart))
+
+class _FakeTimer(object):
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, type, value, traceback):
+        pass
+
+Timer = _FakeTimer
+
 class MaybeTargetedObject:
 
     is_in_area = False
