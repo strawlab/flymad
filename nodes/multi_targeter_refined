@@ -71,58 +71,63 @@ Timer = _FakeTimer
 class MaybeTargetedObject:
 
     is_in_area = False
-    is_targeted = False
 
-    def __init__(self,msg,past,hitmanager):
+    def __init__(self,msg,hitmanager):
         self.msg = msg
-        self.last_hit_time = past
+        self.last_hit_time  = 0
         self.total_hit_time = 0.0
         self.hitmanager = hitmanager
-        assert isinstance(past, float)
 
     def __str__(self):
         s = self.msg.state_vec
-        return '%cobj %d at %.1f,%.1f, hit for %.1f (last %.2f)' % (
-                    't' if self.is_targeted else ' ',
+        return 'obj %d at %.1f,%.1f, hit for %.1f (last %.2f) in %c' % (
                     self.msg.obj_id,
                     s[0],s[1],
-                    self.total_hit_time,self.last_hit_time
+                    self.total_hit_time,self.last_hit_time,
+                    'Y' if self.is_in_area else 'N'
         )
 
     def __repr__(self):
         return 'MaybeTargetedObject('+str(self)+')'
 
-    def update(self,msg,obj_id):
+    def __cmp__(self, other):
+        #sorted sorts in ascending order, so most recent time.time() values are
+        #at the end, and oldest time.time() values at the start
+        return cmp(self.last_hit_time,other.last_hit_time)
+
+    def update_position(self,msg):
         self.is_in_area  = self.hitmanager.in_area(int(msg.state_vec[0]), int(msg.state_vec[1]))
-        self.is_targeted = (msg.obj_id == obj_id)
         self.msg = msg
 
     def hit_with_laser(self, now):
         assert isinstance(now, float)
-        self.total_hit_time += (now - self.last_hit_time)
+        if self.last_hit_time != 0:
+            self.total_hit_time += (now - self.last_hit_time)
         self.last_hit_time  = now
+
+    def is_targeted(self, obj_id):
+        return (self.msg.obj_id == obj_id)
 
 class Targeter:
     def __init__(self, cal_fname, borders_x, borders_y):
         self.cal = load_calibration(cal_fname)
-        self.past   = (rospy.Time.now() - rospy.Duration(1e6)).to_sec()
-        self.future = (rospy.Time.now() + rospy.Duration(1e6)).to_sec()
 
         if None in (borders_x, borders_y):
             self.hitmanager = HitImage()
         else:
             self.hitmanager = HitBox(borders_x, borders_y)
 
-        self.incoming_data_queue = Queue.Queue()
-        self.tracked_objects = {} # a dict of currently tracked objects
-        self.hit_dict = {} # dict of objects we want to zap
         self.dacs = 0,0
-        self.last_vals = None
 
         self.zoom_misses = 0
 
+        #use this lock to protect the tracked objects
         self.plan_lock      = threading.Lock()
         self.current_plan   = ('idle',-1) #(plan name, obj_id)
+        self.tracked_objects = {} # a dict of currently tracked objects
+
+        self.dac_lock       = threading.Lock()
+        self.last_vals      = None
 
         self.pub_plan = rospy.Publisher('/multi_targeter/plan',
                                         Plan)
@@ -157,8 +162,8 @@ class Targeter:
                              self.on_target_object)
 
     def on_target_object(self, msg):
-        obj_id = msg.data
-        self.set_current_plan('point mirror',obj_id, reason='manual')
+        with self.plan_lock:
+            self.set_current_plan('point mirror',msg.data,reason='manual')
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -171,81 +176,85 @@ class Targeter:
 
         realtime tracking is done using the through the lens camera only
         """
-        with self.plan_lock:
-            plan,plan_obj_id = self.current_plan
-            obj = self.tracked_objects.get(plan_obj_id)
+        with Timer('head'):
+            with self.plan_lock:
+                plan,plan_obj_id = self.current_plan
+                obj = self.tracked_objects.get(plan_obj_id)
 
-        if plan not in TTL_MODES:
-            return
+                if plan not in TTL_MODES:
+                    return
 
-        if not (obj and obj.is_targeted):
-            return
+                if not (obj and obj.is_targeted(plan_obj_id)):
+                    return
 
-        dx = msg.x
-        dy = msg.y
+                dx = msg.x
+                dy = msg.y
 
-        miss = np.abs(dx) > 300
-        if miss:
-            self.zoom_misses += 1
+                miss = np.abs(dx) > 300
+                if miss:
+                    self.zoom_misses += 1
 
-        if self.zoom_misses > 10:
-            #we have lost the fly, or have a bad estimate
-            #go back to pre zap (which uses the wide camera)
-            self.set_current_plan('point mirror', plan_obj_id, reason='%d misses'%self.zoom_misses)
+                if self.zoom_misses > 10:
+                    #we have lost the fly, or have a bad estimate, go back to pre zap (wide camera)
+                    self.set_current_plan('point mirror', plan_obj_id, reason='%d misses'%self.zoom_misses)
 
-        if not miss:
-            PX = -0.4
-            PY = -0.4
-            a,b = self.last_vals
-            cmdA = a+(PX*dx)
-            cmdB = b+(PY*dy)
-            self.send_dac(cmdA, cmdB, plan_obj_id,'zoom')
+                if not miss:
+                    PX = -0.4
+                    PY = -0.4
+                    a,b = self.last_vals
+                    cmdA = a+(PX*dx)
+                    cmdB = b+(PY*dy)
+                    self.send_dac(cmdA, cmdB, plan_obj_id,'zoom')
 
     def on_tracking(self, msg):
-        #update the position of all objects
-        with self.plan_lock:
-            plan,plan_obj_id = self.current_plan
-            obj_id = msg.obj_id
+        with Timer('trck'):
+            #update the position of all objects
+            with self.plan_lock:
+                plan,plan_obj_id = self.current_plan
+                obj_id = msg.obj_id
 
-            if obj_id not in self.tracked_objects:
-                self.tracked_objects[obj_id] = MaybeTargetedObject(msg, self.past, self.hitmanager)
+                if obj_id not in self.tracked_objects:
+                    self.tracked_objects[obj_id] = MaybeTargetedObject(msg, self.hitmanager)
 
-            self.tracked_objects[obj_id].update(msg, plan_obj_id)
+                self.tracked_objects[obj_id].update_position(msg)
 
-            if not msg.is_living:
-                del self.tracked_objects[obj_id]
+                if not msg.is_living:
+                    del self.tracked_objects[obj_id]
 
-            obj = self.tracked_objects.get(obj_id)
+                obj = self.tracked_objects.get(obj_id)
 
-        if obj and obj.is_targeted and (plan == 'point mirror'):
-            #point at the updated position
-            self.point_mirrors_at_msg(msg)
-            #but if the fly is already in the centre of the view then use the zoom camera for
-            #the next tracking
-            laser_distance = self.get_laser_distance(obj)
-            if laser_distance < THRESHOLD_DISTANCE_PIXELS:
-                self.set_current_plan('zap start', obj_id, reason='close (%.1f)' % laser_distance)
+                if plan != 'point mirror':
+                    return
+
+                if not obj:
+                    return
+
+                if obj.is_targeted(plan_obj_id):
+                    #point at the updated position
+                    self.point_mirrors_at_msg(msg)
+                    #but if the fly is already in the centre of the view then use the zoom camera for
+                    #the next tracking
+                    laser_distance = self.get_laser_distance(obj)
+                    if laser_distance < THRESHOLD_DISTANCE_PIXELS:
+                        self.set_current_plan('zap start', obj_id, reason='close (%.1f)' % laser_distance)
 
     def update(self):
-        return
-
-        with self.plan_lock:
-            for obj in self.tracked_objects.values():
-                print repr(obj)
+        with Timer('upd8'):
+            with self.plan_lock:
+                print [obj for obj in self.tracked_objects.values() if obj.is_in_area]
 
     def set_current_plan(self,plan,obj_id,reason=''):
         assert isinstance(obj_id, int)
 
-        with self.plan_lock:
-            obj = self.tracked_objects.get(obj_id)
-            #we just lost the object in between this call executing
-            if not obj:
-                return
+        obj = self.tracked_objects.get(obj_id)
+        #we just lost the object in between this call executing
+        if not obj:
+            return
 
-            if plan == 'zap start':
-                self.zoom_misses = 0
+        if plan == 'zap start':
+            self.zoom_misses = 0
 
-            self.current_plan = (plan,obj_id)
+        self.current_plan = (plan,obj_id)
 
         print "{0:<15s}({1:<10s}) : {2:s}".format(plan,reason,repr(obj))
 
@@ -328,12 +337,8 @@ class Targeter:
         msg = MicroPosition(myint16(daca), myint16(dacb))
         this_vals = msg.posA, msg.posB
         if this_vals != self.last_vals:
-            try:
-                self.pub_dac_position.publish(msg)
-                self.last_vals = this_vals
-                print which
-            except rospy.ROSSerializationException:
-                print 'error serialzing', msg
+            self.pub_dac_position.publish(msg)
+            self.last_vals = this_vals
 
         #ix = msg.posA, msg.posB
         #px = self.cal.d2px(ix)
