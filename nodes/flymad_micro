@@ -13,7 +13,6 @@ from flymad.util import myint16, dac_value_wrap
 class FlyMADMicro(object):
     def __init__(self):
         rospy.init_node('flymad_micro')
-        _ = rospy.Subscriber('~laser', UInt8, self.laser_callback)
         _ = rospy.Subscriber('~position', MicroPosition, self.position_callback)
         _ = rospy.Subscriber('~velocity', MicroVelocity, self.velocity_callback)
         self._pub_dac_position = rospy.Publisher('~position_echo',
@@ -41,7 +40,6 @@ class FlyMADMicro(object):
             self.ser = None
 
         self._buf = ''
-        self.laser = 0
         self.velocity_mode = False
 
         self._debug = rospy.get_param('~debug', 0)
@@ -74,29 +72,22 @@ class FlyMADMicro(object):
         msg.data = time.tzname[0]
         pub_timezone.publish(msg)
 
-    def laser_callback(self,msg):
-        val = msg.data
-        self._update(laser=val)
-
     def position_callback(self,msg):
         if self._debug:
             print 'msg: position:',msg.posA, msg.posB
 
-        self._update(posA=msg.posA, posB=msg.posB)
+        self._update(laser=msg.laser, posA=msg.posA, posB=msg.posB)
 
     def velocity_callback(self,msg):
         if self._debug:
             print 'msg: velocity:',msg.velA, msg.velB
 
-        self._update(velA=msg.velA, velB=msg.velB)
+        self._update(laser=msg.laser, velA=msg.velA, velB=msg.velB)
 
-    def _update(self,
+    def _update(self, 
                 laser=None,
                 posA=None, posB=None,
                 velA=None, velB=None):
-        if laser is not None:
-            self.laser = laser
-
 
         cmd = 0x00
         argA = 0
@@ -105,7 +96,7 @@ class FlyMADMicro(object):
         if self._adc_scale > 0:
             cmd |= 0x08
 
-        if self.laser:
+        if laser:
             cmd |= 0x02
 
         if velA is not None or velB is not None:
