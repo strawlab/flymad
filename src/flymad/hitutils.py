@@ -24,16 +24,16 @@ class HitImage(object):
         self._img = None
 
         self._origin = 'top left'
-        rospy.Subscriber('/flyman/geom_image_origin',
+        rospy.Subscriber('/draw_geom/image_origin',
                         std_msgs.msg.String,
                         self._on_image_origin)
         #width,height
         self._size = tuple()
-        rospy.Subscriber('/flyman/geom_image_size',
+        rospy.Subscriber('/draw_geom/image_size',
                         geometry_msgs.msg.Point32,
                         self._on_image_size)
         self._poly = []
-        rospy.Subscriber('/flymad/geom_poly',
+        rospy.Subscriber('/draw_geom/poly',
                         geometry_msgs.msg.Polygon,
                         self._on_image_poly)
 
