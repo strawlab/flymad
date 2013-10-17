@@ -16,7 +16,7 @@ from flymad.util import myint16
 from flymad.hitutils import HitBox, HitImage
 
 PRINT_TIME  = False
-PRINT_DAC   = False
+PRINT_DAC   = True
 PRINT_STATE = False
 
 LASER_POWER_ON  = 255 #0 -> 255
@@ -25,6 +25,8 @@ LASER_POWER_OFF = 0
 MOTOR_LAG       = 0.015
 
 HIT_DURATION    = 1 # 10 msec
+MANAGEMENT_RATE = 5 # every xHz look for flies entering the arena
+
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
 
 def str_to_code(plan):
@@ -270,7 +272,7 @@ class Targeter:
                         laser_distance = self.get_laser_distance(obj)
                         if laser_distance < THRESHOLD_DISTANCE_PIXELS:
                             self.set_current_plan('zap start', obj.obj_id,
-                                        reason='close (%.1f)' % laser_distance)
+                                        reason='close %.1f' % laser_distance)
 
     def update(self):
         with Timer('upd8'):
@@ -401,7 +403,7 @@ class Targeter:
         self.pub_targeted.publish(msg)
 
     def run(self):
-        r = rospy.Rate(5)
+        r = rospy.Rate(MANAGEMENT_RATE)
 
         while not rospy.is_shutdown():
             self.update()
