@@ -10,15 +10,26 @@ import std_msgs.msg
 import cv2
 import numpy as np
 
-class HitBox:
-    def __init__(self, borders_x, borders_y):
+class _HitManager(object):
+    def __init__(self, target_when_inside):
+        if target_when_inside:
+            self.should_target = self.is_inside_area
+        else:
+            self.should_target = lambda x,y: not self.is_inside_area(x,y)
 
-        self.in_area = (lambda x,y:
-                ((int(borders_x[0]) <= x <= int(borders_x[1])) and
-                 (int(borders_y[0]) <= y <= int(borders_y[1]))) )
+class HitBox(_HitManager):
+    def __init__(self, target_when_inside, borders_x, borders_y):
+        _HitManager.__init__(self, target_when_inside)
+        self._borders_x = map(int,borders_x)
+        self._borders_y = map(int,borders_y)
 
-class HitImage(object):
-    def __init__(self, change_cb=None):
+    def is_inside_area(self, x, y):
+        return  ((self._borders_x[0] <= x <= self._borders_x[1]) and
+                 (self._borders_y[0] <= y <= self._borders_y[1]))
+
+class HitImage(_HitManager):
+    def __init__(self, target_when_inside, change_cb=None):
+        _HitManager.__init__(self, target_when_inside)
         self._change_cb = change_cb
         self._img_lock = threading.Lock()
         self._img = None
@@ -76,7 +87,7 @@ class HitImage(object):
         with self._img_lock:
             return self._img.copy()
 
-    def in_area(self, x, y):
+    def is_inside_area(self, x, y):
         if self._img is None:
             return False
         try:

@@ -9,7 +9,7 @@ import rospy
 from flymad.msg import TrackedObj
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import UInt8, Int64
-from flymad.msg import MicroVelocity, MicroPosition, StampedObject, Plan
+from flymad.msg import MicroVelocity, MicroPosition, TargetedObj
 
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint16
@@ -44,6 +44,10 @@ def str_to_code(plan):
 
 TTL_MODES = set(("zap start","zap continue"))
 
+(MODE_IDLE,
+ MODE_WIDE,
+ MODE_ZOOM) = range(3)
+
 class _Timer(object):
     def __init__(self, name=None):
         self.name = name
@@ -70,8 +74,7 @@ Timer = _Timer if PRINT_TIME else _FakeTimer
 
 class MaybeTargetedObject:
 
-    is_in_area = False
-    should_laser = False
+    should_target = False
     obj_id = -1
 
     def __init__(self,msg,hitmanager):
@@ -85,12 +88,12 @@ class MaybeTargetedObject:
 
     def __str__(self):
         s = self.msg.state_vec
-        return '%cobj %d at %.1f,%.1f, hit for %.1f (last %.2f) in %c' % (
+        return '%cobj %d at %.1f,%.1f, hit for %.1f (last %.2f) trg %c' % (
                     self.target_type,
                     self.msg.obj_id,
                     s[0],s[1],
                     self.laser_total_hit,self.laser_last_hit,
-                    'Y' if self.is_in_area else 'N'
+                    'Y' if self.should_target else 'N'
         )
 
     def __repr__(self):
@@ -118,10 +121,10 @@ class MaybeTargetedObject:
     def update_position(self,msg):
         assert self.obj_id == msg.obj_id
 
-        was_in_area = self.is_in_area
-        self.is_in_area  = self.hitmanager.in_area(int(msg.state_vec[0]), int(msg.state_vec[1]))
+        was_target = self.should_target
+        self.should_target  = self.hitmanager.should_target(int(msg.state_vec[0]), int(msg.state_vec[1]))
         #if we left the area then no more laser (IS THIS NEEDED?)
-        if was_in_area and not self.is_in_area:
+        if was_target and not self.should_target:
             self.reset_laser()
 
         self.msg = msg
@@ -137,18 +140,18 @@ class MaybeTargetedObject:
             return False
 
     def should_laser(self):
-        if self.is_in_area:
+        if self.should_target:
             return self.laser_total_hit < HIT_DURATION
         return False
 
 class Targeter:
-    def __init__(self, cal_fname, borders_x, borders_y):
+    def __init__(self, cal_fname, target_when_inside, borders_x, borders_y):
         self.cal = load_calibration(cal_fname)
 
         if None in (borders_x, borders_y):
-            self.hitmanager = HitImage()
+            self.hitmanager = HitImage(target_when_inside)
         else:
-            self.hitmanager = HitBox(borders_x, borders_y)
+            self.hitmanager = HitBox(target_when_inside, borders_x, borders_y)
 
         self.dacs       = 0,0
         self.last_vals  = 0,0,LASER_POWER_OFF #a,b,laser
@@ -160,16 +163,15 @@ class Targeter:
         self.current_plan   = ('idle',-1) #(plan name, obj_id)
         self.tracked_objects = {} # a dict of currently tracked objects
 
-        self.pub_plan = rospy.Publisher('/multi_targeter/plan',
-                                        Plan)
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
                                                 MicroPosition,
                                                 tcp_nodelay=True)
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
                                                 MicroVelocity,
                                                 tcp_nodelay=True)
-        self.pub_targeted = rospy.Publisher('/flymad/targeted',
-                                            StampedObject,
+
+        self.pub_targeted = rospy.Publisher('/targeter/targeted',
+                                            TargetedObj,
                                             tcp_nodelay=True)
 
         self.point_mirrors_at_nothing()
@@ -240,6 +242,11 @@ class Targeter:
 
                             self.send_dac(cmdA, cmdB, laser_power, obj.obj_id)
 
+                            #SEND TARGET MESSAGE
+                            x,y,lx,ly = self.get_obj_xy_and_laser_xy(obj)
+                            self.send_targeted(obj.obj_id, x, y, lx, ly, laser_power, MODE_ZOOM)
+
+
 
     def on_tracking(self, msg):
         with Timer('trck'):
@@ -264,12 +271,18 @@ class Targeter:
                     if obj.update_targeting(plan_obj_id, now, 'w'):
                         assert plan_obj_id == obj.obj_id
 
-                        #point at the updated position
-                        self.point_mirrors_at_obj(obj)
+                        #get the current fly position and galvo/laser position
+                        x,y,lx,ly = self.get_obj_xy_and_laser_xy(obj)
+                        #immediately point at the fly (because the next frame might be
+                        #a head delta, in which case we will switch to TTL tracking
+                        self.point_mirrors_at_xy(x,y,obj.obj_id)
+
+                        #SEND TARGET MESSAGE
+                        self.send_targeted(obj.obj_id, x, y, lx, ly, LASER_POWER_OFF, MODE_WIDE)
 
                         #but if the fly is already in the centre of the view then use the zoom
                         #camera for the next tracking
-                        laser_distance = self.get_laser_distance(obj)
+                        laser_distance = np.sqrt((lx-x)**2 + (ly-y)**2)
                         if laser_distance < THRESHOLD_DISTANCE_PIXELS:
                             self.set_current_plan('zap start', obj.obj_id,
                                         reason='close %.1f' % laser_distance)
@@ -281,7 +294,7 @@ class Targeter:
 
                 to_hit = []
                 for obj in self.tracked_objects.values():
-                    #if we are not currently lasering that fly, and it is in the area and
+                    #if we are not currently lasering that fly, and it should be targeted and
                     #not been hit lately
                     if (plan_obj_id != obj.obj_id) and obj.should_laser():
                         to_hit.append( obj )
@@ -306,13 +319,6 @@ class Targeter:
 
         if PRINT_STATE:
             print "{0:<15s}({1:<10s}) : {2:s}".format(plan,reason,repr(self.tracked_objects.get(obj_id)))
-
-        msg = Plan()
-        msg.plan_code = int(str_to_code(plan))
-        msg.obj_id = obj_id
-        msg.stamp = rospy.Time().now()
-        msg.number = int(len(self.tracked_objects))
-        self.pub_plan.publish(msg)
 
     def get_obj_xy(self,obj,predict=False):
         """return the object position, optionally predicting
@@ -339,7 +345,7 @@ class Targeter:
 
         return x,y
 
-    def get_laser_distance(self,obj):
+    def get_obj_xy_and_laser_xy(self,obj):
         assert isinstance(obj, MaybeTargetedObject)
 
         x,y = self.get_obj_xy(obj)
@@ -347,15 +353,7 @@ class Targeter:
         dac_pixel_x = self.cal.d2px((aa,ab))
         dac_pixel_y = self.cal.d2py((aa,ab))
 
-        laser_distance = np.sqrt((dac_pixel_x-x)**2 + (dac_pixel_y-y)**2)
-
-        return laser_distance
-
-    def point_mirrors_at_obj(self,obj):
-        assert isinstance(obj, MaybeTargetedObject)
-
-        x,y = self.get_obj_xy(obj)
-        self.point_mirrors_at_xy(x,y,obj.obj_id)
+        return x,y,dac_pixel_x,dac_pixel_y
 
     def point_mirrors_at_nothing(self):
         self.point_mirrors_at_xy(250,250,0)
@@ -397,9 +395,16 @@ class Targeter:
         if PRINT_DAC:
             print repr(self.tracked_objects.get(obj_id))
 
-        msg = StampedObject()
+    def send_targeted(self, obj_id, fly_x, fly_y, laser_x, laser_y, laser_power, mode):
+        msg = TargetedObj()
         msg.header.stamp = rospy.Time.now()
-        msg.obj_id = obj_id
+        msg.obj_id = int(obj_id)
+        msg.fly_x = float(fly_x)
+        msg.fly_y = float(fly_y)
+        msg.laser_x = float(laser_x)
+        msg.laser_y = float(laser_y)
+        msg.laser_power = int(laser_power)
+        msg.mode = int(mode)
         self.pub_targeted.publish(msg)
 
     def run(self):
@@ -416,15 +421,25 @@ if __name__=='__main__':
     rospy.init_node('flymad_targeter')
 
     import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+                'multi_targeter_refined',
+                epilog='flies are targeted when inside the specified area, unless '\
+                       '--outside is given.\n'\
+                       'if --borders_{x,y} is not given, listen to ROS topics /draw_geom/... '\
+                       'for an arbitary polygon defining the targeting area.\n\n'
+    )
+
     parser.add_argument('calibration', nargs=1, help='calibration yaml')
     parser.add_argument('--borders_x', nargs=2, metavar=('X0','X1'),
                             default=None, help='borders for targeting')
     parser.add_argument('--borders_y', nargs=2, metavar=('Y0','Y1'),
                             default=None, help='borders for targeting')
+    parser.add_argument('--outside', action='store_false', default=True,
+                            dest='target_when_inside',
+                            help='targeted when outside')
 
     args = parser.parse_args(rospy.myargv()[1:])
 
-    t = Targeter(args.calibration[0], args.borders_x, args.borders_y)
+    t = Targeter(args.calibration[0], args.target_when_inside, args.borders_x, args.borders_y)
     t.run()
 
