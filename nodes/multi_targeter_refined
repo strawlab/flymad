@@ -29,21 +29,6 @@ MANAGEMENT_RATE = 5 # every xHz look for flies entering the arena
 
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
 
-def str_to_code(plan):
-    if plan=='idle':
-        code = 0
-    elif plan=="point mirror":
-        code = 1
-    elif plan=="zap start":
-        code = 2
-    elif plan=="zap continue":
-        code = 3
-    else:
-        raise ValueError('unknown plan: %r'%plan)
-    return code
-
-TTL_MODES = set(("zap start","zap continue"))
-
 (MODE_IDLE,
  MODE_WIDE,
  MODE_ZOOM) = range(3)
@@ -208,7 +193,7 @@ class Targeter:
             with self.plan_lock:
                 plan,plan_obj_id = self.current_plan
 
-                if plan not in TTL_MODES:
+                if plan != "zap start":
                     return
 
                 now = rospy.Time.now().to_sec()
