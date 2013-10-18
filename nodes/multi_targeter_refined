@@ -19,13 +19,16 @@ PRINT_TIME  = False
 PRINT_DAC   = True
 PRINT_STATE = False
 
+PX = -0.5
+PY = -0.5
+
 LASER_POWER_ON  = 255 #0 -> 255
 LASER_POWER_OFF = 0
 
 MOTOR_LAG       = 0.015
 
-HIT_DURATION    = 1 # 10 msec
-MANAGEMENT_RATE = 5 # every xHz look for flies entering the arena
+HIT_DURATION    = 0.2  # 10 msec
+MANAGEMENT_RATE = 5  # every xHz look for flies entering the arena
 
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
 
@@ -93,24 +96,25 @@ class MaybeTargetedObject:
         assert isinstance(now, float)
 
         if self.laser_first_hit:
-            self.laser_last_hit  = now
+            self.laser_total_hit = 0
         else:
             self.laser_total_hit += (now - self.laser_last_hit)
 
+        self.laser_last_hit = now
         self.laser_first_hit = False
 
     def reset_laser(self):
         self.laser_first_hit = True
-        self.laser_total_hit = 0.0
 
     def update_position(self,msg):
         assert self.obj_id == msg.obj_id
 
-        was_target = self.should_target
+        #was_target = self.should_target
         self.should_target  = self.hitmanager.should_target(int(msg.state_vec[0]), int(msg.state_vec[1]))
+
         #if we left the area then no more laser (IS THIS NEEDED?)
-        if was_target and not self.should_target:
-            self.reset_laser()
+        #if was_target and not self.should_target:
+        #    self.reset_laser()
 
         self.msg = msg
 
@@ -126,7 +130,7 @@ class MaybeTargetedObject:
 
     def should_laser(self):
         if self.should_target:
-            return self.laser_total_hit < HIT_DURATION
+            return (self.laser_total_hit < HIT_DURATION)
         return False
 
 class Targeter:
@@ -214,8 +218,6 @@ class Targeter:
                                         reason='%d misses'%self.zoom_misses)
 
                         if not miss:
-                            PX = -0.4
-                            PY = -0.4
                             a,b,_ = self.last_vals
                             cmdA = a+(PX*dx)
                             cmdB = b+(PY*dy)
@@ -291,9 +293,9 @@ class Targeter:
                     to_hit.sort()
                     self.set_current_plan('point mirror', to_hit[0].obj_id,
                                 reason='your turn')
-                else:
+                #else:
                     #turn off the laser (turning it on is handled by the head_delta callback)
-                    self.turnoff_laser()
+                    #self.turnoff_laser()
 
     def set_current_plan(self,plan,obj_id,reason=''):
         assert isinstance(obj_id, int)
