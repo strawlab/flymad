@@ -15,9 +15,10 @@ from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint16
 from flymad.hitutils import HitBox, HitImage
 
-PRINT_TIME  = False
-PRINT_DAC   = True
-PRINT_STATE = False
+PRINT_TIME      = False
+PRINT_DAC       = True
+PRINT_STATE     = False
+PRINT_UPDATE    = False
 
 PX = -0.5
 PY = -0.5
@@ -27,8 +28,8 @@ LASER_POWER_OFF = 0
 
 MOTOR_LAG       = 0.015
 
-HIT_DURATION    = 0.2  # 10 msec
-MANAGEMENT_RATE = 5  # every xHz look for flies entering the arena
+HIT_DURATION    = 0.2   # seconds
+MANAGEMENT_RATE = max(10,2.0/HIT_DURATION)
 
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
 
@@ -62,7 +63,8 @@ Timer = _Timer if PRINT_TIME else _FakeTimer
 
 class MaybeTargetedObject:
 
-    should_target = False
+    _t0 = time.time()
+    should_target   = False
     obj_id = -1
 
     def __init__(self,msg,hitmanager):
@@ -76,12 +78,13 @@ class MaybeTargetedObject:
 
     def __str__(self):
         s = self.msg.state_vec
-        return '%cobj %d at %.1f,%.1f, hit for %.1f (last %.2f) trg %c' % (
+        return '%cobj %d at %.1f,%.1f, hit=%.1f (lst=%.2f) t:%c l:%c' % (
                     self.target_type,
                     self.msg.obj_id,
                     s[0],s[1],
-                    self.laser_total_hit,self.laser_last_hit,
-                    'Y' if self.should_target else 'N'
+                    self.laser_total_hit,self.laser_last_hit-self._t0,
+                    'Y' if self.should_target else 'N',
+                    'Y' if self.should_laser() else 'N',
         )
 
     def __repr__(self):
@@ -95,9 +98,7 @@ class MaybeTargetedObject:
     def update_laser(self, now):
         assert isinstance(now, float)
 
-        if self.laser_first_hit:
-            self.laser_total_hit = 0
-        else:
+        if not self.laser_first_hit:
             self.laser_total_hit += (now - self.laser_last_hit)
 
         self.laser_last_hit = now
@@ -105,33 +106,28 @@ class MaybeTargetedObject:
 
     def reset_laser(self):
         self.laser_first_hit = True
+        self.laser_total_hit = 0
 
     def update_position(self,msg):
         assert self.obj_id == msg.obj_id
 
         #was_target = self.should_target
         self.should_target  = self.hitmanager.should_target(int(msg.state_vec[0]), int(msg.state_vec[1]))
-
-        #if we left the area then no more laser (IS THIS NEEDED?)
-        #if was_target and not self.should_target:
-        #    self.reset_laser()
-
         self.msg = msg
 
-    def update_targeting(self, target_obj_id, now, which):
+    def update_targeting(self, target_obj_id, which):
         assert which in 'wf'
 
-        if self.obj_id == target_obj_id:
-            self.target_type = which
-            return True
-        else:
-            self.target_type = ' '
-            return False
+        is_targeted = self.obj_id == target_obj_id
+        self.target_type = which if is_targeted else ' '
+
+        return is_targeted
 
     def should_laser(self):
         if self.should_target:
-            return (self.laser_total_hit < HIT_DURATION)
+            return self.laser_total_hit < HIT_DURATION
         return False
+
 
 class Targeter:
     def __init__(self, cal_fname, target_when_inside, borders_x, borders_y):
@@ -149,7 +145,7 @@ class Targeter:
 
         #use this lock to protect the tracked objects
         self.plan_lock      = threading.Lock()
-        self.current_plan   = ('idle',-1) #(plan name, obj_id)
+        self.current_plan   = ('idle',0,LASER_POWER_OFF) #(plan name, obj_id, laser_power)
         self.tracked_objects = {} # a dict of currently tracked objects
 
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
@@ -180,7 +176,7 @@ class Targeter:
 
     def on_target_object(self, msg):
         with self.plan_lock:
-            self.set_current_plan('point mirror',msg.data,reason='manual')
+            self.set_current_plan('point mirror',msg.data,LASER_POWER_OFF,reason='manual')
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -195,14 +191,14 @@ class Targeter:
         """
         with Timer('head'):
             with self.plan_lock:
-                plan,plan_obj_id = self.current_plan
+                plan,plan_obj_id,laser_power = self.current_plan
 
                 if plan != "zap start":
                     return
 
                 now = rospy.Time.now().to_sec()
                 for obj in self.tracked_objects.values():
-                    if obj.update_targeting(plan_obj_id, now, 'f'):
+                    if obj.update_targeting(plan_obj_id,'f'):
                         assert plan_obj_id == obj.obj_id
 
                         dx = msg.x
@@ -214,7 +210,7 @@ class Targeter:
 
                         if self.zoom_misses > 10:
                             #we have lost the fly, or have a bad estimate, go back to pre zap (wide camera)
-                            self.set_current_plan('point mirror', obj.obj_id,
+                            self.set_current_plan('point mirror', obj.obj_id,laser_power,
                                         reason='%d misses'%self.zoom_misses)
 
                         if not miss:
@@ -222,12 +218,11 @@ class Targeter:
                             cmdA = a+(PX*dx)
                             cmdB = b+(PY*dy)
 
-                            laser_power = LASER_POWER_OFF
-                            if obj.should_laser():
-                                obj.update_laser(now)
-                                laser_power = LASER_POWER_ON
+#                            if obj.should_laser():
+#                                obj.update_laser(now)
 
                             self.send_dac(cmdA, cmdB, laser_power, obj.obj_id)
+                            obj.update_laser(now)
 
                             #SEND TARGET MESSAGE
                             x,y,lx,ly = self.get_obj_xy_and_laser_xy(obj)
@@ -239,7 +234,7 @@ class Targeter:
         with Timer('trck'):
             #update the position of all objects
             with self.plan_lock:
-                plan,plan_obj_id = self.current_plan
+                plan,plan_obj_id,laser_power = self.current_plan
                 obj_id = msg.obj_id
 
                 if obj_id not in self.tracked_objects:
@@ -253,59 +248,76 @@ class Targeter:
                 if plan != 'point mirror':
                     return
 
-                now = rospy.Time.now()
+                now = rospy.Time.now().to_sec()
                 for obj in self.tracked_objects.values():
-                    if obj.update_targeting(plan_obj_id, now, 'w'):
+                    if obj.update_targeting(plan_obj_id,'w'):
                         assert plan_obj_id == obj.obj_id
 
                         #get the current fly position and galvo/laser position
                         x,y,lx,ly = self.get_obj_xy_and_laser_xy(obj)
                         #immediately point at the fly (because the next frame might be
                         #a head delta, in which case we will switch to TTL tracking
-                        self.point_mirrors_at_xy(x,y,obj.obj_id)
+                        self.point_mirrors_at_xy(x,y,obj.obj_id,laser_power)
+                        obj.update_laser(now)
 
                         #SEND TARGET MESSAGE
-                        self.send_targeted(obj.obj_id, x, y, lx, ly, LASER_POWER_OFF, MODE_WIDE)
+                        self.send_targeted(obj.obj_id, x, y, lx, ly, laser_power, MODE_WIDE)
 
                         #but if the fly is already in the centre of the view then use the zoom
                         #camera for the next tracking
                         laser_distance = np.sqrt((lx-x)**2 + (ly-y)**2)
                         if laser_distance < THRESHOLD_DISTANCE_PIXELS:
-                            self.set_current_plan('zap start', obj.obj_id,
+                            self.set_current_plan('zap start', obj.obj_id,laser_power,
                                         reason='close %.1f' % laser_distance)
 
     def update(self):
         with Timer('upd8'):
             with self.plan_lock:
-                plan,plan_obj_id = self.current_plan
+                plan,plan_obj_id,laser_power = self.current_plan
 
                 to_hit = []
-                for obj in self.tracked_objects.values():
-                    #if we are not currently lasering that fly, and it should be targeted and
-                    #not been hit lately
-                    if (plan_obj_id != obj.obj_id) and obj.should_laser():
-                        to_hit.append( obj )
-                    else:
-                        obj.reset_laser()
+                to_reset = []
+                is_targeted = None
 
-                if to_hit:
+                if PRINT_UPDATE:
+                    print "-------------"
+
+                for obj in self.tracked_objects.values():
+                    if PRINT_UPDATE:
+                        print "? ",plan_obj_id,"=",obj
+
+                    #are we already targeting this fly
+                    if obj.should_laser():
+                        if obj.obj_id == plan_obj_id:
+                            is_targeted = obj
+                        else:
+                            to_hit.append( obj )
+                    else:
+                        to_reset.append( obj )
+
+                if to_hit and (is_targeted is None):
                     #t[0] now contains the object hit least recently (see __cmp__)
                     to_hit.sort()
-                    self.set_current_plan('point mirror', to_hit[0].obj_id,
-                                reason='your turn')
-                #else:
-                    #turn off the laser (turning it on is handled by the head_delta callback)
-                    #self.turnoff_laser()
+                    obj = to_hit[0]
+                    self.set_current_plan('point mirror', obj.obj_id,LASER_POWER_ON,reason='your turn')
+                elif (not to_hit) and (is_targeted is None):
+                    #turn off the laser, no flies to track, nothing to do
+                    self.set_current_plan('idle',0,LASER_POWER_OFF,reason='laser off')
+                    self.point_mirrors_at_nothing()
 
-    def set_current_plan(self,plan,obj_id,reason=''):
+                for obj in to_reset:
+                    obj.reset_laser()
+
+
+    def set_current_plan(self,plan,obj_id,laser_power,reason=''):
         assert isinstance(obj_id, int)
 
         if plan == 'zap start':
             self.zoom_misses = 0
-        self.current_plan = (plan,obj_id)
+        self.current_plan = (plan,obj_id,laser_power)
 
         if PRINT_STATE:
-            print "{0:<15s}({1:<10s}) : {2:s}".format(plan,reason,repr(self.tracked_objects.get(obj_id)))
+            print "-> {0:<13s}({1:<10s}) : {2:s}".format(plan,reason,self.tracked_objects.get(obj_id))
 
     def get_obj_xy(self,obj,predict=False):
         """return the object position, optionally predicting
@@ -343,9 +355,9 @@ class Targeter:
         return x,y,dac_pixel_x,dac_pixel_y
 
     def point_mirrors_at_nothing(self):
-        self.point_mirrors_at_xy(250,250,0)
+        self.point_mirrors_at_xy(250,250,0,LASER_POWER_OFF)
 
-    def point_mirrors_at_xy(self,x,y,obj_id):
+    def point_mirrors_at_xy(self,x,y,obj_id,laser_power):
         # desired
         bad_data = False
         try:
@@ -361,7 +373,7 @@ class Targeter:
             # Hmm, should we do something more?
             return
 
-        self.send_dac(daca, dacb, LASER_POWER_OFF, obj_id)
+        self.send_dac(daca, dacb, laser_power, obj_id)
 
     def turnoff_laser(self):
         a,b,_ = self.last_vals
