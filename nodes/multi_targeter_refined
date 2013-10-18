@@ -28,8 +28,8 @@ LASER_POWER_OFF = 0
 
 MOTOR_LAG       = 0.015
 
-HIT_DURATION    = 0.2   # seconds
-MANAGEMENT_RATE = max(10,2.0/HIT_DURATION)
+HIT_DURATION    = 0.1   # seconds
+MANAGEMENT_RATE = max(20,2.0/HIT_DURATION)
 
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
 
@@ -304,7 +304,7 @@ class Targeter:
                     off_lp = LASER_POWER_ON
                     #turn off the laser, no flies to track, nothing to do
                     self.set_current_plan('idle',0,off_lp,reason='laser off')
-                    self.send_dac(0, -12000, off_lp, 0)
+                    self.send_dac(-1200, 0, off_lp, 0)
 
                 for obj in to_reset:
                     obj.reset_laser()
