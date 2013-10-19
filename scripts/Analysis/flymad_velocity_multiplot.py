@@ -97,22 +97,6 @@ for csvfile in sorted(glob.glob(sys.argv[1] + "/*.csv")):
     df['lasergroup'] = laser
     df['RepID'] = repID
     
-#    df['smoothv'] = np.nan
-#    df['smooththeta'] = np.nan
-#    df['smoothAfwd'] = np.nan
-#    df['smoothrot'] = np.nan
-#    for row in df.index:
-#        if row >=2:
-#          df.ix[row,'smoothv'] = df.ix[(row-2):(row+2), 'Vfwd'].mean()
-#          df.ix[row,'smooththeta'] = df.ix[(row-2):(row+2), 'orientation'].mean()
-#          dt = df.ix[row, 'tracked_t'] - df.ix[row-1, 'tracked_t']
-#          df.ix[row,'smoothAfwd'] = (df.ix[row, 'smoothv'] - df.ix[row-1, 'smoothv']) / dt
-#          df.ix[row, 'smoothrot'] = abs(df.ix[row, 'smooththeta'] - df.ix[row-1, 'smooththeta']) / dt 
-#        else:
-#          continue 
-#    df['smoothAfwd'][abs(df['smoothAfwd']) >=2000] = np.nan
-#    df['smoothrot'][abs(df['smoothrot']) >=2000] = np.nan
-    
     #combine 7s trials together into df2:
     dfshift = df.shift()
     laserons = df[ (df['laser_state']-dfshift['laser_state']) == 1 ]
