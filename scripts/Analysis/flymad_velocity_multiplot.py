@@ -4,21 +4,17 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from pandas import Series
 from pandas import DataFrame
 from pandas.tseries.offsets import DateOffset
 import datetime
-import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
 import flymad_analysis
 
 #need to support numpy datetime64 types for resampling in pandas
-#assert np.version.version == "1.7.1"
+assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.__version__ == "0.11.0"
-
-SECOND_TO_NANOSEC = 1e9
 
 CTRL_GENOTYPE = 'ctrl' #black
 EXP_GENOTYPE = 'MW' #blue
@@ -34,7 +30,7 @@ if not os.path.exists(sys.argv[1] + "/Velocity_calculations/"):
 for csvfile in sorted(glob.glob(sys.argv[1] + "/*.csv")):
     csvfilefn = os.path.basename(csvfile)
     try:
-        experimentID,date,time = csvfilefn.split("_",2)
+        experimentID,date,_time = csvfilefn.split("_",2)
         genotype,laser,repID = experimentID.split("-",2)
         repID = repID + "_" + date
         print "processing: ", experimentID
@@ -82,7 +78,7 @@ for csvfile in sorted(glob.glob(sys.argv[1] + "/*.csv")):
     df['as'][amask2.index] = math.pi
     df['orientation'] = df['orientation'] - df['as']
     df['orientation'] = df['orientation'].astype(float)
-    
+
     df['orientation'][np.isfinite(df['orientation'])] = np.unwrap(df['orientation'][np.isfinite(df['orientation'])]) 
     #MAXIMUM SPEED = 300:
     df['v'][df['v'] >= 300] = np.nan
@@ -92,7 +88,7 @@ for csvfile in sorted(glob.glob(sys.argv[1] + "/*.csv")):
     df['Vfwd'] = (np.cos(df['orientation'] - df['Vtheta'])) * df['v']
     df['Afwd'] = np.gradient(df['Vfwd'].values) / dt
     df['dorientation'] = np.gradient(df['orientation'].values) / dt
-    
+
     #the resampling above, using the default rule of 'mean' will, if the laser
     #was on any time in that bin, increase the mean > 0.
     df['laser_state'][df['laser_state'] > 0] = 1

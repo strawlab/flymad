@@ -21,10 +21,8 @@ import matplotlib.transforms as mtransforms
 import flymad_analysis
 
 #need to support numpy datetime64 types for resampling in pandas
-#assert np.version.version == "1.7.1"
+assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.__version__ == "0.11.0"
-
-SECOND_TO_NANOSEC = 1e9
 
 EXP_GENOTYPE = 'OK371shib'
 CTRL_GENOTYPE = 'wshib'
