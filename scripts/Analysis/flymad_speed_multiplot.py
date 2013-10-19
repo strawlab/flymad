@@ -1,11 +1,4 @@
-import math
-import glob
-import os
-import sys
-import numpy as np
-import pandas as pd
-import math
-import glob
+import argparse
 import os
 import sys
 import numpy as np
@@ -13,6 +6,7 @@ import pandas as pd
 from pandas import Series
 from pandas import DataFrame
 from pandas.tseries.offsets import DateOffset
+
 import datetime
 import matplotlib
 import matplotlib.pyplot as plt
