@@ -144,6 +144,12 @@ df2std = df2.groupby(['Genotype', 'lasergroup','align'], as_index=False)[['Vfwd'
 df2mean.to_csv((sys.argv[1] + "/Velocity_calculations/overlaid_means.csv"))
 df2std.to_csv((sys.argv[1] + "/Velocity_calculations/overlaid_std.csv"))
 
+#matplotlib seems sensitive to non-float colums, so convert to
+#float anything we plot
+for _df in [df2mean, df2std]:
+    real_cols = [col for col in _df.columns if col not in ("Genotype", "lasergroup")]
+    _df[ real_cols ] = _df[ real_cols ].astype(float)
+
 # PLOT
 """
 fig = plt.figure()
@@ -184,6 +190,7 @@ MWmean = df2mean[df2mean['Genotype'] == EXP_GENOTYPE]
 ctrlmean = df2mean[df2mean['Genotype']== CTRL_GENOTYPE]
 MWstd = df2std[df2std['Genotype'] == EXP_GENOTYPE]
 ctrlstd = df2std[df2std['Genotype']== CTRL_GENOTYPE]
+
 
 fig2 = plt.figure()
 #velocity overlay:
