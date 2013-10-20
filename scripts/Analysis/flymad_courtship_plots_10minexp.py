@@ -5,6 +5,7 @@
 
 #OUTPUT: /outputs/*.CSV -- ONE FILE PER ; t0=LASEROFF; dtarget=DISTANCE TO NEAREST TARGET
 
+import argparse
 import math
 import glob
 import os
@@ -17,17 +18,19 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
-if __name__ == '__main__':
-    if len(sys.argv) !=2:
-        print 'call with directory. example: "home/user/foo/filedir"'
-        exit()	
-    
-    CTRL_GENOTYPE = 'uasstoptrpmyc' #black
-    EXP_GENOTYPE = 'wGP' #blue
-    EXP_GENOTYPE2 = '40347' #purple
-    
+import flymad_analysis
+import flymad_plot
+
+#need to support numpy datetime64 types for resampling in pandas
+assert np.version.version in ("1.7.1", "1.6.1")
+assert pd.__version__ == "0.11.0"
+
+def prepare_data(path, exp_genotype, exp2_genotype, ctrl_genotype):
+    path_out = path + "/outputs/"
+
+
     # OPEN IMAGE of background  (.png)
-    image_file = str(glob.glob(sys.argv[1] + "/*.png"))[2:-2]
+    image_file = str(glob.glob(path + "/*.png"))[2:-2]
     image_file = open(image_file, 'r')
     image = plt.imread(image_file)
     fig1=plt.figure()
@@ -48,14 +51,14 @@ if __name__ == '__main__':
     fig1.canvas.mpl_disconnect(cid)
     targets = DataFrame(targets)
     targets = (targets + 0.5).astype(int)
-    if not os.path.exists(sys.argv[1] + "/outputs/"):
-        os.makedirs(sys.argv[1] + "/outputs/")
-    targets.to_csv(sys.argv[1] + '/outputs/targetlocations.csv')
+    if not os.path.exists(path_out):
+        os.makedirs(path_out)
+    targets.to_csv(path_out+'/targetlocations.csv')
 
     #PROCESS SCORE FILES:
     pooldf = DataFrame()
     filelist = []
-    for posfile in sorted(glob.glob(sys.argv[1] + "/*.csv")):
+    for posfile in sorted(glob.glob(path + "/*.csv")):
         csvfilefn = os.path.basename(posfile)
         df = pd.read_csv(posfile)
         try:
@@ -70,7 +73,7 @@ if __name__ == '__main__':
             continue   #avoid processing flies more than once.
         filelist.append(csvfilefn)  
         print "processing:", csvfilefn         
-        for csvfile2 in sorted(glob.glob(sys.argv[1] + "/*.csv")):
+        for csvfile2 in sorted(glob.glob(path + "/*.csv")):
             csvfile2fn = os.path.basename(csvfile2)
             try:
                 experimentID2,date2,time2 = csvfile2fn.split("_",2)
@@ -153,30 +156,74 @@ if __name__ == '__main__':
         df['Genotype'][df['Genotype'] =='csGP'] = 'wGP'
         df['lasergroup'] = laser
         df['RepID'] = repID             
-        #SAVE TO .CSV
-        df.to_csv((sys.argv[1] + "/outputs/" + experimentID + "_" + date + ".csv"), index=False)
+
+        df.to_csv((path_out + experimentID + "_" + date + ".csv"), index=False)
         pooldf = pd.concat([pooldf, df[['Genotype','lasergroup', 't','zx', 'dtarget', 'as']]])   
 
     # half-assed, uninformed danno's tired method of grouping for plots:
+    expdf = pooldf[pooldf['Genotype'] == exp_genotype]
+    exp2df = pooldf[pooldf['Genotype'] == exp2_genotype]
+    ctrldf = pooldf[pooldf['Genotype']== ctrl_genotype]
+
+    #we no longer need to group by genotype, and lasergroup is always the same here
+    #so just drop it. 
+    assert len(expdf['lasergroup'].unique()) == 1, "only one lasergroup handled"
+
+    #Also ensure things are floats before plotting can fail, which it does because
+    #groupby does not retain types on grouped colums, which seems like a bug to me
+
+    expmean = expdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].mean().astype(float)
+    exp2mean = exp2df.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].mean().astype(float)
+    ctrlmean = ctrldf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].mean().astype(float)
     
-    expdf = pooldf[pooldf['Genotype'] == EXP_GENOTYPE]
-    exp2df = pooldf[pooldf['Genotype'] == EXP_GENOTYPE2]
-    ctrldf = pooldf[pooldf['Genotype']== CTRL_GENOTYPE]
+    expstd = expdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].std().astype(float)
+    exp2std = exp2df.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].std().astype(float)
+    ctrlstd = ctrldf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].std().astype(float)
     
-    expmean = expdf.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].mean()
-    exp2mean = exp2df.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].mean()
-    ctrlmean = ctrldf.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].mean()
+    expn = expdf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'as']].count().astype(float)
+    exp2n = exp2df.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'as']].count().astype(float)
+    ctrln = ctrldf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'as']].count().astype(float)
     
-    expstd = expdf.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].std()
-    exp2std = exp2df.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].std()
-    ctrlstd = ctrldf.groupby(['Genotype', 'lasergroup', 't'], as_index=False)[['zx', 'dtarget', 'as']].std()
+    ####AAAAAAAARRRRRRRRRRRGGGGGGGGGGGGGGHHHHHHHHHH so much copy paste here
+    expdf.save(path+'/exp.df')
+    exp2df.save(path+'/exp2.df')
+    ctrldf.save(path+'/ctrl.df')
     
-    expn = expdf.groupby(['Genotype', 'lasergroup','t'],  as_index=False)[['zx', 'dtarget', 'as']].count()
-    exp2n = exp2df.groupby(['Genotype', 'lasergroup','t'],  as_index=False)[['zx', 'dtarget', 'as']].count()
-    ctrln = ctrldf.groupby(['Genotype', 'lasergroup','t'],  as_index=False)[['zx', 'dtarget', 'as']].count()
-    
-    expn.to_csv((sys.argv[1] + "/outputs/expn.csv"))
-    
+    expmean.save(path+'/expmean.df')
+    exp2mean.save(path+'/exp2mean.df')
+    ctrlmean.save(path+'/ctrlmean.df')
+
+    expstd.save(path+'/expstd.df')
+    exp2std.save(path+'/exp2std.df')
+    ctrlstd.save(path+'/ctrlstd.df')
+
+    expn.save(path+'/expn.df')
+    exp2n.save(path+'/exp2n.df')
+    ctrln.save(path+'/ctrln.df')
+
+    return (expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln)
+
+def load_data(path):
+
+    return (
+        pd.load(path+'/exp.df'),
+        pd.load(path+'/exp2.df'),
+        pd.load(path+'/ctrl.df'),
+        pd.load(path+'/expmean.df'),
+        pd.load(path+'/exp2mean.df'),
+        pd.load(path+'/ctrlmean.df'),
+        pd.load(path+'/expstd.df'),
+        pd.load(path+'/exp2std.df'),
+        pd.load(path+'/ctrlstd.df'),
+        pd.load(path+'/expn.df'),
+        pd.load(path+'/exp2n.df'),
+        pd.load(path+'/ctrln.df')
+    )
+
+
+def plot_data(path, expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln):
+    path_out = path + "/outputs/"
+
     expzxsem = ((expstd['zx']).values) / (np.sqrt(expn['zx'].values))
     expdtargetsem = (expstd['dtarget'].values)/(np.sqrt(expn['dtarget'].values))
 
@@ -186,15 +233,6 @@ if __name__ == '__main__':
     ctrlzxsem = ((ctrlstd['zx']).values) / (np.sqrt(ctrln['zx'].values))
     ctrldtargetsem = (ctrlstd['dtarget'].values)/(np.sqrt(ctrln['dtarget'].values)) 
     
-    expmean.to_csv((sys.argv[1] + "/outputs/expmeans.csv"))
-    exp2mean.to_csv((sys.argv[1] + "/outputs/exp2means.csv"))
-    ctrlmean.to_csv((sys.argv[1] + "/outputs/ctrlmeans.csv"))
-
-
-
-    # PLOT FULL TRACE (MEAN +- SEM)
-    
-      
     fig = plt.figure()
     #WING EXTENSION:
     ax = fig.add_subplot(1,1,1)
@@ -208,8 +246,9 @@ if __name__ == '__main__':
     
     ax.plot(ctrlmean['t'].values, ctrlmean['zx'].values, 'k-', zorder=1, lw=3)
     ax.fill_between(ctrlmean['t'].values, (ctrlmean['zx'] + ctrlzxsem).values, (ctrlmean['zx'] - ctrlzxsem).values, color='k', alpha=0.1, zorder=3)
+
     #ax.fill_between(ctrlmean['t'].values, 0, 1, where=ctrlmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
-    
+
     ax.plot(exp2mean['t'].values, exp2mean['zx'].values, color='purple', zorder=1, lw=3)
     ax.fill_between(exp2mean['t'].values, (exp2mean['zx'] + exp2zxsem).values, (exp2mean['zx'] - exp2zxsem).values, color='purple', alpha=0.1, zorder=2)
         
@@ -240,10 +279,26 @@ if __name__ == '__main__':
     """
     
     plt.subplots_adjust(bottom=0.1, top=0.94, hspace=0.38)
-    plt.savefig((sys.argv[1] + "/outputs/following_and_WingExt.png"))
-    plt.savefig((sys.argv[1] + "/outputs/following_and_WingExt.svg"))
+    plt.savefig((path_out + "following_and_WingExt.png"))
+    plt.savefig((path_out + "following_and_WingExt.svg"))
+
+if __name__ == "__main__":
+    CTRL_GENOTYPE = 'uasstoptrpmyc' #black
+    EXP_GENOTYPE = 'wGP' #blue
+    EXP_GENOTYPE2 = '40347' #purple
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', nargs=1, help='path to csv files')
+    parser.add_argument('--only-plot', action='store_true', default=False)
+
+    args = parser.parse_args()
+    path = args.path[0]
+
+    if args.only_plot:
+        data = load_data(path)
+    else:
+        data = prepare_data(path, EXP_GENOTYPE, EXP_GENOTYPE2, CTRL_GENOTYPE)
+
+    plot_data(path, *data)
 
     plt.show()
-
-
-    

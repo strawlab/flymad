@@ -140,15 +140,15 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
 
     #save dataframes for faster replotting
     df2.save(path + "/df2.df")
-    expmean.save(path + "expmean.df")
-    ctrlmean.save(path + "ctrlmean.df")
-    expstd.save(path + "expstd.df")
-    ctrlstd.save(path + "ctrlstd.df")
+    expmean.save(path + "/expmean.df")
+    ctrlmean.save(path + "/ctrlmean.df")
+    expstd.save(path + "/expstd.df")
+    ctrlstd.save(path + "/ctrlstd.df")
 
     return expmean, ctrlmean, expstd, ctrlstd
 
 def load_data( path ):
-    return pd.load(path + "expmean.df"), pd.load(path + "ctrlmean.df"), pd.load(path + "expstd.df"), pd.load(path + "ctrlstd.df")
+    return pd.load(path + "/expmean.df"), pd.load(path + "/ctrlmean.df"), pd.load(path + "/expstd.df"), pd.load(path + "/ctrlstd.df")
 
 def plot_data( path, expmean, ctrlmean, expstd, ctrlstd ):
 
