@@ -12,26 +12,24 @@ arena = madplot.Arena(dat)
 
 ordered_trials = sorted(dat['coupled'].keys())
 
-nplots = len(dat['coupled'])
-ncols = int(math.sqrt(nplots)+0.5)
-nrows = nplots/ncols
-
-fig = plt.figure()
-gs = gridspec.GridSpec(ncols, nrows)
+fig = plt.figure(figsize=(16,8))
+gs = gridspec.GridSpec(2, 4)
 
 pct_in_area_per_time = {} #bagname:(offset[],pct[])
 
-#do the control (i.e. unpunished)
-ldf,tdf,geom = madplot.load_bagfile(os.path.join(dat['_base'], dat['control']))
-pct_in_area_per_time['unpunished'] = madplot.calculate_time_in_area(tdf, arena, geom)
+def do_bagcalc(bname, label=None):
+    if label is None:
+        label = bname
+
+    ldf,tdf,geom = madplot.load_bagfile(os.path.join(dat['_base'], bname))
+    pct_in_area_per_time[label] = madplot.calculate_time_in_area(tdf, arena, geom)
+
+    return ldf, tdf, geom
 
 for i,trial in enumerate(ordered_trials):
     bname = dat['coupled'][trial]
 
-    p = os.path.join(dat['_base'], bname)
-    ldf,tdf,geom = madplot.load_bagfile(p)
-
-    pct_in_area_per_time[bname] = madplot.calculate_time_in_area(tdf, arena, geom)
+    ldf,tdf,geom = do_bagcalc(bname)
 
     ax = fig.add_subplot(gs[i])
     madplot.plot_tracked_trajectory(ax, tdf,
@@ -39,7 +37,28 @@ for i,trial in enumerate(ordered_trials):
             limits=arena.get_limits()
     )
 
-    ax.set_title(os.path.basename(bname))
+    ax.set_title(os.path.basename(bname),
+#            prop={'size':10}
+    )
+
+    ax.xaxis.set_visible(False)
+    ax.yaxis.set_visible(False)
+
+#do the unpunished control
+ldf,tdf,geom = do_bagcalc(bname=dat['control'], label="unpunished")
+ax = fig.add_subplot(gs[i+1])
+madplot.plot_tracked_trajectory(ax, tdf,
+        intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
+        limits=arena.get_limits()
+)
+ax.set_title("unpunished",
+#        prop={'size':10}
+)
+
+ax.xaxis.set_visible(False)
+ax.yaxis.set_visible(False)
+
+gs.tight_layout(fig, h_pad=1.8)
 
 ax = plt.figure().add_subplot(111)
 for trial in ordered_trials:

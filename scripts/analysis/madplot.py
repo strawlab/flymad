@@ -53,17 +53,20 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
     if intersect_patch is not None:
         ax.add_patch(intersect_patch)
 
+    first = True
     for name, group in df.groupby('obj_id'):
         fly_x = group['fly_x'].values
         fly_y = group['fly_y'].values
 
-        ax.plot(fly_x,fly_y,'k-')
-        ax.plot(fly_x[0],fly_y[0],'b.')
+        pp = ax.plot(fly_x,fly_y,'k.',label="predicted" if first else "__nolegend__")
+
+#        ax.plot(fly_x[0],fly_y[0],'b.')
 
         #plot the laser when under fine control
         laserdf = group[group['mode'] == 2]
-        ax.plot(laserdf['laser_x'],laserdf['laser_y'],'r-')
+        lp = ax.plot(laserdf['laser_x'],laserdf['laser_y'],'r.',label="required" if first else "__nolegend__")
 
+        first = False
 
 def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None):
     ax.set_aspect('equal')
