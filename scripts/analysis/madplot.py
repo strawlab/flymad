@@ -8,7 +8,7 @@ import shapely.geometry as sg
 import matplotlib.pyplot as plt
 import matplotlib.patches
 
-import roslib
+import roslib; roslib.load_manifest('rosbag')
 import rosbag
 
 class Arena:
@@ -60,7 +60,7 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
 
         pp = ax.plot(fly_x,fly_y,'k.',label="predicted" if first else "__nolegend__")
 
-#        ax.plot(fly_x[0],fly_y[0],'b.')
+#        ax.plot(fly_x[0],fly_y[0],'b.',label="predicted" if first else "__nolegend__")
 
         #plot the laser when under fine control
         laserdf = group[group['mode'] == 2]
