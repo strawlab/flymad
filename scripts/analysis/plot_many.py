@@ -21,6 +21,10 @@ gs = gridspec.GridSpec(ncols, nrows)
 
 pct_in_area_per_time = {} #bagname:(offset[],pct[])
 
+#do the control (i.e. unpunished)
+ldf,tdf,geom = madplot.load_bagfile(os.path.join(dat['_base'], dat['control']))
+pct_in_area_per_time['unpunished'] = madplot.calculate_time_in_area(tdf, arena, geom)
+
 for i,trial in enumerate(ordered_trials):
     bname = dat['coupled'][trial]
 
@@ -42,6 +46,10 @@ for trial in ordered_trials:
     bname = dat['coupled'][trial]
     offset,pct = pct_in_area_per_time[bname]
     ax.plot(offset, pct, linestyle='solid', marker='o', label=bname)
+
+bname = 'unpunished'
+offset,pct = pct_in_area_per_time[bname]
+ax.plot(offset, pct, linestyle='solid', marker='+', label=bname)
 
 ax.set_xlabel('time since trial start (s)')
 ax.set_ylabel('time spent in target area (pct)')
