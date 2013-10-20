@@ -10,7 +10,8 @@ arena = madplot.Arena()
 
 ldf,tdf,geom = madplot.load_bagfile(sys.argv[1])
 madplot.plot_tracked_trajectory(ax, tdf,
-            arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2)
+            intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
+            limits=arena.get_limits()
 )
 
 plt.show()

@@ -14,26 +14,44 @@ import rosbag
 class Arena:
     def __init__(self, jsonconf=dict()):
         x = jsonconf.get('cx',360)
-        y = jsonconf.get('cy',260)
+        y = jsonconf.get('cy',255)
         r = jsonconf.get('cr',200)
+        self._x, self._y, self._r = x,y,r
         self._circ = sg.Point(x,y).buffer(r)
 
-    def get_intersect_points(self, geom):
+    def get_intersect_polygon(self, geom):
         poly = sg.Polygon(list(zip(*geom)))
         inter = self._circ.intersection(poly)
+        return inter
+
+    def get_intersect_points(self, geom):
+        inter = self.get_intersect_polygon(geom)
         return list(inter.exterior.coords)
 
     def get_intersect_patch(self, geom, **kwargs):
         pts = self.get_intersect_points(geom)
         return matplotlib.patches.Polygon(pts, **kwargs)
 
+    def get_patch(self, **kwargs):
+        return matplotlib.patches.Circle((self._x,self._y), radius=self._r, **kwargs)
+
+    def get_limits(self):
+        #(xlim, ylim)
+        return (150,570), (47,463)
+
 def plot_geom(ax, geom):
     ax.plot(geom[0],geom[1],'g-')
 
-def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect_patch=None):
+def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect_patch=None, limits=None):
     ax.set_aspect('equal')
-    ax.set_xlim(150,570)
-    ax.set_ylim(50,470)
+
+    if limits is not None:
+        xlim,ylim = limits
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+
+    if intersect_patch is not None:
+        ax.add_patch(intersect_patch)
 
     for name, group in df.groupby('obj_id'):
         fly_x = group['fly_x'].values
@@ -46,20 +64,22 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
         laserdf = group[group['mode'] == 2]
         ax.plot(laserdf['laser_x'],laserdf['laser_y'],'r-')
 
+
+def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None):
+    ax.set_aspect('equal')
+
+    if limits is not None:
+        xlim,ylim = limits
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+
     if intersect_patch is not None:
         ax.add_patch(intersect_patch)
-
-def plot_tracked_trajectory(ax, df, intersect_patch=None):
-    ax.set_aspect('equal')
-    ax.set_xlim(150,570)
-    ax.set_ylim(50,470)
 
     for name, group in df.groupby('obj_id'):
         _df = group.resample('20L')
         ax.plot(_df['x'],_df['y'],'k-')
 
-    if intersect_patch is not None:
-        ax.add_patch(intersect_patch)
 
 def load_bagfile(bagpath):
     print "loading", bagpath
@@ -105,4 +125,39 @@ def load_bagfile(bagpath):
     points_y = [pt.y for pt in geom_msg.points]
 
     return l_df, t_df, (points_x, points_y)
+
+def calculate_time_in_area(tdf, arena, geom, interval=30):
+    poly = arena.get_intersect_polygon(geom)
+
+    pct = []
+    offset = []
+
+    #put the df into 10ms bins
+    df = tdf.resample('10L')
+
+    #maybe pandas has a built in way to do this?
+    t0 = t1 = df.index[0]
+    tend = df.index[-1]
+    toffset = 0
+
+    while t1 < tend:
+        t1 = t0 + datetime.timedelta(seconds=interval)
+        
+        #get trajectories of that time
+        idf = df[t0:t1]
+
+        npts = 0
+        for idx,ser in idf.iterrows():
+            pt = sg.Point(ser['x'], ser['y'])
+            #check if point is in the target area
+            npts += int(poly.contains(pt))
+
+        #percentage of time in area
+        pct.append( 100.0 * (npts / float(len(idf))) )
+        offset.append( toffset )
+
+        t0 = t1
+        toffset += interval
+
+    return offset, pct
 
