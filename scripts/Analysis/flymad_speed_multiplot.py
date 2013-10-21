@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import glob
 import numpy as np
 import pandas as pd
 from pandas import Series
@@ -13,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
 import flymad_analysis
+import flymad_plot
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
@@ -20,7 +22,6 @@ assert pd.__version__ == "0.11.0"
 
 def prepare_data(path, exp_genotype, ctrl_genotype):
 
-    pooldf = DataFrame()
     df2 = DataFrame()
     if not os.path.exists(path + "/Speed_calculations/"):
         os.makedirs(path + "/Speed_calculations/")
@@ -51,7 +52,6 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
         lasermask = df[df['laser_state'] == 1]
         df['tracked_t'] = df['tracked_t'] - np.min(lasermask['tracked_t'].values)
 
-     
         #MAXIMUM SPEED = 300:
         df['v'][df['v'] >= 300] = np.nan
         
@@ -81,53 +81,68 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
                 dftemp['align'] = np.linspace(0,(after-before).total_seconds(),len(dftemp))
                 df2 = pd.concat([df2, dftemp])
 
-    df2mean = df2.groupby(['Genotype', 'lasergroup','align'], as_index=False).mean()
-    df2std = df2.groupby(['Genotype', 'lasergroup','align'], as_index=False).std()
-    df2mean.to_csv((path + "/Speed_calculations/overlaid_means.csv"))
-    df2std.to_csv((path + "/Speed_calculations/overlaid_std.csv"))
+    expdf = df2[df2['Genotype'] == exp_genotype]
+    ctrldf = df2[df2['Genotype']== ctrl_genotype]
 
-    #matplotlib seems sensitive to non-float colums, so convert to
-    #float anything we plot
-    for _df in [df2mean, df2std]:
-        real_cols = [col for col in _df.columns if col not in ("Genotype", "lasergroup")]
-        _df[ real_cols ] = _df[ real_cols ].astype(float)
+    #we no longer need to group by genotype, and lasergroup is always the same here
+    #so just drop it. 
+    assert len(expdf['lasergroup'].unique()) == 1, "only one lasergroup handled"
 
-    # half-assed, uninformed danno's tired method of grouping for plots:
-    expmean = df2mean[df2mean['Genotype'] == exp_genotype]
-    ctrlmean = df2mean[df2mean['Genotype']== ctrl_genotype]
-    expstd = df2std[df2std['Genotype'] == exp_genotype]
-    ctrlstd = df2std[df2std['Genotype']== ctrl_genotype]
+    expmean = expdf.groupby(['align'], as_index=False).mean().astype(float)
+    ctrlmean = ctrldf.groupby(['align'], as_index=False).mean().astype(float)
 
-    #save dataframes for faster replotting
+    expstd = expdf.groupby(['align'], as_index=False).mean().astype(float)
+    ctrlstd = ctrldf.groupby(['align'], as_index=False).mean().astype(float)
+
+    expn = expdf.groupby(['align'], as_index=False).count().astype(float)
+    ctrln = ctrldf.groupby(['align'], as_index=False).count().astype(float)
+
+    ####AAAAAAAARRRRRRRRRRRGGGGGGGGGGGGGGHHHHHHHHHH so much copy paste here
     df2.save(path + "/df2.df")
-    expmean.save(path + "expmean.df")
-    ctrlmean.save(path + "ctrlmean.df")
-    expstd.save(path + "expstd.df")
-    ctrlstd.save(path + "ctrlstd.df")
+    expmean.save(path + "/expmean.df")
+    ctrlmean.save(path + "/ctrlmean.df")
+    expstd.save(path + "/expstd.df")
+    ctrlstd.save(path + "/ctrlstd.df")
+    expn.save(path + "/expn.df")
+    ctrln.save(path + "/ctrln.df")
 
-    return expmean, ctrlmean, expstd, ctrlstd
+    return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln
 
 def load_data( path ):
-    return pd.load(path + "expmean.df"), pd.load(path + "ctrlmean.df"), pd.load(path + "expstd.df"), pd.load(path + "ctrlstd.df")
+    return (
+            pd.load(path + "/expmean.df"),
+            pd.load(path + "/ctrlmean.df"),
+            pd.load(path + "/expstd.df"),
+            pd.load(path + "/ctrlstd.df"),
+            pd.load(path + "/expn.df"),
+            pd.load(path + "/ctrln.df"),
+    )
 
-def plot_data( path, expmean, ctrlmean, expstd, ctrlstd ):
+def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
 
-    fig2 = plt.figure()
-    #velocity overlay:
-    ax4 = fig2.add_subplot(1,1,1)
-    ax4.plot(expmean['align'].values, expmean['v'].values, 'b-', zorder=11, lw=3)
-    trans = mtransforms.blended_transform_factory(ax4.transData, ax4.transAxes)
-    ax4.fill_between(expmean['align'].values, (expmean['v'] + expstd['v']).values, (expmean['v'] - expstd['v']).values, color='b', alpha=0.1, zorder=6)
-    plt.axhline(y=0, color='k')
-    ax4.fill_between(expmean['align'].values, 0, 1, where=expmean['laser_state'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=1)
-    ax4.plot(ctrlmean['align'].values, ctrlmean['v'].values, 'k-', zorder=10, lw=3)
-    ax4.fill_between(ctrlmean['align'].values, (ctrlmean['v'] + ctrlstd['v']).values, (ctrlmean['v'] - ctrlstd['v']).values, color='k', alpha=0.1, zorder=5)
-    ax4.fill_between(ctrlmean['align'].values, 0, 1, where=ctrlmean['laser_state'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=1)
-    ax4.set_xlabel('Time (s)')
-    ax4.set_ylabel('Speed (pixels/s) +/- STD')
+    fig2 = plt.figure("Speed Multiplot")
+    ax = fig2.add_subplot(1,1,1)
 
-    plt.savefig((path + "/Speed_calculations/overlaid_plot.png"))
-    plt.savefig((path + "/Speed_calculations/overlaid_plot.svg"))
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    exp=dict(xaxis=expmean['align'].values,
+                             value=expmean['v'].values,
+                             std=expstd['v'].values,
+                             n=expn['v'].values,
+                             ontop=True),
+                    ctrl=dict(xaxis=ctrlmean['align'].values,
+                              value=ctrlmean['v'].values,
+                              std=ctrlstd['v'].values,
+                              n=ctrln['v'].values),
+                    targetbetween=ctrlmean['laser_state'].values>0,
+                    downsample=20
+    )
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Speed (pixels/s) +/- STD')
+    ax.set_ylim([0, 160])
+    ax.set_xlim([0, 70])
+
+    plt.savefig((path + "/Speed_calculations/speed_plot.png"))
+    plt.savefig((path + "/Speed_calculations/speed_plot.svg"))
 
 
 if __name__ == "__main__":
@@ -137,6 +152,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--only-plot', action='store_true', default=False)
+    parser.add_argument('--show', action='store_true', default=False)
 
     args = parser.parse_args()
     path = args.path[0]
@@ -148,5 +164,7 @@ if __name__ == "__main__":
 
     plot_data(path, *data)
 
-    plt.show()
+    if args.show:
+        plt.show()
+
 

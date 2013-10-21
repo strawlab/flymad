@@ -224,63 +224,68 @@ def load_data(path):
 def plot_data(path, expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln):
     path_out = path + "/outputs/"
 
-    expzxsem = ((expstd['zx']).values) / (np.sqrt(expn['zx'].values))
-    expdtargetsem = (expstd['dtarget'].values)/(np.sqrt(expn['dtarget'].values))
-
-    exp2zxsem = ((exp2std['zx']).values) / (np.sqrt(exp2n['zx'].values))
-    exp2dtargetsem = (exp2std['dtarget'].values)/(np.sqrt(exp2n['dtarget'].values))
-    
-    ctrlzxsem = ((ctrlstd['zx']).values) / (np.sqrt(ctrln['zx'].values))
-    ctrldtargetsem = (ctrlstd['dtarget'].values)/(np.sqrt(ctrln['dtarget'].values)) 
-    
-    fig = plt.figure()
-    #WING EXTENSION:
+    fig = plt.figure("Courtship Wingext 10min")
     ax = fig.add_subplot(1,1,1)
-    
-    ax.plot(expmean['t'].values, expmean['zx'].values, 'b-', zorder=1, lw=3)
-    trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-    ax.fill_between(expmean['t'].values, (expmean['zx'] + expzxsem).values, (expmean['zx'] - expzxsem).values, color='b', alpha=0.1, zorder=4)
-    plt.axhline(y=0, color='k')
-    
-    ax.fill_between(expmean['t'].values, 0, 1, where=expmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=1)
-    
-    ax.plot(ctrlmean['t'].values, ctrlmean['zx'].values, 'k-', zorder=1, lw=3)
-    ax.fill_between(ctrlmean['t'].values, (ctrlmean['zx'] + ctrlzxsem).values, (ctrlmean['zx'] - ctrlzxsem).values, color='k', alpha=0.1, zorder=3)
 
-    #ax.fill_between(ctrlmean['t'].values, 0, 1, where=ctrlmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    exp=dict(xaxis=expmean['t'].values,
+                             value=expmean['zx'].values,
+                             std=expstd['zx'].values,
+                             n=expn['zx'].values,
+                             ontop=True),
+                    ctrl=dict(xaxis=ctrlmean['t'].values,
+                              value=ctrlmean['zx'].values,
+                              std=ctrlstd['zx'].values,
+                              n=ctrln['zx'].values),
+                    exp2=dict(xaxis=exp2mean['t'].values,
+                             value=exp2mean['zx'].values,
+                             std=exp2std['zx'].values,
+                             n=exp2n['zx'].values,
+                             ontop=True),
+                    targetbetween=ctrlmean['as'].values>0,
+                    sem=True,
+    )
 
-    ax.plot(exp2mean['t'].values, exp2mean['zx'].values, color='purple', zorder=1, lw=3)
-    ax.fill_between(exp2mean['t'].values, (exp2mean['zx'] + exp2zxsem).values, (exp2mean['zx'] - exp2zxsem).values, color='purple', alpha=0.1, zorder=2)
-        
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Wing Ext. Index, +/- SEM')
     ax.set_title('Wing Extension', size=12)
     ax.set_ylim([-0.1,0.6])
     ax.set_xlim([-120,480])
-    ax.set_xticks([-60,0,60,120,180,240,300,360,420,480])
 
-    """  
-      
-    #DISTANCE TO TARGETS:
-    ax2 = fig.add_subplot(2,1,2)
-    ax2.plot(expmean['t'].values, expmean['dtarget'].values, 'b-', zorder=1, lw=3, label = 'P1-TRP')
-    trans = mtransforms.blended_transform_factory(ax2.transData, ax2.transAxes)
-    ax2.fill_between(expmean['t'].values, (expmean['dtarget'] + expdtargetsem).values, (expmean['dtarget'] - expdtargetsem).values, color='b', alpha=0.1, zorder=2)
-    ax2.fill_between(expmean['t'].values, 0, 1, where=expmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
-    ax2.plot(ctrlmean['t'].values, ctrlmean['dtarget'].values, 'r-', zorder=1, lw=3, label = 'Control')
-    ax2.fill_between(ctrlmean['t'].values, (ctrlmean['dtarget'] + ctrldtargetsem).values, (ctrlmean['dtarget'] - ctrldtargetsem).values, color='r', alpha=0.1, zorder=3)
-    ax2.fill_between(ctrlmean['t'].values, 0, 1, where=ctrlmean['as'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=100)
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Distance (pixels), +/- SEM')
-    ax2.set_title('Distance to Nearest Target', size=12)
-    ax2.set_ylim([20,120])
-    ax2.set_xlim([-120,480])
-    ax2.set_xticks([-60,0,60,120,180,240,300,360,420,480])
-    """
-    
-    plt.subplots_adjust(bottom=0.1, top=0.94, hspace=0.38)
-    plt.savefig((path_out + "following_and_WingExt.png"))
-    plt.savefig((path_out + "following_and_WingExt.svg"))
+    fig.savefig((path_out + "following_and_WingExt.png"))
+    fig.savefig((path_out + "following_and_WingExt.svg"))
+
+    if 0:
+        fig = plt.figure("Courtship Dtarget 10min")
+        ax = fig.add_subplot(1,1,1)
+
+        flymad_plot.plot_timeseries_with_activation(ax,
+                        exp=dict(xaxis=expmean['t'].values,
+                                 value=expmean['zx'].values,
+                                 std=expstd['zx'].values,
+                                 n=expn['zx'].values,
+                                 ontop=True),
+                        ctrl=dict(xaxis=ctrlmean['t'].values,
+                                  value=ctrlmean['dtarget'].values,
+                                  std=ctrlstd['dtarget'].values,
+                                  n=ctrln['dtarget'].values),
+                        exp2=dict(xaxis=exp2mean['t'].values,
+                                 value=exp2mean['dtarget'].values,
+                                 std=exp2std['dtarget'].values,
+                                 n=exp2n['dtarget'].values,
+                                 ontop=True),
+                        targetbetween=ctrlmean['as'].values>0,
+                        sem=True,
+        )
+
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Distance (pixels), +/- SEM')
+        ax.set_title('Distance to Nearest Target', size=12)
+        ax.set_ylim([20,120])
+        ax.set_xlim([-120,480])
+
+        fig.savefig((path_out + "following_and_dtarget.png"))
+        fig.savefig((path_out + "following_and_dtarget.svg"))
 
 if __name__ == "__main__":
     CTRL_GENOTYPE = 'uasstoptrpmyc' #black
@@ -290,6 +295,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--only-plot', action='store_true', default=False)
+    parser.add_argument('--show', action='store_true', default=False)
 
     args = parser.parse_args()
     path = args.path[0]
@@ -301,4 +307,6 @@ if __name__ == "__main__":
 
     plot_data(path, *data)
 
-    plt.show()
+    if args.show:
+        plt.show()
+

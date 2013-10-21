@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
 import flymad_analysis
+import flymad_plot
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
@@ -19,7 +20,6 @@ assert pd.__version__ == "0.11.0"
 
 def prepare_data(path, exp_genotype, ctrl_genotype):
 
-    pooldf = DataFrame()
     df2 = DataFrame()
     if not os.path.exists(path + "/Velocity_calculations/"):
         os.makedirs(path + "/Velocity_calculations/")
@@ -110,49 +110,49 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
                 dftemp['align'] = np.linspace(0,(after-before).total_seconds(),len(dftemp))
                 df2 = pd.concat([df2, dftemp])
 
-    #    pooldf = pd.concat([pooldf, df])   
+    expdf = df2[df2['Genotype'] == exp_genotype]
+    ctrldf = df2[df2['Genotype']== ctrl_genotype]
 
-    #    df.to_csv((path + "/Velocity_calculations/" + experimentID + "_" + date + ".csv"), index=False)
-    print "DF2:", df2.columns
+    #we no longer need to group by genotype, and lasergroup is always the same here
+    #so just drop it. 
+    assert len(expdf['lasergroup'].unique()) == 1, "only one lasergroup handled"
 
-    """
-    means = pooldf.groupby(['Genotype', 'lasergroup', 'tracked_t'], as_index=False)[['Vfwd', 'Afwd', 'dorientation']].mean()
-    stds = pooldf.groupby(['Genotype', 'lasergroup', 'tracked_t'], as_index=False)[['Vfwd', 'Afwd', 'dorientation']].std()
-    means.to_csv((path + "/Velocity_calculations/means.csv"))
-    """
+    #Also ensure things are floats before plotting can fail, which it does because
+    #groupby does not retain types on grouped colums, which seems like a bug to me
 
-    df2mean = df2.groupby(['Genotype', 'lasergroup','align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].mean()
-    df2std = df2.groupby(['Genotype', 'lasergroup','align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].std()
-    df2mean.to_csv((path + "/Velocity_calculations/overlaid_means.csv"))
-    df2std.to_csv((path + "/Velocity_calculations/overlaid_std.csv"))
+    expmean = expdf.groupby(['align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].mean().astype(float)
+    ctrlmean = ctrldf.groupby(['align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].mean().astype(float)
 
-    #matplotlib seems sensitive to non-float colums, so convert to
-    #float anything we plot
-    for _df in [df2mean, df2std]:
-        real_cols = [col for col in _df.columns if col not in ("Genotype", "lasergroup")]
-        _df[ real_cols ] = _df[ real_cols ].astype(float)
+    expstd = expdf.groupby(['align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].std().astype(float)
+    ctrlstd = ctrldf.groupby(['align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].std().astype(float)
 
-    # half-assed, uninformed danno's tired method of grouping for plots:
-    expmean = df2mean[df2mean['Genotype'] == exp_genotype]
-    ctrlmean = df2mean[df2mean['Genotype']== ctrl_genotype]
-    expstd = df2std[df2std['Genotype'] == exp_genotype]
-    ctrlstd = df2std[df2std['Genotype']== ctrl_genotype]
+    expn = expdf.groupby(['align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].count().astype(float)
+    ctrln = ctrldf.groupby(['align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].count().astype(float)
 
-    #save dataframes for faster replotting
+    ####AAAAAAAARRRRRRRRRRRGGGGGGGGGGGGGGHHHHHHHHHH so much copy paste here
     df2.save(path + "/df2.df")
     expmean.save(path + "/expmean.df")
     ctrlmean.save(path + "/ctrlmean.df")
     expstd.save(path + "/expstd.df")
     ctrlstd.save(path + "/ctrlstd.df")
+    expn.save(path + "/expn.df")
+    ctrln.save(path + "/ctrln.df")
 
-    return expmean, ctrlmean, expstd, ctrlstd
+    return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln
 
 def load_data( path ):
-    return pd.load(path + "/expmean.df"), pd.load(path + "/ctrlmean.df"), pd.load(path + "/expstd.df"), pd.load(path + "/ctrlstd.df")
+    return (
+            pd.load(path + "/expmean.df"),
+            pd.load(path + "/ctrlmean.df"),
+            pd.load(path + "/expstd.df"),
+            pd.load(path + "/ctrlstd.df"),
+            pd.load(path + "/expn.df"),
+            pd.load(path + "/ctrln.df"),
+    )
 
-def plot_data( path, expmean, ctrlmean, expstd, ctrlstd ):
 
-    # PLOT
+def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
+
     """
     fig = plt.figure()
     ax = fig.add_subplot(3,1,1)
@@ -184,47 +184,77 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd ):
 
     plt.savefig((path + "/Velocity_calculations/singletrace_plot.png"))
     """
-    #PLOT OVERLAY
 
-    fig2 = plt.figure()
-    #velocity overlay:
-    ax4 = fig2.add_subplot(1,1,1)
-    ax4.plot(expmean['align'].values, expmean['Vfwd'].values, 'b-', zorder=10, lw=3)
-    trans = mtransforms.blended_transform_factory(ax4.transData, ax4.transAxes)
-    ax4.fill_between(expmean['align'].values, (expmean['Vfwd'] + expstd['Vfwd']).values, (expmean['Vfwd'] - expstd['Vfwd']).values, color='b', alpha=0.1, zorder=5)
-    plt.axhline(y=0, color='k')
-    ax4.fill_between(expmean['align'].values, 0, 1, where=expmean['laser_state'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=1)
-    ax4.plot(ctrlmean['align'].values, ctrlmean['Vfwd'].values, 'k-', zorder=11, lw=3)
-    ax4.fill_between(ctrlmean['align'].values, (ctrlmean['Vfwd'] + ctrlstd['Vfwd']).values, (ctrlmean['Vfwd'] - ctrlstd['Vfwd']).values, color='k', alpha=0.1, zorder=6)
-    ax4.fill_between(ctrlmean['align'].values, 0, 1, where=ctrlmean['laser_state'].values>0, facecolor='Yellow', alpha=0.15, transform=trans, zorder=1)
-    ax4.set_xlabel('Time (s)')
-    ax4.set_ylabel('Fwd Velocity (pixels/s) +/- STD')
-    """
-    #acceleration overlay:
-    ax5 = fig2.add_subplot(3,1,2)
-    ax5.plot(df2mean['align'].values, df2mean['Afwd'].values, 'r-')
-    trans = mtransforms.blended_transform_factory(ax5.transData, ax5.transAxes)
-    ax5.fill_between(df2mean['align'].values, (df2mean['Afwd'] + df2std['Afwd']).values, (df2mean['Afwd'] - df2std['Afwd']).values, color='r', alpha=0.1, zorder=2)
-    plt.axhline(y=0, color='k')
-    ax5.fill_between(df2mean['align'].values, 0, 1, where=df2mean['laser_state'].values>0.9, facecolor='Yellow', alpha=0.3, transform=trans)
-    ax5.set_xlabel('Time (s)')
-    ax5.set_ylabel('Fwd Acceleration (pixels/s^2) +/- STD')
-    ax5.set_ylim([-1000,1000])
+    fig2 = plt.figure("Velocity Multiplot")
+    ax = fig2.add_subplot(1,1,1)
 
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    exp=dict(xaxis=expmean['align'].values,
+                             value=expmean['Vfwd'].values,
+                             std=expstd['Vfwd'].values,
+                             n=expn['Vfwd'].values,
+                             ontop=True),
+                    ctrl=dict(xaxis=ctrlmean['align'].values,
+                              value=ctrlmean['Vfwd'].values,
+                              std=ctrlstd['Vfwd'].values,
+                              n=ctrln['Vfwd'].values),
+                    targetbetween=ctrlmean['laser_state'].values>0
+    )
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Fwd Velocity (pixels/s) +/- STD')
+    ax.set_ylim([-60, 120])
+    ax.set_xlim([0, 9])
 
-    #rotation overlay:
-    ax6 = fig2.add_subplot(3,1,3)
-    ax6.plot(df2mean['align'].values, df2mean['dorientation'].values, 'k-')
-    trans = mtransforms.blended_transform_factory(ax6.transData, ax6.transAxes)
-    ax6.fill_between(df2mean['align'].values, (df2mean['dorientation'] + df2std['dorientation']).values, (df2mean['dorientation'] - df2std['dorientation']).values, color='r', alpha=0.1, zorder=2)
-    ax6.set_xlabel('Time (s)')
-    ax6.fill_between(df2mean['align'].values, 0, 1, where=df2mean['laser_state'].values>0.9, facecolor='Yellow', alpha=0.3, transform=trans)
-    ax6.set_ylabel('angular rotation (radians/s) +/- STD')
-    ax6.set_ylim([-20,30])
-    plt.subplots_adjust(bottom=0.06, top=0.98, hspace=0.31)
-    """
-    plt.savefig((path + "/Velocity_calculations/overlaid_plot.png"))
-    plt.savefig((path + "/Velocity_calculations/overlaid_plot.svg"))
+    fig2.savefig((path + "/Velocity_calculations/vfwd_plot.png"))
+    fig2.savefig((path + "/Velocity_calculations/vfwd_plot.svg"))
+
+    if 0:
+        fig3 = plt.figure("Acceleration Multiplot")
+        ax = fig3.add_subplot(1,1,1)
+
+        flymad_plot.plot_timeseries_with_activation(ax,
+                        exp=dict(xaxis=expmean['align'].values,
+                                 value=expmean['Afwd'].values,
+                                 std=expstd['Afwd'].values,
+                                 n=expn['Afwd'].values,
+                                 ontop=True),
+                        ctrl=dict(xaxis=ctrlmean['align'].values,
+                                  value=ctrlmean['Afwd'].values,
+                                  std=ctrlstd['Afwd'].values,
+                                  n=ctrln['Afwd'].values),
+                        targetbetween=ctrlmean['laser_state'].values>0
+        )
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Fwd Acceleration (pixels/s^2) +/- STD')
+        ax.set_ylim([-1000, 1000])
+        ax.set_xlim([0, 9])
+
+        fig3.savefig((path + "/Velocity_calculations/afwd_plot.png"))
+        fig3.savefig((path + "/Velocity_calculations/afwd_plot.svg"))
+
+    if 0:
+        fig4 = plt.figure("Angular Rotation Multiplot")
+        ax = fig4.add_subplot(1,1,1)
+
+        flymad_plot.plot_timeseries_with_activation(ax,
+                        exp=dict(xaxis=expmean['align'].values,
+                                 value=expmean['dorientation'].values,
+                                 std=expstd['dorientation'].values,
+                                 n=expn['dorientation'].values,
+                                 ontop=True),
+                        ctrl=dict(xaxis=ctrlmean['align'].values,
+                                  value=ctrlmean['dorientation'].values,
+                                  std=ctrlstd['dorientation'].values,
+                                  n=ctrln['dorientation'].values),
+                        targetbetween=ctrlmean['laser_state'].values>0
+        )
+        ax.set_xlabel('Time (s)')
+        ax.set_xlim([0, 9])
+        ax.set_ylabel('angular rotation (radians/s) +/- STD')
+        ax.set_ylim([-20,30])
+
+        fig4.savefig((path + "/Velocity_calculations/dorientation_plot.png"))
+        fig4.savefig((path + "/Velocity_calculations/dorientation_plot.svg"))
 
 
 if __name__ == "__main__":
@@ -234,6 +264,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--only-plot', action='store_true', default=False)
+    parser.add_argument('--show', action='store_true', default=False)
 
     args = parser.parse_args()
     path = args.path[0]
@@ -245,4 +276,6 @@ if __name__ == "__main__":
 
     plot_data(path, *data)
 
-    plt.show()
+    if args.show:
+        plt.show()
+
