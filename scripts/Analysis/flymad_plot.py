@@ -10,6 +10,13 @@ import matplotlib.transforms as mtransforms
 
 import numpy as np
 
+TS_DEFAULTS = {
+    'many': dict(lw=0.2, color='k', alpha=0.6 ),
+    'spread': dict(alpha=0.4, facecolor='red', edgecolor='none'),
+    'value': dict(lw=2, color='red' ),
+    'global': dict(rasterized=True),
+}
+
 def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None, downsample=1, sem=False):
     #zorder = 1 = back
     #downsample ::1 is a noop
@@ -41,7 +48,7 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
                 alpha=0.1, color='b',
                 zorder=exp_zorder)
     ax.plot(exp['xaxis'][::ds], exp['value'][::ds],
-                color='b',
+                color='b',label=exp.get('label'),
                 zorder=exp_zorder+1)
 
     if sem:
@@ -54,7 +61,7 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
                 alpha=0.1, color='r',
                 zorder=ctrl_zorder)
     ax.plot(ctrl['xaxis'][::ds], ctrl['value'][::ds],
-                color='r',
+                color='r',label=ctrl.get('label'),
                 zorder=ctrl_zorder+1)
 
     if exp2 is not None:
@@ -69,9 +76,10 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
                     alpha=0.1, color='g',
                     zorder=ctrl_zorder)
         ax.plot(exp2['xaxis'][::ds], exp2['value'][::ds],
-                    color='g',
+                    color='g',label=exp2.get('label'),
                     zorder=ctrl_zorder+1)
 
     spine_placer(ax, location='left,bottom' )
 
+    ax.legend(loc='upper right')
 

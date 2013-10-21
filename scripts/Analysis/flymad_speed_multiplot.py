@@ -128,11 +128,13 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
                              value=expmean['v'].values,
                              std=expstd['v'].values,
                              n=expn['v'].values,
+                             label='OK371>ShibireTS',
                              ontop=True),
                     ctrl=dict(xaxis=ctrlmean['align'].values,
                               value=ctrlmean['v'].values,
                               std=ctrlstd['v'].values,
-                              n=ctrln['v'].values),
+                              n=ctrln['v'].values,
+                              label='Control'),
                     targetbetween=ctrlmean['laser_state'].values>0,
                     downsample=20
     )

@@ -193,11 +193,13 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
                              value=expmean['Vfwd'].values,
                              std=expstd['Vfwd'].values,
                              n=expn['Vfwd'].values,
+                             label='Moonwalker>TRPA1',
                              ontop=True),
                     ctrl=dict(xaxis=ctrlmean['align'].values,
                               value=ctrlmean['Vfwd'].values,
                               std=ctrlstd['Vfwd'].values,
-                              n=ctrln['Vfwd'].values),
+                              n=ctrln['Vfwd'].values,
+                              label='Control'),
                     targetbetween=ctrlmean['laser_state'].values>0
     )
     ax.set_xlabel('Time (s)')
