@@ -123,13 +123,14 @@ def load_bagfile(bagpath):
     t_df['time'] = t_df.index.values.astype('datetime64[ns]')
     t_df.set_index(['time'], inplace=True)
 
+    #FIXME: remove short trials here
 
     points_x = [pt.x for pt in geom_msg.points]
     points_y = [pt.y for pt in geom_msg.points]
 
     return l_df, t_df, (points_x, points_y)
 
-def calculate_time_in_area(tdf, arena, geom, interval=30):
+def calculate_time_in_area(tdf, arena, geom, interval=30, maxtime=None):
     poly = arena.get_intersect_polygon(geom)
 
     pct = []

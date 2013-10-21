@@ -11,9 +11,16 @@ dat = json.load(open(sys.argv[1]))
 arena = madplot.Arena(dat)
 
 ordered_trials = sorted(dat['coupled'].keys())
-
 fig = plt.figure(figsize=(16,8))
-gs = gridspec.GridSpec(2, 4)
+
+if len(ordered_trials) <= 8:
+    gs = gridspec.GridSpec(2, 4)
+elif len(ordered_trials) <= 12:
+    gs = gridspec.GridSpec(3, 4)
+elif len(ordered_trials) <= 16:
+    gs = gridspec.GridSpec(4, 4)
+else:
+    raise Exception("yeah, this figure will be ugly")
 
 pct_in_area_per_time = {} #bagname:(offset[],pct[])
 
@@ -22,7 +29,7 @@ def do_bagcalc(bname, label=None):
         label = bname
 
     ldf,tdf,geom = madplot.load_bagfile(os.path.join(dat['_base'], bname))
-    pct_in_area_per_time[label] = madplot.calculate_time_in_area(tdf, arena, geom)
+    pct_in_area_per_time[label] = madplot.calculate_time_in_area(tdf, arena, geom, interval=30)
 
     return ldf, tdf, geom
 
