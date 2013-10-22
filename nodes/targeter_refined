@@ -8,14 +8,23 @@ import rospy
 from flymad.msg import TrackedObj
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import UInt8, Int64
-from flymad.msg import MicroVelocity, MicroPosition, StampedObject
+from flymad.msg import MicroVelocity, MicroPosition, TargetedObj, HeadDetect
 
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32, myint16
 
 LATENCY     = 0.05
-LASER_POWER_ON  = 0
+LASER_POWER_ON  = 255
 LASER_POWER_OFF = 0
+
+PX = -0.5
+PY = -0.5
+
+NO_DETECT = HeadDetect.NO_DETECT
+
+(MODE_IDLE,
+ MODE_WIDE,
+ MODE_ZOOM) = range(3)
 
 class Targeter:
     def __init__(self, cal_fname):
@@ -31,6 +40,9 @@ class Targeter:
         self._track_lock = threading.Lock()
         self._track_mode = 'W' #W or F (wide or fine)
         self._track_wait = 0
+        self._track_zoom_misses = 0
+
+        self._laser_power = LASER_POWER_OFF
 
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
                                                 MicroPosition,
@@ -38,8 +50,9 @@ class Targeter:
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
                                                 MicroVelocity,
                                                 tcp_nodelay=True)
-        self.pub_targeted = rospy.Publisher('/flymad/targeted',
-                                            StampedObject,
+
+        self.pub_targeted = rospy.Publisher('/targeter/targeted',
+                                            TargetedObj,
                                             tcp_nodelay=True)
 
         self.stop_tracking(None)
@@ -54,41 +67,47 @@ class Targeter:
                              MicroPosition,
                              self.on_dac)
         _ = rospy.Subscriber('/flymad/laser_head_delta',
-                             Vector3,
+                             HeadDetect,
                              self.on_head_delta)
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
 
     def on_head_delta(self,msg):
-        dx = msg.x
-        dy = msg.y
+        dx = msg.head_dx
+        dy = msg.head_dy
 
         with self._track_lock:
             if self._track_mode != 'F':
                 return
 
-            if np.abs(dx) > 300:
+            miss = dx == NO_DETECT
+
+            if miss:
+                print "miss"
+                self._track_zoom_misses += 1
+
+            if self._track_zoom_misses > 10:
                 print "give up"
                 self._track_mode = 'W'
                 self._track_wait = 0
+                self._track_zoom_misses = 0
                 return
 
-        a,b,_ = self.last_vals
+        if not miss:
+            self._track_zoom_misses = 0
 
-        #left = +ve dx
-        #up   = +ve dy
-        PX = -0.4
-        PY = -0.4
-        cmdA = a+(PX*dx)
-        cmdB = b+(PY*dy)
+            a,b,_ = self.last_vals
 
-        print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)" % (a,b,cmdA,cmdB,dx,dy)
+            #left = +ve dx
+            #up   = +ve dy
+            cmdA = a+(PX*dx)
+            cmdB = b+(PY*dy)
 
-        self.send_dac(cmdA, cmdB, LASER_POWER_ON)
+            print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)" % (a,b,cmdA,cmdB,dx,dy)
 
-    def _get_current_dacs(self):
-        return self.dacs
+            self.send_dac(cmdA, cmdB, self._laser_power)
+            self.send_targeted(MODE_ZOOM)
 
     def stop_tracking(self,old_obj_id):
         rospy.loginfo('stopped targeting object %s'%old_obj_id)
@@ -99,6 +118,7 @@ class Targeter:
         with self._track_lock:
             self._track_mode = 'W' #W or F (wide or fine)
             self._track_wait = 0
+            self._track_zoom_misses = 0
             self.cur_obj_id = obj_id
             rospy.loginfo('now targeting object %d'%self.cur_obj_id)
 
@@ -113,7 +133,7 @@ class Targeter:
         with self._track_lock:
             if self._track_mode != 'W':
                 return
-            if self._track_wait < 10:
+            if self._track_wait < 5:
                 print "wait"
                 self._track_wait += 1
             else:
@@ -132,11 +152,14 @@ class Targeter:
 
         # calculate fly position in pixel coordinates
         s = msg.state_vec
-        x = s[0] + s[2]*LATENCY
-        y = s[1] + s[3]*LATENCY
+        self._cur_x = s[0]
+        self._cur_y = s[1]
 
-        x = int(max(0,x))
-        y = int(max(0,y))
+        #self._cur_x = s[0] + s[2]*LATENCY
+        #self._cur_y = s[1] + s[3]*LATENCY
+
+        x = int(max(0,self._cur_x))
+        y = int(max(0,self._cur_y))
 
         # desired
         try:
@@ -145,7 +168,8 @@ class Targeter:
         except IndexError:
             return
 
-        self.send_dac(daca, dacb, LASER_POWER_OFF)
+        self.send_dac(daca, dacb, self._laser_power)
+        self.send_targeted(MODE_WIDE)
 
     def turnoff_laser(self):
         a,b,_ = self.last_vals
@@ -153,6 +177,23 @@ class Targeter:
         this_vals = msg.posA, msg.posB, msg.laser
         self.pub_dac_position.publish(msg)
         self.last_vals = this_vals
+
+    def send_targeted(self, mode):
+        obj_id = self.cur_obj_id
+        aa, ab = self.dacs
+        dac_pixel_x = self.cal.d2px((aa,ab))
+        dac_pixel_y = self.cal.d2py((aa,ab))
+
+        msg = TargetedObj()
+        msg.header.stamp = rospy.Time.now()
+        msg.obj_id = int(obj_id) if obj_id is not None else 0
+        msg.fly_x = float(self._cur_x)
+        msg.fly_y = float(self._cur_y)
+        msg.laser_x = float(dac_pixel_x)
+        msg.laser_y = float(dac_pixel_y)
+        msg.laser_power = int(self._laser_power)
+        msg.mode = int(mode)
+        self.pub_targeted.publish(msg)
 
     def send_dac(self, daca, dacb, laser_power):
 
@@ -162,11 +203,6 @@ class Targeter:
         if this_vals != self.last_vals:
             self.pub_dac_position.publish(msg)
             self.last_vals = this_vals
-
-        msg = StampedObject()
-        msg.header.stamp = rospy.Time.now()
-        msg.obj_id = self.cur_obj_id
-        self.pub_targeted.publish(msg)
 
     def run(self):
         rospy.spin()
