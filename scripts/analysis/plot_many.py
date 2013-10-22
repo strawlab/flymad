@@ -2,6 +2,9 @@ import sys
 import json
 import math
 import os.path
+import cPickle
+import argparse
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,94 +12,99 @@ import matplotlib.gridspec as gridspec
 
 import madplot
 
+def get_path(dat, bname):
+    return os.path.join(dat.get('_base','.'), bname)
 
-dat = json.load(open(sys.argv[1]))
-arena = madplot.Arena(dat)
+def prepare_data(path):
+    dat = json.load(open(path))
+    arena = madplot.Arena(dat)
 
-ordered_trials = sorted(dat['coupled'].keys())
-fig = plt.figure(figsize=(16,8))
+    for k in dat:
+        if k.startswith("_"):
+            continue
+        for bag in dat[k]:
+            bname = bag["bag"]
+            bag["data"] = madplot.load_bagfile(
+                                get_path(dat,bname),
+                                arena
+            )
 
-if len(ordered_trials) <= 8:
-    gs = gridspec.GridSpec(2, 4)
-elif len(ordered_trials) <= 12:
-    gs = gridspec.GridSpec(3, 4)
-elif len(ordered_trials) <= 16:
-    gs = gridspec.GridSpec(4, 4)
-else:
-    raise Exception("yeah, this figure will be ugly")
+    with open(get_path(dat,'data.pkl'), 'wb') as f:
+        cPickle.dump(dat, f, -1)
 
-pct_in_area_per_time = {} #bagname:(offset[],pct[])
+    return dat
 
-def do_bagcalc(bname, label=None):
-    if label is None:
-        label = bname
+def load_data(path):
+    dat = json.load(open(path))
+    with open(get_path(dat,'data.pkl'), 'rb') as f:
+        return cPickle.load(f)
 
-    ldf,tdf,geom = madplot.load_bagfile(
-                        os.path.join(dat['_base'], bname),
-                        arena
-    )
+def plot_data(path, dat):
+    arena = madplot.Arena(dat)
 
-    pct_in_area_per_time[label] = madplot.calculate_time_in_area(tdf, 300, interval=30)
+    ordered_trials = dat['coupled']
 
-    madplot.calculate_time_to_area(tdf, 300)
+    if len(ordered_trials) <= 8:
+        gs = gridspec.GridSpec(2, 4)
+    elif len(ordered_trials) <= 12:
+        gs = gridspec.GridSpec(3, 4)
+    elif len(ordered_trials) <= 16:
+        gs = gridspec.GridSpec(4, 4)
+    else:
+        raise Exception("yeah, this figure will be ugly")
 
-    return ldf, tdf, geom
+    fig = plt.figure("Trajectories", figsize=(16,8))
 
-for i,trial in enumerate(ordered_trials):
-    bname = dat['coupled'][trial]
+    pct_in_area_per_time = []
+    pct_in_area_per_time_lbls = []
 
-    ldf,tdf,geom = do_bagcalc(bname)
+    for i,trial in enumerate(ordered_trials):
+        label = trial.get('label',trial['bag'])
+        ldf, tdf, geom = trial['data']
 
-    ax = fig.add_subplot(gs[i])
-    madplot.plot_tracked_trajectory(ax, tdf,
-            intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
-            limits=arena.get_limits()
-    )
+        ax = fig.add_subplot(gs[i])
+        madplot.plot_tracked_trajectory(ax, tdf,
+                intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
+                limits=arena.get_limits()
+        )
+        ax.set_title(label)
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
 
-    ax.set_title(os.path.basename(bname),
-#            prop={'size':10}
-    )
+        pct_in_area_per_time_lbls.append( label )
+        pct_in_area_per_time.append ( madplot.calculate_time_in_area(tdf, 300, interval=30) )
 
-    ax.xaxis.set_visible(False)
-    ax.yaxis.set_visible(False)
+    #need more colors
+    fig = plt.figure("Time in Area")
+    ax = fig.add_subplot(1,1,1)
 
-##do the unpunished control
-#ldf,tdf,geom = do_bagcalc(bname=dat['control'], label="unpunished")
-#ax = fig.add_subplot(gs[i+1])
-#madplot.plot_tracked_trajectory(ax, tdf,
-#        intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
-#        limits=arena.get_limits()
-#)
-#ax.set_title("unpunished",
-##        prop={'size':10}
-#)
+    colormap = plt.cm.gnuplot
+    ax.set_color_cycle([colormap(i) for i in np.linspace(0, 1.0, len(ordered_trials))])
 
-ax.xaxis.set_visible(False)
-ax.yaxis.set_visible(False)
+    for lbl,data in zip(pct_in_area_per_time_lbls, pct_in_area_per_time):
+        offset,pct = data
+        ax.plot(offset, pct, linestyle='solid', label=lbl)
 
-gs.tight_layout(fig, h_pad=1.8)
-fig.savefig('traces.png', bbox_inches='tight')
+    ax.legend()
 
-fig = plt.figure()
-ax = fig.add_subplot(111)
+if __name__ == "__main__":
 
-#need more colors
-colormap = plt.cm.gnuplot
-ax.set_color_cycle([colormap(i) for i in np.linspace(0, 1.0, len(ordered_trials))])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', nargs=1, help='path to json files')
+    parser.add_argument('--only-plot', action='store_true', default=False)
+    parser.add_argument('--show', action='store_true', default=False)
 
-for trial in ordered_trials:
-    bname = dat['coupled'][trial]
-    offset,pct = pct_in_area_per_time[bname]
-    ax.plot(offset, pct, linestyle='solid', label=bname)
+    args = parser.parse_args()
+    path = args.path[0]
 
-#bname = 'unpunished'
-#offset,pct = pct_in_area_per_time[bname]
-#ax.plot(offset, pct, linestyle='solid', marker='+', label=bname)
+    if args.only_plot:
+        data = load_data(path)
+    else:
+        data = prepare_data(path)
 
-ax.set_xlabel('time since trial start (s)')
-ax.set_ylabel('time spent in target area (pct)')
-ax.legend()
+    plot_data(path, data)
 
-fig.savefig('times.png', bbox_layout='tight')
+    if args.show:
+        plt.show()
 
-plt.show()
+
