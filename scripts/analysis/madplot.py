@@ -27,11 +27,16 @@ class Arena:
 
     def get_intersect_points(self, geom):
         inter = self.get_intersect_polygon(geom)
-        return list(inter.exterior.coords)
+        if inter:
+            return list(inter.exterior.coords)
+        else:
+            return []
 
     def get_intersect_patch(self, geom, **kwargs):
         pts = self.get_intersect_points(geom)
-        return matplotlib.patches.Polygon(pts, **kwargs)
+        if pts:
+            return matplotlib.patches.Polygon(pts, **kwargs)
+        return None
 
     def get_patch(self, **kwargs):
         return matplotlib.patches.Circle((self._x,self._y), radius=self._r, **kwargs)
