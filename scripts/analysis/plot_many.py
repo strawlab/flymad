@@ -2,10 +2,13 @@ import sys
 import json
 import math
 import os.path
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 import madplot
+
 
 dat = json.load(open(sys.argv[1]))
 arena = madplot.Arena(dat)
@@ -28,8 +31,14 @@ def do_bagcalc(bname, label=None):
     if label is None:
         label = bname
 
-    ldf,tdf,geom = madplot.load_bagfile(os.path.join(dat['_base'], bname))
-    pct_in_area_per_time[label] = madplot.calculate_time_in_area(tdf, arena, geom, interval=30)
+    ldf,tdf,geom = madplot.load_bagfile(
+                        os.path.join(dat['_base'], bname),
+                        arena
+    )
+
+    pct_in_area_per_time[label] = madplot.calculate_time_in_area(tdf, 300, interval=30)
+
+    madplot.calculate_time_to_area(tdf, 300)
 
     return ldf, tdf, geom
 
@@ -70,10 +79,15 @@ fig.savefig('traces.png', bbox_inches='tight')
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
+
+#need more colors
+colormap = plt.cm.gnuplot
+ax.set_color_cycle([colormap(i) for i in np.linspace(0, 1.0, len(ordered_trials))])
+
 for trial in ordered_trials:
     bname = dat['coupled'][trial]
     offset,pct = pct_in_area_per_time[bname]
-    ax.plot(offset, pct, linestyle='solid', marker='o', label=bname)
+    ax.plot(offset, pct, linestyle='solid', label=bname)
 
 #bname = 'unpunished'
 #offset,pct = pct_in_area_per_time[bname]

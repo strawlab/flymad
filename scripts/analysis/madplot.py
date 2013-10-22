@@ -1,6 +1,7 @@
 import json
 import os.path
 import datetime
+import collections
 
 import numpy as np
 import pandas as pd
@@ -80,13 +81,16 @@ def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None):
         ax.add_patch(intersect_patch)
 
     for name, group in df.groupby('obj_id'):
+        print "\t%s:%s" % (name,len(group))
         _df = group.resample('20L')
         ax.plot(_df['x'],_df['y'],'k-')
 
+def load_bagfile(bagpath, arena):
+    def in_area(row, poly):
+        pt = sg.Point(row['x'], row['y'])
+        return pd.Series({"in_area":poly.contains(pt)})
 
-def load_bagfile(bagpath):
     print "loading", bagpath
-
     bag = rosbag.Bag(bagpath)
 
     l_index = []
@@ -115,6 +119,12 @@ def load_bagfile(bagpath):
                 t_data['x'].append(msg.state_vec[0])
                 t_data['y'].append(msg.state_vec[1])
 
+    points_x = [pt.x for pt in geom_msg.points]
+    points_y = [pt.y for pt in geom_msg.points]
+    geom = (points_x, points_y)
+
+    poly = arena.get_intersect_polygon(geom)
+
     l_df = pd.DataFrame(l_data, index=l_index)
     l_df['time'] = l_df.index.values.astype('datetime64[ns]')
     l_df.set_index(['time'], inplace=True)
@@ -123,45 +133,72 @@ def load_bagfile(bagpath):
     t_df['time'] = t_df.index.values.astype('datetime64[ns]')
     t_df.set_index(['time'], inplace=True)
 
-    #FIXME: remove short trials here
+    #add a new colum if they were in the area
+    t_df = pd.concat([t_df,
+                      t_df.apply(in_area, axis=1, args=(poly,))],
+                      axis=1)
 
-    points_x = [pt.x for pt in geom_msg.points]
-    points_y = [pt.y for pt in geom_msg.points]
+    #remove short trials here
+    short_tracks = []
+    for name, group in t_df.groupby('obj_id'):
+        if len(group) < 100:
+            short_tracks.append(name)
 
-    return l_df, t_df, (points_x, points_y)
+    l_df = l_df[~l_df['obj_id'].isin(short_tracks)]
+    t_df = t_df[~t_df['obj_id'].isin(short_tracks)]
 
-def calculate_time_in_area(tdf, arena, geom, interval=30, maxtime=None):
-    poly = arena.get_intersect_polygon(geom)
+    return l_df, t_df, geom
 
+def calculate_time_in_area(df, maxtime=None, interval=20):
     pct = []
     offset = []
 
     #put the df into 10ms bins
-    df = tdf.resample('10L')
+    #df = tdf.resample('10L')
 
     #maybe pandas has a built in way to do this?
     t0 = t1 = df.index[0]
-    tend = df.index[-1]
+    tend = df.index[-1] if maxtime else (t0 + datetime.timedelta(seconds=maxtime))
     toffset = 0
 
     while t1 < tend:
-        t1 = t0 + datetime.timedelta(seconds=interval)
+        if maxtime:
+            t1 = t0 + datetime.timedelta(seconds=interval)
+        else:
+            t1 = min(t0 + datetime.timedelta(seconds=interval), tend)
         
-        #get trajectories of that time
+        #get trajectories of that timespan
         idf = df[t0:t1]
-
-        npts = 0
-        for idx,ser in idf.iterrows():
-            pt = sg.Point(ser['x'], ser['y'])
-            #check if point is in the target area
-            npts += int(poly.contains(pt))
-
+        #number of timepoints in the area
+        npts = idf['in_area'].sum()
         #percentage of time in area
         pct.append( 100.0 * (npts / float(len(idf))) )
+
         offset.append( toffset )
 
         t0 = t1
         toffset += interval
 
     return offset, pct
+
+def calculate_time_to_area(tdf, maxtime=300):
+    tta = []
+
+    for name, group in tdf.groupby('obj_id'):
+        t0 = group.head(1)
+        t0_in_area = t0['in_area']
+        t1_in_area = False
+        for ix,row in group.iterrows():
+            if row['in_area']:
+                t1_in_area = True
+                break
+
+        #did the fly finish inside, and start outside
+        if t1_in_area and (not t0_in_area):
+            dt = ix - t0.index[0]
+            tta.append( dt )
+
+    print tta
+
+
 
