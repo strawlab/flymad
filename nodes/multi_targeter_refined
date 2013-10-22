@@ -9,7 +9,7 @@ import rospy
 from flymad.msg import TrackedObj
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import UInt8, Int64
-from flymad.msg import MicroVelocity, MicroPosition, TargetedObj
+from flymad.msg import MicroVelocity, MicroPosition, TargetedObj, HeadDetect
 
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint16
@@ -22,6 +22,8 @@ PRINT_UPDATE    = False
 
 PX = -0.5
 PY = -0.5
+
+NO_DETECT = HeadDetect.NO_DETECT
 
 LASER_POWER_ON  = 255 #0 -> 255
 LASER_POWER_OFF = 0
@@ -168,7 +170,7 @@ class Targeter:
                              MicroPosition,
                              self.on_dac)
         _ = rospy.Subscriber('/flymad/laser_head_delta',
-                             Vector3,
+                             HeadDetect,
                              self.on_head_delta)
         _ = rospy.Subscriber('/flymad/target_object',
                              Int64,
@@ -201,10 +203,11 @@ class Targeter:
                     if obj.update_targeting(plan_obj_id,'f'):
                         assert plan_obj_id == obj.obj_id
 
-                        dx = msg.x
-                        dy = msg.y
+                        dx = msg.head_dx
+                        dy = msg.head_dy
 
-                        miss = np.abs(dx) > 300
+                        miss = dx == NO_DETECT
+
                         if miss:
                             self.zoom_misses += 1
 
@@ -214,6 +217,8 @@ class Targeter:
                                         reason='%d misses'%self.zoom_misses)
 
                         if not miss:
+                            self.zoom_misses = 0
+
                             a,b,_ = self.last_vals
                             cmdA = a+(PX*dx)
                             cmdB = b+(PY*dy)
@@ -304,7 +309,7 @@ class Targeter:
                     off_lp = LASER_POWER_ON
                     #turn off the laser, no flies to track, nothing to do
                     self.set_current_plan('idle',0,off_lp,reason='laser off')
-                    self.send_dac(-1200, 0, off_lp, 0)
+                    self.send_dac(-12000, 0, off_lp, 0)
 
                 for obj in to_reset:
                     obj.reset_laser()
