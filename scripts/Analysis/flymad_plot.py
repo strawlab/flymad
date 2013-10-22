@@ -1,9 +1,8 @@
 import strawlab_mpl.defaults as smd
-smd.setup_defaults()
-
 from strawlab_mpl.many_timeseries import ManyTimeseries
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
@@ -17,10 +16,22 @@ TS_DEFAULTS = {
     'global': dict(rasterized=True),
 }
 
+def setup_defaults():
+    rcParams = matplotlib.rcParams
+
+    rcParams['legend.numpoints'] = 1
+    rcParams['legend.fontsize'] = 'medium' #same as axis
+    rcParams['legend.frameon'] = False
+    rcParams['legend.numpoints'] = 1
+    rcParams['legend.scatterpoints'] = 1
+
+
 def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None, downsample=1, sem=False):
     #zorder = 1 = back
     #downsample ::1 is a noop
     ds = downsample
+
+    #FIXME: make controls black, but the other black, not perfect black
 
     trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
 
@@ -82,4 +93,8 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
     spine_placer(ax, location='left,bottom' )
 
     ax.legend(loc='upper right')
+
+#setup default plotting styles
+smd.setup_defaults()
+setup_defaults()
 
