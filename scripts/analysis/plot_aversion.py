@@ -117,7 +117,8 @@ def plot_data(path, data):
     label_map = {'a':'Antenna','b':'Body','h':'Head','x':'Nothing'}
     labels = []
 
-    for k in 'ahbx':
+    #keep the same order
+    for k in [t for t in 'ahbx' if len(pooled_on.get(t,[]))]:
         on = pd.concat(pooled_on[k])
         off = pd.concat(pooled_off[k])
 
