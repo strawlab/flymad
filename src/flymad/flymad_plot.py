@@ -11,7 +11,7 @@ import matplotlib.transforms as mtransforms
 
 import numpy as np
 
-BLACK       = 'k'
+BLACK       = '#292724'
 DARK_GRAY   = '#939598'
 LIGHT_GRAY  = '#e7e8e8'
 #colors from ggplot
@@ -77,10 +77,10 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
         spread = exp['std'][::ds]
 
     ax.fill_between(exp['xaxis'][::ds], exp['value'][::ds]+spread, exp['value'][::ds]-spread,
-                alpha=0.1, color='b',
+                alpha=0.1, color=MID_RED,
                 zorder=exp_zorder)
     ax.plot(exp['xaxis'][::ds], exp['value'][::ds],
-                color='b',label=exp.get('label'),
+                color=MID_RED,label=exp.get('label'),lw=2,
                 zorder=exp_zorder+1)
 
     if sem:
@@ -90,10 +90,10 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
 
 
     ax.fill_between(ctrl['xaxis'][::ds], ctrl['value'][::ds]+spread, ctrl['value'][::ds]-spread,
-                alpha=0.1, color='r',
+                alpha=0.1, color=BLACK,
                 zorder=ctrl_zorder)
     ax.plot(ctrl['xaxis'][::ds], ctrl['value'][::ds],
-                color='r',label=ctrl.get('label'),
+                color=BLACK,label=ctrl.get('label'),lw=2,
                 zorder=ctrl_zorder+1)
 
     if exp2 is not None:
@@ -105,10 +105,10 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
         exp_zorder = exp_zorder + 2
 
         ax.fill_between(exp2['xaxis'][::ds], exp2['value'][::ds]+spread, exp2['value'][::ds]-spread,
-                    alpha=0.1, color='g',
+                    alpha=0.1, color=GREEN,
                     zorder=ctrl_zorder)
         ax.plot(exp2['xaxis'][::ds], exp2['value'][::ds],
-                    color='g',label=exp2.get('label'),
+                    color=GREEN,label=exp2.get('label'),lw=2,
                     zorder=ctrl_zorder+1)
 
     spine_placer(ax, location='left,bottom' )

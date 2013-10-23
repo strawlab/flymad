@@ -201,7 +201,8 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
                               std=ctrlstd['Vfwd'].values,
                               n=ctrln['Vfwd'].values,
                               label='Control'),
-                    targetbetween=ctrlmean['laser_state'].values>0
+                    targetbetween=ctrlmean['laser_state'].values>0,
+                    downsample=2,
     )
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Fwd Velocity (pixels/s) +/- STD')

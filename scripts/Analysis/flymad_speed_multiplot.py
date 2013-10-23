@@ -137,7 +137,7 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
                               n=ctrln['v'].values,
                               label='Control'),
                     targetbetween=ctrlmean['laser_state'].values>0,
-                    downsample=20
+                    downsample=25
     )
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Speed (pixels/s) +/- STD')
