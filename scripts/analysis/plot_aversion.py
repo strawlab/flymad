@@ -72,6 +72,11 @@ def prepare_data(path):
             #t_off = t_df.head(3000)
             #t_on = t_df.tail(3000)
 
+            #fig = plt.figure()
+            #ax = fig.gca()
+            #t_df.plot(ax=ax)
+            #fig.savefig("%s_%s.png" % (exp["bag"],exp["type"]), bbox_inches='tight')
+
             #the laser was off at the start and on at the end
             #tracking data when the laser was on 
             t_on = t_df[l_on0:]
@@ -92,7 +97,7 @@ def prepare_data(path):
 
 def load_data(path):
     dat = json.load(open(path))
-    bpath = dat.get('_base','.')
+    bpath = dat.get('_base',os.path.dirname(path))
 
     return (
         cPickle.load(open(os.path.join(bpath,'pooled_on.pkl'),'rb')),
@@ -101,15 +106,58 @@ def load_data(path):
     )
 
 def plot_data(path, data):
+
     pooled_on, pooled_off, pooled_lon = data
 
-    for k in pooled_on:
+    on_means = []
+    off_means = []
+    on_stds = []
+    off_stds = []
+
+    label_map = {'a':'Antenna','b':'Body','h':'Head','x':'Nothing'}
+    labels = []
+
+    for k in 'ahbx':
         on = pd.concat(pooled_on[k])
         off = pd.concat(pooled_off[k])
 
+        on_mean = on['v'].mean()
+        off_mean = off['v'].mean()
+        on_std = on['v'].std()
+        off_std = off['v'].std()
+
         print "%s: on %.2f +/- %.2f off %.2f +/- %.2f" % (
-                k, on['v'].mean(), on['v'].std(),
-                off['v'].mean(), off['v'].std())
+                k, on_mean, on_std,
+                off_mean, off_std
+        )
+
+        on_means.append(on_mean)
+        off_means.append(off_mean)
+        on_stds.append(on_std)
+        off_stds.append(off_std)
+        labels.append( label_map[k] )
+
+    N = len(on_means)
+    ind = np.arange(N)  # the x locations for the groups
+    width = 0.35        # the width of the bars
+
+    fig = plt.figure("Aversion")
+    ax = fig.add_subplot(1,1,1)
+
+    rects1 = ax.bar(ind, on_means, width, color='b', yerr=on_std, ecolor='k')
+    rects2 = ax.bar(ind+width, off_means, width, color='r', yerr=off_std, ecolor='k')
+
+    ax.set_ylim([0, 20])
+
+    ax.set_ylabel('Speed (pixels/s) +/- STD')
+    ax.set_xticks(ind+width)
+    ax.set_xticklabels( labels )
+    ax.spines['bottom'].set_color('none') # don't draw bottom spine
+
+    ax.legend( (rects1[0], rects2[0]), ('Laser On', 'Laser Off'), loc='upper right' )
+
+    fig.savefig('aversion.svg', bbox_inches='tight')
+    fig.savefig('aversion.png', bbox_inches='tight')
 
 if __name__ == "__main__":
 
@@ -131,10 +179,3 @@ if __name__ == "__main__":
     if args.show:
         plt.show()
 
-
-
-
-
-
-#             /flymad/tracked            6229 msgs    : flymad/TrackedObj    
-#             /targeter/targeted         4838 msgs    : flymad/TargetedObj
