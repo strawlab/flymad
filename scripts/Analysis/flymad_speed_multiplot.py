@@ -144,8 +144,8 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
     ax.set_ylim([0, 160])
     ax.set_xlim([0, 70])
 
-    plt.savefig((path + "/Speed_calculations/speed_plot.png"))
-    plt.savefig((path + "/Speed_calculations/speed_plot.svg"))
+    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.png"), bbox_inches='tight')
+    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.svg"), bbox_inches='tight')
 
 
 if __name__ == "__main__":

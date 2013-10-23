@@ -256,8 +256,8 @@ def plot_data(path, expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, 
     ax.set_ylim([-0.1,0.6])
     ax.set_xlim([-120,480])
 
-    fig.savefig((path_out + "following_and_WingExt.png"))
-    fig.savefig((path_out + "following_and_WingExt.svg"))
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt.png"), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt.svg"), bbox_inches='tight')
 
     if 0:
         fig = plt.figure("Courtship Dtarget 10min")
@@ -288,8 +288,8 @@ def plot_data(path, expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, 
         ax.set_ylim([20,120])
         ax.set_xlim([-120,480])
 
-        fig.savefig((path_out + "following_and_dtarget.png"))
-        fig.savefig((path_out + "following_and_dtarget.svg"))
+        fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget.png"), bbox_inches='tight')
+        fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget.svg"), bbox_inches='tight')
 
 if __name__ == "__main__":
     CTRL_GENOTYPE = 'uasstoptrpmyc' #black

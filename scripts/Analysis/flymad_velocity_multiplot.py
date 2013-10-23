@@ -209,8 +209,8 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
     ax.set_ylim([-60, 120])
     ax.set_xlim([0, 9])
 
-    fig2.savefig((path + "/Velocity_calculations/vfwd_plot.png"))
-    fig2.savefig((path + "/Velocity_calculations/vfwd_plot.svg"))
+    fig2.savefig(flymad_plot.get_plotpath(path,"vfwd_plot.png"), bbox_inches='tight')
+    fig2.savefig(flymad_plot.get_plotpath(path,"vfwd_plot.svg"), bbox_inches='tight')
 
     if 0:
         fig3 = plt.figure("Acceleration Multiplot")
@@ -233,8 +233,9 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
         ax.set_ylim([-1000, 1000])
         ax.set_xlim([0, 9])
 
-        fig3.savefig((path + "/Velocity_calculations/afwd_plot.png"))
-        fig3.savefig((path + "/Velocity_calculations/afwd_plot.svg"))
+        fig3.savefig(flymad_plot.get_plotpath(path,"afwd_plot.png"), bbox_inches='tight')
+        fig3.savefig(flymad_plot.get_plotpath(path,"afwd_plot.svg"), bbox_inches='tight')
+
 
     if 0:
         fig4 = plt.figure("Angular Rotation Multiplot")
@@ -257,8 +258,9 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
         ax.set_ylabel('angular rotation (radians/s) +/- STD')
         ax.set_ylim([-20,30])
 
-        fig4.savefig((path + "/Velocity_calculations/dorientation_plot.png"))
-        fig4.savefig((path + "/Velocity_calculations/dorientation_plot.svg"))
+        fig4.savefig(flymad_plot.get_plotpath(path,"dorientation_plot.png"), bbox_inches='tight')
+        fig4.savefig(flymad_plot.get_plotpath(path,"dorientation_plot.svg"), bbox_inches='tight')
+
 
 
 if __name__ == "__main__":
