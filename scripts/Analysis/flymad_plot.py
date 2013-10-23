@@ -9,6 +9,18 @@ import matplotlib.transforms as mtransforms
 
 import numpy as np
 
+BLACK       = 'k'
+DARK_GRAY   = '#939598'
+LIGHT_GRAY  = '#e7e8e8'
+#colors from ggplot
+BLUE        = '#348ABD'
+PURPLE      = '#7A68A6'
+RED         = '#A60628'
+GREEN       = '#467821'
+MID_RED     = '#CF4457'
+MID_BLUE    = '#188487'
+ORANGE_RED  = '#E24A33'
+
 TS_DEFAULTS = {
     'many': dict(lw=0.2, color='k', alpha=0.6 ),
     'spread': dict(alpha=0.4, facecolor='red', edgecolor='none'),
