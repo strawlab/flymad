@@ -1,3 +1,5 @@
+import os.path
+
 import strawlab_mpl.defaults as smd
 from strawlab_mpl.many_timeseries import ManyTimeseries
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
@@ -37,6 +39,13 @@ def setup_defaults():
     rcParams['legend.numpoints'] = 1
     rcParams['legend.scatterpoints'] = 1
 
+def get_plotpath(path, name):
+    path_out = os.path.join(os.path.dirname(path),'plots')
+    if not os.path.exists(path_out):
+        os.makedirs(path_out)
+    fig_out = os.path.join(path_out,name)
+    print "wrote", fig_out
+    return fig_out
 
 def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None, downsample=1, sem=False):
     #zorder = 1 = back
