@@ -208,6 +208,7 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
     ax.set_ylabel('Fwd Velocity (pixels/s) +/- STD')
     ax.set_ylim([-60, 120])
     ax.set_xlim([0, 9])
+    ax.axhline(color='k', linestyle='--',alpha=0.8)
 
     fig2.savefig(flymad_plot.get_plotpath(path,"vfwd_plot.png"), bbox_inches='tight')
     fig2.savefig(flymad_plot.get_plotpath(path,"vfwd_plot.svg"), bbox_inches='tight')
@@ -232,6 +233,7 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
         ax.set_ylabel('Fwd Acceleration (pixels/s^2) +/- STD')
         ax.set_ylim([-1000, 1000])
         ax.set_xlim([0, 9])
+        ax.axhline(color='k', linestyle='--',alpha=0.8)
 
         fig3.savefig(flymad_plot.get_plotpath(path,"afwd_plot.png"), bbox_inches='tight')
         fig3.savefig(flymad_plot.get_plotpath(path,"afwd_plot.svg"), bbox_inches='tight')
@@ -257,6 +259,7 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
         ax.set_xlim([0, 9])
         ax.set_ylabel('angular rotation (radians/s) +/- STD')
         ax.set_ylim([-20,30])
+        ax.axhline(color='k', linestyle='--',alpha=0.8)
 
         fig4.savefig(flymad_plot.get_plotpath(path,"dorientation_plot.png"), bbox_inches='tight')
         fig4.savefig(flymad_plot.get_plotpath(path,"dorientation_plot.svg"), bbox_inches='tight')
