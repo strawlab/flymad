@@ -15,9 +15,12 @@ import matplotlib.patches
 import roslib; roslib.load_manifest('rosbag')
 import rosbag
 
+import madplot
+
 def prepare_data(path):
 
     dat = json.load(open(path))
+    arena = madplot.Arena(dat)
 
     fly_data = dat['data']
     bpath = dat.get('_base',os.path.abspath(os.path.dirname(path)))
@@ -27,67 +30,34 @@ def prepare_data(path):
     pooled_lon = {k:[] for k in "axbh"}
 
     for exp in fly_data:
-        with rosbag.Bag(os.path.join(bpath,exp["bag"])) as bag:
 
-            l_index = []
-            l_data = {k:[] for k in ("obj_id","fly_x","fly_y","laser_x","laser_y","laser_power","mode")}
-            l_data_names = l_data.keys()
+        l_df, t_df, geom = madplot.load_bagfile(
+                                    madplot.get_path(path,dat,exp["bag"]),
+                                    arena
+        )
 
-            t_index = []
-            t_data = {k:[] for k in ("obj_id","x","y","vx","vy",'v')}
-            t_data_names = t_data.keys()
+        #find when the laser was on
+        l_on = l_df[l_df['laser_power'] > 0]
+        #time of first laser on
+        l_on0 = l_df.index[0] + datetime.timedelta(seconds=30)
 
-            for topic,msg,rostime in bag.read_messages(topics=["/targeter/targeted",
-                                                               "/flymad/tracked",
-                                                               "/draw_geom/poly"]):
-                if topic == "/targeter/targeted":
-                    l_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
-                    for k in l_data_names:
-                        l_data[k].append( getattr(msg,k) )
-                elif topic == "/flymad/tracked":
-                    if msg.is_living:
-                        vx = msg.state_vec[2]
-                        vy = msg.state_vec[3]
-                        t_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
-                        t_data['obj_id'].append(msg.obj_id)
-                        t_data['x'].append(msg.state_vec[0])
-                        t_data['y'].append(msg.state_vec[1])
-                        t_data['vx'].append(vx)
-                        t_data['vy'].append(vy)
-                        t_data['v'].append(math.sqrt( (vx**2) + (vy**2) ))
+        #t_off = t_df.head(3000)
+        #t_on = t_df.tail(3000)
 
-            l_df = pd.DataFrame(l_data, index=l_index)
-            l_df['time'] = l_df.index.values.astype('datetime64[ns]')
-            l_df.set_index(['time'], inplace=True)
+        #fig = plt.figure()
+        #ax = fig.gca()
+        #t_df.plot(ax=ax)
+        #fig.savefig("%s_%s.png" % (exp["bag"],exp["type"]), bbox_inches='tight')
 
-            #find when the laser was on
-            l_on = l_df[l_df['laser_power'] > 0]
-            #time of first laser on
-            l_on0 = l_df.index[0] + datetime.timedelta(seconds=30)
+        #the laser was off at the start and on at the end
+        #tracking data when the laser was on 
+        t_on = t_df[l_on0:]
+        #tracking data when the laser was off
+        t_off = t_df[:l_on0]
 
-            t_df = pd.DataFrame(t_data, index=t_index)
-            t_df['time'] = t_df.index.values.astype('datetime64[ns]')
-            t_df.set_index(['time'], inplace=True)
-
-            #t_off = t_df.head(3000)
-            #t_on = t_df.tail(3000)
-
-            #fig = plt.figure()
-            #ax = fig.gca()
-            #t_df.plot(ax=ax)
-            #fig.savefig("%s_%s.png" % (exp["bag"],exp["type"]), bbox_inches='tight')
-
-            #the laser was off at the start and on at the end
-            #tracking data when the laser was on 
-            t_on = t_df[l_on0:]
-            #tracking data when the laser was off
-            t_off = t_df[:l_on0]
-
-            print "loading", exp["bag"], len(t_on), "/", len(t_off)
-
-            pooled_on[exp["type"]].append(t_on)
-            pooled_off[exp["type"]].append(t_off)
-            pooled_lon[exp["type"]].append(l_on)
+        pooled_on[exp["type"]].append(t_on)
+        pooled_off[exp["type"]].append(t_off)
+        pooled_lon[exp["type"]].append(l_on)
 
     cPickle.dump(pooled_on, open(os.path.join(bpath,'pooled_on.pkl'),'wb'), -1)
     cPickle.dump(pooled_off, open(os.path.join(bpath,'pooled_off.pkl'),'wb'), -1)

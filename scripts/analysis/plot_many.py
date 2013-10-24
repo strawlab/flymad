@@ -12,9 +12,6 @@ import matplotlib.gridspec as gridspec
 
 import madplot
 
-def get_path(dat, bname):
-    return os.path.join(dat.get('_base','.'), bname)
-
 def prepare_data(path):
     dat = json.load(open(path))
     arena = madplot.Arena(dat)
@@ -25,18 +22,18 @@ def prepare_data(path):
         for bag in dat[k]:
             bname = bag["bag"]
             bag["data"] = madplot.load_bagfile(
-                                get_path(dat,bname),
+                                madplot.get_path(path, dat,bname),
                                 arena
             )
 
-    with open(get_path(dat,'data.pkl'), 'wb') as f:
+    with open(madplot.get_path(path, dat,'data.pkl'), 'wb') as f:
         cPickle.dump(dat, f, -1)
 
     return dat
 
 def load_data(path):
     dat = json.load(open(path))
-    with open(get_path(dat,'data.pkl'), 'rb') as f:
+    with open(madplot.get_path(path, dat,'data.pkl'), 'rb') as f:
         return cPickle.load(f)
 
 def plot_data(path, dat):
