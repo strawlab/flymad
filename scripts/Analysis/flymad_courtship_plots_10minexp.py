@@ -38,13 +38,19 @@ def prepare_data(path, exp_genotype, exp2_genotype, ctrl_genotype):
     fig1.set_size_inches(12,8)
     fig1.subplots_adjust(hspace=0)
     ax1=fig1.add_subplot(1,1,1)	
-    ax1.imshow(image, extent=[0,1350,495,0],zorder=0) #extent=[h_min,h_max,v_min,v_max]
+    #the original wide field camera was 659x494px. The rendered mp4 is 384px high
+    #the widefield image is padded with a 10px margin, so it is technically 514 high.
+    #scaling h=384->514 means new w=1371
+    #
+    #the image origin is top-left because matplotlib
+    ax1.imshow(image, extent=[0,1371,514,0],zorder=0) #extent=[h_min,h_max,v_min,v_max]
     ax1.axis('off') 
     # DEFINE TARGET POSITIONS AND SAVE THEM TO A DATAFRAME (targets)    
     targets = []
     def onclick(target):
-        print [target.xdata, target.ydata] 
-        xydict = {'x': target.xdata, 'y': target.ydata}
+        #subtract 10px for the margin
+        xydict = {'x': target.xdata-10, 'y': target.ydata-10}
+        print xydict
         targets.append(xydict)
         return
     cid = fig1.canvas.mpl_connect('button_press_event', onclick)
