@@ -83,6 +83,8 @@ def plot_data(path, data):
     off_means = []
     on_stds = []
     off_stds = []
+    on_sems = []
+    off_sems = []
 
     label_map = {'a':'Antenna','b':'Body','h':'Head','x':'Nothing'}
     labels = []
@@ -92,20 +94,16 @@ def plot_data(path, data):
         on = pd.concat(pooled_on[k])
         off = pd.concat(pooled_off[k])
 
-        on_mean = on['v'].mean()
-        off_mean = off['v'].mean()
-        on_std = on['v'].std()
-        off_std = off['v'].std()
+        _on_std = on['v'].std()
+        _off_std = off['v'].std()
 
-        print "%s: on %.2f +/- %.2f off %.2f +/- %.2f" % (
-                k, on_mean, on_std,
-                off_mean, off_std
-        )
+        on_means.append( on['v'].mean() )
+        off_means.append( off['v'].mean() )
+        on_stds.append( _on_std )
+        off_stds.append( _off_std )
+        on_sems.append( _on_std / np.sqrt(on['v'].count()) )
+        off_sems.append( _off_std / np.sqrt(off['v'].count()) )
 
-        on_means.append(on_mean)
-        off_means.append(off_mean)
-        on_stds.append(on_std)
-        off_stds.append(off_std)
         labels.append( label_map[k] )
 
     N = len(on_means)
@@ -115,12 +113,12 @@ def plot_data(path, data):
     fig = plt.figure("Aversion")
     ax = fig.add_subplot(1,1,1)
 
-    rects1 = ax.bar(ind, on_means, width, color='b', yerr=on_std, ecolor='k')
-    rects2 = ax.bar(ind+width, off_means, width, color='r', yerr=off_std, ecolor='k')
+    rects1 = ax.bar(ind, on_means, width, color='b', yerr=on_sems, ecolor='k')
+    rects2 = ax.bar(ind+width, off_means, width, color='r', yerr=off_sems, ecolor='k')
 
     ax.set_ylim([0, 20])
 
-    ax.set_ylabel('Speed (pixels/s) +/- STD')
+    ax.set_ylabel('Speed (pixels/s) +/- SEM')
     ax.set_xticks(ind+width)
     ax.set_xticklabels( labels )
     ax.spines['bottom'].set_color('none') # don't draw bottom spine
