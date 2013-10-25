@@ -82,7 +82,7 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
 
         first = False
 
-def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None):
+def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None, ds=1, **kwargs):
     ax.set_aspect('equal')
 
     if limits is not None:
@@ -96,7 +96,7 @@ def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None):
     for name, group in df.groupby('obj_id'):
         print "\t%s:%s" % (name,len(group))
         _df = group.resample('20L')
-        ax.plot(_df['x'],_df['y'],'k-')
+        ax.plot(_df['x'].values[::ds],_df['y'].values[::ds],**kwargs)
 
 def load_bagfile(bagpath, arena, filter_short=100):
     def in_area(row, poly):
