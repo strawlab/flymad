@@ -30,7 +30,7 @@ LASER_POWER_OFF = 0
 
 MOTOR_LAG       = 0.015
 
-HIT_DURATION    = 0.1   # seconds
+HIT_DURATION    = 0.2   # seconds
 MANAGEMENT_RATE = max(20,2.0/HIT_DURATION)
 
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
@@ -309,7 +309,7 @@ class Targeter:
                     off_lp = LASER_POWER_ON
                     #turn off the laser, no flies to track, nothing to do
                     self.set_current_plan('idle',0,off_lp,reason='laser off')
-                    self.send_dac(-12000, 0, off_lp, 0)
+                    self.send_dac(12000, 12000, off_lp, 0)
 
                 for obj in to_reset:
                     obj.reset_laser()
@@ -361,7 +361,7 @@ class Targeter:
         return x,y,dac_pixel_x,dac_pixel_y
 
     def point_mirrors_at_nothing(self,laser_power=LASER_POWER_OFF):
-        self.point_mirrors_at_xy(250,250,0,laser_power)
+        self.point_mirrors_at_xy(350,250,0,laser_power)
 
     def point_mirrors_at_xy(self,x,y,obj_id,laser_power):
         # desired
@@ -414,8 +414,12 @@ class Targeter:
 
     def run(self):
         r = rospy.Rate(MANAGEMENT_RATE)
+        now = start = time.time()
 
         while not rospy.is_shutdown():
+            now = time.time()
+            if (now-start) > 300:
+                    break
             self.update()
             r.sleep()
 
