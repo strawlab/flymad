@@ -7,10 +7,17 @@ import argparse
 
 import numpy as np
 import pandas as pd
+import matplotlib.colors
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
 import madplot
+
+def colors_hsv_circle(n, alpha=1.0):
+    _hsv = np.dstack( (np.linspace(0,2/3.,n), [1]*n, [1]*n) )
+    _rgb = matplotlib.colors.hsv_to_rgb(_hsv)
+    return np.dstack((_rgb, [alpha]*n))[0]
+    
 
 def prepare_data(path):
     dat = json.load(open(path))
@@ -36,52 +43,80 @@ def load_data(path):
     with open(madplot.get_path(path, dat,'data.pkl'), 'rb') as f:
         return cPickle.load(f)
 
-def plot_data(path, dat):
+def plot_data(path, dat, exps=('coupled','uncoupled')):
     arena = madplot.Arena(dat)
 
-    ordered_trials = dat['coupled']
+    exps = [e for e in exps if e in dat]
 
-    if len(ordered_trials) <= 8:
-        gs = gridspec.GridSpec(2, 4)
-    elif len(ordered_trials) <= 12:
-        gs = gridspec.GridSpec(3, 4)
-    elif len(ordered_trials) <= 16:
-        gs = gridspec.GridSpec(4, 4)
-    else:
-        raise Exception("yeah, this figure will be ugly")
+    pct_in_area_per_time = {k:[] for k in exps}
+    pct_in_area_per_time_lbls = {k:[] for k in exps}
 
-    fig = plt.figure("Trajectories", figsize=(16,8))
+    for exp in pct_in_area_per_time:
+        ordered_trials = dat[exp]
 
-    pct_in_area_per_time = []
-    pct_in_area_per_time_lbls = []
+        if len(ordered_trials) <= 8:
+            gs = gridspec.GridSpec(2, 4)
+        elif len(ordered_trials) <= 12:
+            gs = gridspec.GridSpec(3, 4)
+        elif len(ordered_trials) <= 16:
+            gs = gridspec.GridSpec(4, 4)
+        else:
+            raise Exception("yeah, this figure will be ugly")
 
-    for i,trial in enumerate(ordered_trials):
-        label = trial.get('label',trial['bag'])
-        ldf, tdf, geom = trial['data']
+        fig = plt.figure("%s Trajectories" % exp.title(), figsize=(16,8))
 
-        ax = fig.add_subplot(gs[i])
-        madplot.plot_tracked_trajectory(ax, tdf,
-                intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
-                limits=arena.get_limits()
-        )
-        ax.set_title(label)
-        ax.xaxis.set_visible(False)
-        ax.yaxis.set_visible(False)
+        for i,trial in enumerate(ordered_trials):
+            label = trial.get('label',os.path.basename(trial['bag']))
+            ldf, tdf, geom = trial['data']
 
-        pct_in_area_per_time_lbls.append( label )
-        pct_in_area_per_time.append ( madplot.calculate_time_in_area(tdf, 300, interval=30) )
+            ax = fig.add_subplot(gs[i])
+            madplot.plot_tracked_trajectory(ax, tdf,
+                    intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
+                    limits=arena.get_limits()
+            )
+            ax.set_title(label)
+            ax.xaxis.set_visible(False)
+            ax.yaxis.set_visible(False)
 
-    #need more colors
+            pct_in_area_per_time_lbls[exp].append( label )
+            pct_in_area_per_time[exp].append ( madplot.calculate_time_in_area(tdf, 300, interval=30) )
+
+        #need more colors
+        fig = plt.figure("%s Time in Area" % exp.title())
+        ax = fig.add_subplot(1,1,1)
+
+        colormap = plt.cm.gnuplot
+        ax.set_color_cycle(colors_hsv_circle(len(ordered_trials)))
+
+        for lbl,data in zip(pct_in_area_per_time_lbls[exp], pct_in_area_per_time[exp]):
+            offset,pct = data
+            #the last point is the total pct, use that later
+            ax.plot(offset[:-1], pct[:-1], linestyle='solid', label=lbl)
+
+        ax.legend()
+
+    #check all trials have the same number
+    trial_lens = set(map(len, (dat[e] for e in exps)))
+    if len(trial_lens) != 1:
+        raise Exception("experiments contain different numbers of trials")
+    ntrials = trial_lens.pop()
+
+    ind = np.arange(ntrials)  # the x locations for the groups
+    width = 0.35              # the width of the bars
+
     fig = plt.figure("Time in Area")
     ax = fig.add_subplot(1,1,1)
+    for i,exp in enumerate(exps):
+        pcts = []
+        for offset,pct in pct_in_area_per_time[exp]:
+            assert offset[-1] == -1
+            pcts.append(pct[-1])
+        ax.bar(ind+(i*width), pcts, width, label=exp)
 
-    colormap = plt.cm.gnuplot
-    ax.set_color_cycle([colormap(i) for i in np.linspace(0, 1.0, len(ordered_trials))])
-
-    for lbl,data in zip(pct_in_area_per_time_lbls, pct_in_area_per_time):
-        offset,pct = data
-        ax.plot(offset, pct, linestyle='solid', label=lbl)
-
+    ax.set_xlabel('Trial number')
+    ax.set_ylabel('Percentage of time spent in area')
+    ax.set_xticks(ind+width)
+    ax.set_xticklabels( [str(i) for i in range(ntrials)] )
     ax.legend()
 
 if __name__ == "__main__":

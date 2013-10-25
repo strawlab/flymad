@@ -218,6 +218,13 @@ def calculate_time_in_area(df, maxtime=None, interval=20):
         t0 = t1
         toffset += interval
 
+    #-ve offset means calculated over the whole time
+    npts = df['in_area'].sum()
+    #percentage of time in area
+    total_pct = 100.0 * (npts / float(len(df)))
+    offset.append(-1)
+    pct.append(total_pct)
+
     return offset, pct
 
 def calculate_time_to_area(tdf, maxtime=300):
