@@ -25,9 +25,9 @@ def prepare_data(path):
     fly_data = dat['data']
     bpath = dat.get('_base',os.path.abspath(os.path.dirname(path)))
 
-    pooled_on = {k:[] for k in "axbh"}
-    pooled_off = {k:[] for k in "axbh"}
-    pooled_lon = {k:[] for k in "axbh"}
+    pooled_on = {k:[] for k in "axbhwq"}
+    pooled_off = {k:[] for k in "axbhwq"}
+    pooled_lon = {k:[] for k in "axbhwq"}
 
     for exp in fly_data:
 
@@ -86,11 +86,11 @@ def plot_data(path, data):
     on_sems = []
     off_sems = []
 
-    label_map = {'a':'Antenna','b':'Body','h':'Head','x':'Nothing'}
+    label_map = {'a':'Antenna','b':'Body','h':'Head','x':'Miss','w':'Non-TTM'}
     labels = []
 
     #keep the same order
-    for k in [t for t in 'ahbx' if len(pooled_on.get(t,[]))]:
+    for k in [t for t in 'ahbxw' if len(pooled_on.get(t,[]))]:
         on = pd.concat(pooled_on[k])
         off = pd.concat(pooled_off[k])
 
