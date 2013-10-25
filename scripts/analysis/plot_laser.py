@@ -8,7 +8,7 @@ import madplot
 arena = madplot.Arena()
 fig = plt.figure(figsize=(8,8))
 ax = fig.add_subplot(111)
-ldf,tdf,geom = madplot.load_bagfile(sys.argv[1])
+ldf,tdf,geom = madplot.load_bagfile(sys.argv[1], arena)
 
 ax.add_patch(arena.get_patch(color='k', alpha=0.1))
 madplot.plot_laser_trajectory(ax, ldf,
