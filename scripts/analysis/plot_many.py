@@ -53,7 +53,7 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
     pct_in_area_per_time_lbls = {k:[] for k in exps}
     latency_to_first_contact = {k:[] for k in exps}
 
-    for exp in pct_in_area_per_time:
+    for exp in exps:
         ordered_trials = dat[exp]
 
         if len(ordered_trials) <= 8:
