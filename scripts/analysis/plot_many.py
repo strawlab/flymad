@@ -47,6 +47,7 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
     arena = madplot.Arena(dat)
 
     exps = [e for e in exps if e in dat]
+    exps_colors = [plt.cm.gnuplot(i) for i in np.linspace(0, 1.0, len(exps))]
 
     pct_in_area_per_time = {k:[] for k in exps}
     pct_in_area_per_time_lbls = {k:[] for k in exps}
@@ -111,7 +112,7 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
         for offset,pct in pct_in_area_per_time[exp]:
             assert offset[-1] == -1
             pcts.append(pct[-1])
-        ax.bar(ind+(i*width), pcts, width, label=exp)
+        ax.bar(ind+(i*width), pcts, width, label=exp, color=exps_colors[i])
 
     ax.set_xlabel('Trial number')
     ax.set_ylabel('Percentage of time spent in area')
