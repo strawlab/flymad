@@ -82,7 +82,7 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
 
         first = False
 
-def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None, ds=1, **kwargs):
+def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlen=20000, **kwargs):
     ax.set_aspect('equal')
 
     if limits is not None:
@@ -90,12 +90,11 @@ def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None, ds=1, **k
         ax.set_xlim(*xlim)
         ax.set_ylim(*ylim)
 
-    if intersect_patch is not None:
-        ax.add_patch(intersect_patch)
-
     for name, group in df.groupby('obj_id'):
-        _df = group.resample('20L')
-        ax.plot(_df['x'].values[::ds],_df['y'].values[::ds],**kwargs)
+        if len(group) < minlen:
+            print "\ttraj: skipping obj_id", name, "too short", len(group)
+            continue
+        ax.plot(group['x'].values[::ds],group['y'].values[::ds],**kwargs)
 
 def load_bagfile(bagpath, arena, filter_short=100):
     def in_area(row, poly):
@@ -175,7 +174,7 @@ def load_bagfile(bagpath, arena, filter_short=100):
         short_tracks = []
         for name, group in t_df.groupby('obj_id'):
             if len(group) < filter_short:
-                print '\tremove trajectory with obj_id %s (%s samples long)' % (name, len(group))
+                print '\tload ignoring trajectory with obj_id %s (%s samples long)' % (name, len(group))
                 short_tracks.append(name)
 
         l_df = l_df[~l_df['obj_id'].isin(short_tracks)]
@@ -239,12 +238,12 @@ def calculate_latency_to_stay(tdf, holdtime=20, minlen=20000):
 
     for name, group in tdf.groupby('obj_id'):
         if len(group) < minlen:
-            print "\tskipping obj_id", name, "too short", len(group)
+            print "\tlatency: skipping obj_id", name, "too short", len(group)
             continue
 
         t0 = group.head(1)
         if t0['in_area']:
-            print "\tskipping obj_id", name, "already in area"
+            print "\tlatency: skipping obj_id", name, "already in area"
             continue
 
         #timestamp of experiment start

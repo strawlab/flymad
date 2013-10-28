@@ -75,9 +75,13 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
 
             ax = fig.add_subplot(gs[i])
             madplot.plot_tracked_trajectory(ax, tdf,
-                    intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
                     limits=arena.get_limits()
             )
+
+            patch = arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2)
+            if patch is not None:
+                ax.add_patch(patch)
+
             ax.set_title(label)
             ax.xaxis.set_visible(False)
             ax.yaxis.set_visible(False)
