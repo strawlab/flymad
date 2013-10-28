@@ -116,12 +116,16 @@ def load_bagfile(bagpath, arena, filter_short=100):
     l_data_names = l_data.keys()
 
     t_index = []
-    t_data = {k:[] for k in ("obj_id","x","y","vx","vy",'v')}
-    t_data_names = t_data.keys()
+    t_data = {k:[] for k in ("obj_id","x","y","vx","vy",'v','t_framenumber')}
+
+    h_index = []
+    h_data = {k:[] for k in ("head_x", "head_y", "head_dx", "head_dy", "body_dx", "body_dy", "h_framenumber", "h_processing_time")}
+    h_data_names = ("head_x", "head_y", "head_dx", "head_dy", "body_dx", "body_dy")
 
     for topic,msg,rostime in bag.read_messages(topics=["/targeter/targeted",
                                                        "/flymad/tracked",
-                                                       "/draw_geom/poly"]):
+                                                       "/draw_geom/poly",
+                                                       "/flymad/laser_head_delta"]):
         if topic == "/targeter/targeted":
             l_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
             for k in l_data_names:
@@ -132,6 +136,7 @@ def load_bagfile(bagpath, arena, filter_short=100):
                 vy = msg.state_vec[3]
                 t_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
                 t_data['obj_id'].append(msg.obj_id)
+                t_data['t_framenumber'].append(msg.framenumber)
                 t_data['x'].append(msg.state_vec[0])
                 t_data['y'].append(msg.state_vec[1])
                 t_data['vx'].append(vx)
@@ -141,6 +146,12 @@ def load_bagfile(bagpath, arena, filter_short=100):
             if geom_msg is not None:
                 print "WARNING: DUPLICATE GEOM MSG", msg, "vs", geom_msg
             geom_msg = msg
+        elif topic == "/flymad/laser_head_delta":
+            h_index.append( datetime.datetime.fromtimestamp(rostime.to_sec()) )
+            for k in h_data_names:
+                h_data[k].append( getattr(msg,k) )
+            h_data["h_framenumber"].append( msg.framenumber )
+            h_data["h_processing_time"].append( msg.processing_time )
 
     if geom_msg is not None:
         points_x = [pt.x for pt in geom_msg.points]
@@ -152,12 +163,13 @@ def load_bagfile(bagpath, arena, filter_short=100):
     poly = arena.get_intersect_polygon(geom)
 
     l_df = pd.DataFrame(l_data, index=l_index)
-    l_df['time'] = l_df.index.values.astype('datetime64[ns]')
-    l_df.set_index(['time'], inplace=True)
-
     t_df = pd.DataFrame(t_data, index=t_index)
-    t_df['time'] = t_df.index.values.astype('datetime64[ns]')
-    t_df.set_index(['time'], inplace=True)
+    h_df = pd.DataFrame(h_data, index=h_index)
+
+#    for df in (l_df,t_df,h_df):
+#        print df
+#        df['time'] = df.index.values.astype('datetime64[ns]')
+#        df.set_index(['time'], inplace=True)
 
     #add a new colum if they were in the area
     t_df = pd.concat([t_df,
@@ -175,18 +187,19 @@ def load_bagfile(bagpath, arena, filter_short=100):
         l_df = l_df[~l_df['obj_id'].isin(short_tracks)]
         t_df = t_df[~t_df['obj_id'].isin(short_tracks)]
 
-    return l_df, t_df, geom
+    return l_df, t_df, h_df, geom
 
 def load_bagfile_single_dataframe(*args, **kwargs):
-    l_df, t_df, geom = load_bagfile(*args, **kwargs)
+    l_df, t_df, h_df, geom = load_bagfile(*args, **kwargs)
 
     #merge the dataframes
     #check we have about the same amount of data
-    size_similarity = (len(t_df)-len(l_df)) / float(max(len(l_df),len(t_df)))
-    if size_similarity < 0.8:
+    size_similarity = min(len(t_df),len(l_df),len(h_df)) / float(max(len(t_df),len(l_df),len(h_df)))
+    if size_similarity < 0.9:
         print "WARNING: ONLY %.1f%% TARGETED MESSAGES FOR ALL TRACKED MESSAGES" % (size_similarity*100)
 
-    pool_df = pd.concat([t_df, l_df], axis=1).fillna(method='ffill')
+    pool_df = pd.concat([t_df, l_df, h_df], axis=1).fillna(method='ffill')
+    return pool_df
 
 def calculate_time_in_area(df, maxtime=None, interval=20):
     pct = []

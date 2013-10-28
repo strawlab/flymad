@@ -67,7 +67,7 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
 
         for i,trial in enumerate(ordered_trials):
             label = trial.get('label',os.path.basename(trial['bag']))
-            ldf, tdf, geom = trial['data']
+            ldf, tdf, hdf, geom = trial['data']
 
             ax = fig.add_subplot(gs[i])
             madplot.plot_tracked_trajectory(ax, tdf,

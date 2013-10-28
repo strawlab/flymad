@@ -31,7 +31,7 @@ def prepare_data(path):
 
     for exp in fly_data:
 
-        l_df, t_df, geom = madplot.load_bagfile(
+        l_df,t_df,h_df,geom = madplot.load_bagfile(
                                     madplot.get_path(path,dat,exp["bag"]),
                                     arena
         )

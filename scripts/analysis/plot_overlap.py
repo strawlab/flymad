@@ -14,7 +14,7 @@ control = os.path.join(dat['_base'],dat['control'])
 
 ax = plt.figure().add_subplot(111)
 
-ldf,tdf,geom = madplot.load_bagfile(control)
+ldf,tdf,hdf,geom = madplot.load_bagfile(control)
 
 madplot.plot_tracked_trajectory(ax, tdf, intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True))
 madplot.plot_geom(ax, geom)
