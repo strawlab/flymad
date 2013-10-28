@@ -94,7 +94,6 @@ def plot_tracked_trajectory(ax, df, intersect_patch=None, limits=None, ds=1, **k
         ax.add_patch(intersect_patch)
 
     for name, group in df.groupby('obj_id'):
-        print "\t%s:%s" % (name,len(group))
         _df = group.resample('20L')
         ax.plot(_df['x'].values[::ds],_df['y'].values[::ds],**kwargs)
 
@@ -165,11 +164,6 @@ def load_bagfile(bagpath, arena, filter_short=100):
     l_df = pd.DataFrame(l_data, index=l_index)
     t_df = pd.DataFrame(t_data, index=t_index)
     h_df = pd.DataFrame(h_data, index=h_index)
-
-#    for df in (l_df,t_df,h_df):
-#        print df
-#        df['time'] = df.index.values.astype('datetime64[ns]')
-#        df.set_index(['time'], inplace=True)
 
     #add a new colum if they were in the area
     t_df = pd.concat([t_df,
