@@ -31,7 +31,8 @@ LASER_POWER_OFF = 0
 MOTOR_LAG       = 0.015
 
 HIT_DURATION    = 0.2   # seconds
-MANAGEMENT_RATE = max(20,2.0/HIT_DURATION)
+REST_DURATION   = 0.2   # seconds
+MANAGEMENT_RATE = max(30,3.0/HIT_DURATION)
 
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
 
@@ -80,13 +81,12 @@ class MaybeTargetedObject:
 
     def __str__(self):
         s = self.msg.state_vec
-        return '%cobj %d at %.1f,%.1f, hit=%.1f (lst=%.2f) t:%c l:%c' % (
+        return '%cobj %d at %.1f,%.1f, hit=%.1f (lst=%.2f) t:%c' % (
                     self.target_type,
                     self.msg.obj_id,
                     s[0],s[1],
                     self.laser_total_hit,self.laser_last_hit-self._t0,
                     'Y' if self.should_target else 'N',
-                    'Y' if self.should_laser() else 'N',
         )
 
     def __repr__(self):
@@ -125,9 +125,14 @@ class MaybeTargetedObject:
 
         return is_targeted
 
-    def should_laser(self):
+    def should_laser(self, now, plan_obj_id):
         if self.should_target:
-            return self.laser_total_hit < HIT_DURATION
+            if self.obj_id == plan_obj_id:
+                #if we are the current target
+                return self.laser_total_hit < HIT_DURATION
+            else:
+                #we are a potential target
+                return (now - self.laser_last_hit) >= REST_DURATION
         return False
 
 
@@ -279,6 +284,7 @@ class Targeter:
         with Timer('upd8'):
             with self.plan_lock:
                 plan,plan_obj_id,laser_power = self.current_plan
+                now = rospy.Time.now().to_sec()
 
                 to_hit = []
                 to_reset = []
@@ -291,21 +297,23 @@ class Targeter:
                     if PRINT_UPDATE:
                         print "? ",plan_obj_id,"=",obj
 
-                    #are we already targeting this fly
-                    if obj.should_laser():
-                        if obj.obj_id == plan_obj_id:
-                            is_targeted = obj
-                        else:
-                            to_hit.append( obj )
+                    if obj.obj_id == plan_obj_id:
+                        is_targeted = obj
+                    elif obj.should_laser(now, plan_obj_id):
+                        to_hit.append( obj )
                     else:
                         to_reset.append( obj )
 
-                if to_hit and (is_targeted is None):
+                if is_targeted is not None and is_targeted.should_laser(now, plan_obj_id):
+                    pass
+                elif to_hit:
                     #t[0] now contains the object hit least recently (see __cmp__)
                     to_hit.sort()
                     obj = to_hit[0]
-                    self.set_current_plan('point mirror', obj.obj_id,LASER_POWER_ON,reason='your turn')
-                elif (not to_hit) and (is_targeted is None):
+                    self.set_current_plan(
+                            'point mirror',
+                            obj.obj_id,LASER_POWER_ON,reason='your turn')
+                else:
                     off_lp = LASER_POWER_ON
                     #turn off the laser, no flies to track, nothing to do
                     self.set_current_plan('idle',0,off_lp,reason='laser off')
