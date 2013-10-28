@@ -23,6 +23,9 @@ PY = -0.5
 
 NO_DETECT = HeadDetect.NO_DETECT
 
+#MAKE THIS FALSE TO DISABLE TTL
+ENABLE_TTL = True
+
 (MODE_IDLE,
  MODE_WIDE,
  MODE_ZOOM) = range(3)
@@ -131,15 +134,22 @@ class Targeter:
             self.start_tracking(obj_id)
 
     def on_tracking(self, msg):
+        # calculate fly position in pixel coordinates
+        s = msg.state_vec
+        self._cur_x = s[0]
+        self._cur_y = s[1]
+
         with self._track_lock:
             if self._track_mode != 'W':
                 return
-            if self._track_wait < 5:
-                print "wait"
-                self._track_wait += 1
-            else:
-                self._track_mode = 'F'
-                return
+
+            if ENABLE_TTL:
+                if self._track_wait < 5:
+                    print "wait"
+                    self._track_wait += 1
+                else:
+                    self._track_mode = 'F'
+                    return
 
         if self.cur_obj_id is None:
             self.start_tracking(msg.obj_id)
@@ -150,11 +160,6 @@ class Targeter:
         if not msg.is_living:
             self.stop_tracking(self.cur_obj_id)
             return
-
-        # calculate fly position in pixel coordinates
-        s = msg.state_vec
-        self._cur_x = s[0]
-        self._cur_y = s[1]
 
         #self._cur_x = s[0] + s[2]*LATENCY
         #self._cur_y = s[1] + s[3]*LATENCY
