@@ -117,8 +117,8 @@ def load_bagfile(bagpath, arena, filter_short=100):
     t_data = {k:[] for k in ("obj_id","x","y","vx","vy",'v','t_framenumber')}
 
     h_index = []
-    h_data = {k:[] for k in ("head_x", "head_y", "head_dx", "head_dy", "body_dx", "body_dy", "h_framenumber", "h_processing_time")}
-    h_data_names = ("head_x", "head_y", "head_dx", "head_dy", "body_dx", "body_dy")
+    h_data = {k:[] for k in ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type", "h_framenumber", "h_processing_time")}
+    h_data_names = ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type")
 
     for topic,msg,rostime in bag.read_messages(topics=["/targeter/targeted",
                                                        "/flymad/tracked",

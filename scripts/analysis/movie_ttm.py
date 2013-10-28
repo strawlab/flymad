@@ -90,8 +90,7 @@ class FMFTTLPlotter(_FMFPlotter):
 
     def render(self, canv, panel, framenumber, row):
         hx,hy = row['head_x'],row['head_y']
-        hdx,hdy = row['head_dx'],row['head_dy']
-        bdx,bdy = row['body_dx'],row['body_dy']
+        tx,ty = row['target_x'],row['target_y']
 
         img = self.get_frame(framenumber)
         with canv.set_user_coords_from_panel(panel):
@@ -99,15 +98,29 @@ class FMFTTLPlotter(_FMFPlotter):
             canv.scatter( [hx],
                           [hy],
                           color_rgba=(0,1,0,0.3), radius=10.0 )
+            canv.scatter( [tx],
+                          [ty],
+                          color_rgba=(0,0,1,0.3), radius=5.0 )
 
-#            canv.scatter( [hx-hdx],
-#                          [hy-hdy],
-#                          color_rgba=(0,0,1,0.3), radius=5.0 )
+### keep in sync with refined_utils.py
+def target_dx_dy_from_message(row):
+    """returns None,None if the head/body was not detected"""
 
-#            canv.scatter( [hx-bdx],
-#                          [hy-bdy],
-#                          color_rgba=(1,0,0,0.3), radius=5.0 )
+    dx = dy = 1e6
+    tx = ty = 1e6
 
+    if row['target_type'] == 1:
+        tx = row['head_x']
+        ty = row['head_y']
+    elif row['target_type'] == 2:
+        tx = row['body_x']
+        ty = row['body_y']
+
+    if tx != 1e6:
+        dx = row['target_x'] - tx
+        dy = row['target_y'] - ty
+
+    return dx, dy
 
 class TTLPlotter:
 
@@ -120,7 +133,7 @@ class TTLPlotter:
         self.dy = collections.deque(maxlen=maxlen)
 
     def render(self, canv, panel, framenumber, row):
-        head_dx, head_dy = row['head_dx'], row['head_dy']
+        head_dx, head_dy = target_dx_dy_from_message(row)
 
         self.dx.appendleft(head_dx)
         self.dy.appendleft(head_dy)
@@ -142,7 +155,7 @@ class TTLPlotter:
 
 class MovieMaker:
     def __init__(self, tmpdir='/tmp/', obj_id='movie', fps=20):
-        self.tmpdir = "/tmp/tmp4e2EPu2013-10-27-16-48-35.bag"#tempfile.mkdtemp(str(obj_id), dir=tmpdir)
+        self.tmpdir = tempfile.mkdtemp(str(obj_id), dir=tmpdir)
         self.obj_id = obj_id
         self.num = 0
         self.fps = fps
@@ -240,9 +253,9 @@ if __name__ == "__main__":
 
     from pprint import pprint
 
-    wfmf = FMFTrajectoryPlotter('/mnt/strawscience/data/FlyMAD/aversion_movies/3/w_aversion_movie_new2_a20131027_164830.fmf')
-    zfmf = FMFTTLPlotter('/mnt/strawscience/data/FlyMAD/aversion_movies/3/z_aversion_movie_new2_a20131027_164832.fmf')
-    b = '/mnt/strawscience/data/FlyMAD/aversion_movies/3/2013-10-27-16-48-35.bag'
+    wfmf = FMFTrajectoryPlotter('/mnt/strawscience_smb/data/FlyMAD/aversion_movies_newbag/w_aversion_movie_new3_h20131028_221436.fmf')
+    zfmf = FMFTTLPlotter('/mnt/strawscience_smb/data/FlyMAD/aversion_movies_newbag/z_aversion_movie_new3_h20131028_221435.fmf')
+    b = '/mnt/strawscience_smb/data/FlyMAD/aversion_movies_newbag/2013-10-28-22-14-37.bag'
 
     arena = madplot.Arena()
     pool_df = madplot.load_bagfile_single_dataframe(b, arena)
