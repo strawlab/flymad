@@ -234,24 +234,39 @@ def calculate_time_in_area(df, maxtime=None, interval=20):
 
     return offset, pct
 
-def calculate_time_to_area(tdf, maxtime=300):
-    tta = []
+def calculate_latency_to_stay(tdf, holdtime=20, minlen=20000):
+    tts = []
 
     for name, group in tdf.groupby('obj_id'):
+        if len(group) < minlen:
+            print "\tskipping obj_id", name, "too short", len(group)
+            continue
+
         t0 = group.head(1)
-        t0_in_area = t0['in_area']
-        t1_in_area = False
+        if t0['in_area']:
+            print "\tskipping obj_id", name, "already in area"
+            continue
+
+        #timestamp of experiment start
+        t00 = t0 = t1 = t0.index[0].asm8.astype(np.int64) / 1e9
+
+        t_in_area = 0
         for ix,row in group.iterrows():
+
+            t1 = ix.asm8.astype(np.int64) / 1e9
+            dt = t1 - t0
+
             if row['in_area']:
-                t1_in_area = True
-                break
+                t_in_area += dt
+                if t_in_area > holdtime:
+                    break
+
+            t0 = t1
 
         #did the fly finish inside, and start outside
-        if t1_in_area and (not t0_in_area):
-            dt = ix - t0.index[0]
-            tta.append( dt )
+        if row['in_area'] and (t_in_area > holdtime):
+            tts.append( t1 - t00 )
 
-    print tta
-
+    return tts
 
 

@@ -51,6 +51,7 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
 
     pct_in_area_per_time = {k:[] for k in exps}
     pct_in_area_per_time_lbls = {k:[] for k in exps}
+    latency_to_first_contact = {k:[] for k in exps}
 
     for exp in pct_in_area_per_time:
         ordered_trials = dat[exp]
@@ -70,6 +71,8 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
             label = trial.get('label',os.path.basename(trial['bag']))
             ldf, tdf, hdf, geom = trial['data']
 
+            print exp.title(), label
+
             ax = fig.add_subplot(gs[i])
             madplot.plot_tracked_trajectory(ax, tdf,
                     intersect_patch=arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2),
@@ -81,6 +84,8 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
 
             pct_in_area_per_time_lbls[exp].append( label )
             pct_in_area_per_time[exp].append ( madplot.calculate_time_in_area(tdf, 300, interval=30) )
+
+            latency_to_first_contact[exp].append(madplot.calculate_latency_to_stay(tdf, 20))
 
         #need more colors
         fig = plt.figure("%s Time in Area" % exp.title())
@@ -102,6 +107,7 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
         raise Exception("experiments contain different numbers of trials")
     ntrials = trial_lens.pop()
 
+    #plot time in area percent
     ind = np.arange(ntrials)  # the x locations for the groups
     width = 0.35              # the width of the bars
 
@@ -114,11 +120,29 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
             pcts.append(pct[-1])
         ax.bar(ind+(i*width), pcts, width, label=exp, color=exps_colors[i])
 
-    ax.set_xlabel('Trial number')
+    ax.set_xlabel('Trial')
     ax.set_ylabel('Percentage of time spent in area')
     ax.set_xticks(ind+width)
     ax.set_xticklabels( [str(i) for i in range(ntrials)] )
     ax.legend()
+
+    #plot latency to first 20s in area
+    fig = plt.figure("Latency to first 20s contact")
+    ax = fig.add_subplot(1,1,1)
+    for i,exp in enumerate(exps):
+        stds = []
+        means = []
+        for tts in latency_to_first_contact[exp]:
+            means.append(np.mean(tts))
+            stds.append(np.std(tts))
+        ax.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
+
+    ax.set_xlabel('Trial')
+    ax.set_ylabel('Latency to first 20s contact')
+    ax.set_xticks(ind+width)
+    ax.set_xticklabels( [str(i) for i in range(ntrials)] )
+    ax.legend()
+
 
 if __name__ == "__main__":
 
