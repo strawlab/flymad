@@ -1,11 +1,15 @@
 float64 head_x
 float64 head_y
-float64 head_dx
-float64 head_dy
-float64 body_dx
-float64 body_dy
+float64 body_x
+float64 body_y
+float64 target_x
+float64 target_y
+uint8 target_type
 uint64 framenumber
 float64 processing_time
 
 float64 NO_DETECT=1000000
+uint8 TARGET_NONE=0
+uint8 TARGET_HEAD=1
+uint8 TARGET_BODY=2
 

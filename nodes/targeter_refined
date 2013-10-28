@@ -14,14 +14,11 @@ from flymad.msg import MicroVelocity, MicroPosition, TargetedObj, HeadDetect
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32, myint16
 
+from refined_utils import PX, PY, target_dx_dy_from_message
+
 LATENCY     = 0.05
 LASER_POWER_ON  = 255
 LASER_POWER_OFF = 0
-
-PX = -0.5
-PY = -0.5
-
-NO_DETECT = HeadDetect.NO_DETECT
 
 #MAKE THIS FALSE TO DISABLE TTL
 ENABLE_TTL = True
@@ -78,14 +75,14 @@ class Targeter:
         self.dacs = msg.posA, msg.posB
 
     def on_head_delta(self,msg):
-        dx = msg.head_dx
-        dy = msg.head_dy
+
+        dx,dy = target_dx_dy_from_message(msg)
 
         with self._track_lock:
             if self._track_mode != 'F':
                 return
 
-            miss = dx == NO_DETECT
+            miss = dx is None
 
             if miss:
                 print "miss"

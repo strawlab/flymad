@@ -15,13 +15,12 @@ from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint16
 from flymad.hitutils import HitBox, HitImage
 
+from refined_utils import PX, PY, target_dx_dy_from_message
+
 PRINT_TIME      = False
 PRINT_DAC       = True
 PRINT_STATE     = False
 PRINT_UPDATE    = False
-
-PX = -0.5
-PY = -0.5
 
 NO_DETECT = HeadDetect.NO_DETECT
 
@@ -31,7 +30,7 @@ LASER_POWER_OFF = 0
 MOTOR_LAG       = 0.015
 
 HIT_DURATION    = 0.2   # seconds
-REST_DURATION   = 0.2   # seconds
+REST_DURATION   = 0.4   # seconds
 MANAGEMENT_RATE = max(30,3.0/HIT_DURATION)
 
 THRESHOLD_DISTANCE_PIXELS       = 10.0 # when to switch to TTL
@@ -208,10 +207,9 @@ class Targeter:
                     if obj.update_targeting(plan_obj_id,'f'):
                         assert plan_obj_id == obj.obj_id
 
-                        dx = msg.head_dx
-                        dy = msg.head_dy
+                        dx,dy = target_dx_dy_from_message(msg)
 
-                        miss = dx == NO_DETECT
+                        miss = dx is None
 
                         if miss:
                             self.zoom_misses += 1
