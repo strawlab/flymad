@@ -115,37 +115,49 @@ def plot_data(path, dat, exps=('coupled','uncoupled')):
     ind = np.arange(ntrials)  # the x locations for the groups
     width = 0.35              # the width of the bars
 
-    fig = plt.figure("Time in Area")
-    ax = fig.add_subplot(1,1,1)
+    figb = plt.figure("Time in Area")
+    axb = figb.add_subplot(1,1,1)
+    figl = plt.figure("Time in Area L")
+    axl = figl.add_subplot(1,1,1)
+
     for i,exp in enumerate(exps):
         pcts = []
         for offset,pct in pct_in_area_per_time[exp]:
             assert offset[-1] == -1
             pcts.append(pct[-1])
-        ax.bar(ind+(i*width), pcts, width, label=exp, color=exps_colors[i])
 
-    ax.set_xlabel('Trial')
-    ax.set_ylabel('Percentage of time spent in area')
-    ax.set_xticks(ind+width)
-    ax.set_xticklabels( [str(i) for i in range(ntrials)] )
-    ax.legend()
+        axb.bar(ind+(i*width), pcts, width, label=exp, color=exps_colors[i])
+        axl.plot(ind, pcts, label=exp, color=exps_colors[i])
+
+    axb.set_xticks(ind+width)
+    for ax in [axb, axl]:
+        ax.set_xlabel('Trial')
+        ax.set_ylabel('Percentage of time spent in area')
+        ax.set_xticklabels( [str(i) for i in range(ntrials)] )
+        ax.legend()
 
     #plot latency to first 20s in area
-    fig = plt.figure("Latency to first 20s contact")
-    ax = fig.add_subplot(1,1,1)
+    figb = plt.figure("Latency to first 20s contact")
+    axb = figb.add_subplot(1,1,1)
+    figl = plt.figure("Latency to first 20s contact L")
+    axl = figl.add_subplot(1,1,1)
+
     for i,exp in enumerate(exps):
         stds = []
         means = []
         for tts in latency_to_first_contact[exp]:
             means.append(np.mean(tts))
             stds.append(np.std(tts))
-        ax.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
 
-    ax.set_xlabel('Trial')
-    ax.set_ylabel('Latency to first 20s contact')
-    ax.set_xticks(ind+width)
-    ax.set_xticklabels( [str(i) for i in range(ntrials)] )
-    ax.legend()
+        axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
+        axl.errorbar(ind, means, label=exp, color=exps_colors[i], yerr=stds)
+
+    axb.set_xticks(ind+width)
+    for ax in [axb, axl]:
+        ax.set_xlabel('Trial')
+        ax.set_ylabel('Latency to first 20s contact')
+        ax.set_xticklabels( [str(i) for i in range(ntrials)] )
+        ax.legend()
 
 
 if __name__ == "__main__":
