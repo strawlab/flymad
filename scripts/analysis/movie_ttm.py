@@ -65,6 +65,8 @@ class FMFTrajectoryPlotter(_FMFPlotter):
     def render(self, canv, panel, framenumber, row):
         x,y = row['fly_x'],row['fly_y']
 
+        lx,ly,mode = row['laser_x'],row['laser_y'],row['mode']
+
         self.xhist.append(x)
         self.yhist.append(y)
 
@@ -77,6 +79,11 @@ class FMFTrajectoryPlotter(_FMFPlotter):
             canv.scatter( self.xhist,
                           self.yhist,
                           color_rgba=(0,1,0,0.3), radius=0.5 )
+
+            if mode == 2:
+                canv.scatter( [lx],
+                              [ly],
+                              color_rgba=(1,0,0,0.3), radius=2.0 )
 
 
 
@@ -106,7 +113,7 @@ class FMFTTLPlotter(_FMFPlotter):
 def target_dx_dy_from_message(row):
     """returns None,None if the head/body was not detected"""
 
-    dx = dy = 1e6
+    dx = dy = np.nan
     tx = ty = 1e6
 
     if row['target_type'] == 1:
