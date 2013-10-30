@@ -4,6 +4,7 @@ import math
 import os.path
 import cPickle
 import argparse
+import multiprocessing
 
 import numpy as np
 import pandas as pd
@@ -23,15 +24,28 @@ def prepare_data(path):
     dat = json.load(open(path))
     arena = madplot.Arena(dat)
 
+    jobs = {}
+    pool = multiprocessing.Pool()
+
     for k in dat:
         if k.startswith("_"):
             continue
         for bag in dat[k]:
             bname = bag["bag"]
-            bag["data"] = madplot.load_bagfile(
-                                madplot.get_path(path, dat,bname),
-                                arena
-            )
+            bpath = madplot.get_path(path, dat, bname)
+            jobs[bname] = pool.apply_async(
+                                madplot.load_bagfile,
+                                (bpath, arena))
+
+    pool.close()
+    pool.join()
+
+    for k in dat:
+        if k.startswith("_"):
+            continue
+        for bag in dat[k]:
+            bname = bag["bag"]
+            bag["data"] = jobs[bname].get()
 
     with open(madplot.get_path(path, dat,'data.pkl'), 'wb') as f:
         cPickle.dump(dat, f, -1)
@@ -43,7 +57,7 @@ def load_data(path):
     with open(madplot.get_path(path, dat,'data.pkl'), 'rb') as f:
         return cPickle.load(f)
 
-def plot_data(path, dat, exps=('coupled','uncoupled')):
+def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
     arena = madplot.Arena(dat)
 
     exps = [e for e in exps if e in dat]
