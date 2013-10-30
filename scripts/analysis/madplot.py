@@ -82,7 +82,7 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
 
         first = False
 
-def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlen=20000, **kwargs):
+def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlenpct=0.12, **kwargs):
     ax.set_aspect('equal')
 
     if limits is not None:
@@ -91,9 +91,13 @@ def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlen=20000, **kwargs):
         ax.set_ylim(*ylim)
 
     for name, group in df.groupby('obj_id'):
-        if len(group) < minlen:
-            print "\ttraj: skipping obj_id", name, "too short", len(group)
+        lenpct = len(group) / float(len(df))
+        if lenpct < minlenpct:
+            print "\tskip: skipping obj_id", name, "len", lenpct
             continue
+
+        print "\ttraj: obj_id", name, "len", lenpct
+
         ax.plot(group['x'].values[::ds],group['y'].values[::ds],**kwargs)
 
 def load_bagfile(bagpath, arena, filter_short=100):
@@ -233,18 +237,21 @@ def calculate_time_in_area(df, maxtime=None, interval=20):
 
     return offset, pct
 
-def calculate_latency_to_stay(tdf, holdtime=20, minlen=20000):
+def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.12):
     tts = []
 
     for name, group in tdf.groupby('obj_id'):
-        if len(group) < minlen:
-            print "\tlatency: skipping obj_id", name, "too short", len(group)
+        lenpct = len(group) / float(len(tdf))
+        if lenpct < minlenpct:
+            print "\tskip: skipping obj_id", name, "len", lenpct
             continue
 
         t0 = group.head(1)
         if t0['in_area']:
-            print "\tlatency: skipping obj_id", name, "already in area"
+            print "\tskip: skipping obj_id", name, "already in area"
             continue
+
+        print "\tltcy: obj_id", name, "len", lenpct
 
         #timestamp of experiment start
         t00 = t0 = t1 = t0.index[0].asm8.astype(np.int64) / 1e9
