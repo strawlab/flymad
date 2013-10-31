@@ -23,6 +23,7 @@ def colors_hsv_circle(n, alpha=1.0):
 
 def prepare_data(path):
     if os.path.isdir(path):
+        path = path + "/"
         dat = {"coupled":[]}
         for b in glob.glob(os.path.join(path,"*.bag")):
             dat["coupled"].append({"bag":os.path.basename(b)})
