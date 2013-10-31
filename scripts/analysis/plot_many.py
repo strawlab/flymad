@@ -5,6 +5,7 @@ import os.path
 import cPickle
 import argparse
 import multiprocessing
+import glob
 
 import numpy as np
 import pandas as pd
@@ -21,7 +22,17 @@ def colors_hsv_circle(n, alpha=1.0):
     
 
 def prepare_data(path):
-    dat = json.load(open(path))
+    if os.path.isdir(path):
+        dat = {"coupled":[]}
+        for b in glob.glob(os.path.join(path,"*.bag")):
+            dat["coupled"].append({"bag":os.path.basename(b)})
+        with open(os.path.join(path,"example.json"), "w") as f:
+            json.dump(dat, f)
+        fname = "exalple.pkl"
+    else:
+        dat = json.load(open(path))
+        fname = os.path.basename(path)
+
     arena = madplot.Arena(dat)
 
     jobs = {}
@@ -47,14 +58,15 @@ def prepare_data(path):
             bname = bag["bag"]
             bag["data"] = jobs[bname].get()
 
-    with open(madplot.get_path(path, dat,'data.pkl'), 'wb') as f:
+    with open(madplot.get_path(path, dat, fname), 'wb') as f:
         cPickle.dump(dat, f, -1)
 
     return dat
 
 def load_data(path):
     dat = json.load(open(path))
-    with open(madplot.get_path(path, dat,'data.pkl'), 'rb') as f:
+    fname = os.path.basename(path)
+    with open(madplot.get_path(path, dat, fname), 'rb') as f:
         return cPickle.load(f)
 
 def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
