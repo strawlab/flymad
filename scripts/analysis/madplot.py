@@ -82,7 +82,7 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
 
         first = False
 
-def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlenpct=0.12, **kwargs):
+def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlenpct=0.10, **kwargs):
     ax.set_aspect('equal')
 
     if limits is not None:
@@ -237,7 +237,7 @@ def calculate_time_in_area(df, maxtime=None, interval=20):
 
     return offset, pct
 
-def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.12):
+def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.10):
     tts = []
 
     for name, group in tdf.groupby('obj_id'):
