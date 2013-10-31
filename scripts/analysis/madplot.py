@@ -151,7 +151,7 @@ def load_bagfile(bagpath, arena, filter_short=100):
         elif topic == "/flymad/laser_head_delta":
             h_index.append( datetime.datetime.fromtimestamp(rostime.to_sec()) )
             for k in h_data_names:
-                h_data[k].append( getattr(msg,k) )
+                h_data[k].append( getattr(msg,k,np.nan) )
             h_data["h_framenumber"].append( msg.framenumber )
             h_data["h_processing_time"].append( msg.processing_time )
 
