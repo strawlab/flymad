@@ -45,6 +45,12 @@ class UI:
         self._manager = rosgobject.managers.ROSNodeManager()
         self._build_ui()
 
+        self._ksb = GtkButtonKillNode(
+                        self._ui.get_object("bkillExperiment"),
+                        self._manager,
+                        "/experiment"
+        )
+
         w = self._ui.get_object("FlyMAD")
         w.connect("delete-event", rosgobject.main_quit)
         w.show_all()
