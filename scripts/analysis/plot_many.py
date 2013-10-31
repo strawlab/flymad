@@ -29,7 +29,7 @@ def prepare_data(path):
             dat["coupled"].append({"bag":os.path.basename(b)})
         with open(os.path.join(path,"example.json"), "w") as f:
             json.dump(dat, f)
-        fname = "exalple.pkl"
+        fname = "example.pkl"
     else:
         dat = json.load(open(path))
         fname = os.path.basename(path)
@@ -66,8 +66,8 @@ def prepare_data(path):
 
 def load_data(path):
     dat = json.load(open(path))
-    fname = os.path.basename(path)
-    with open(madplot.get_path(path, dat, fname), 'rb') as f:
+    fname = os.path.splitext(os.path.basename(path))[0]
+    with open(madplot.get_path(path, dat, fname+".pkl"), 'rb') as f:
         return cPickle.load(f)
 
 def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
