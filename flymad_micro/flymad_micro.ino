@@ -10,22 +10,27 @@ DAC714 analogOut = DAC714(AOUT_A0,AOUT_A1);
 
 // global vars for the state of the DACs
 uint8_t velocity_mode=0;
+uint8_t enable_adc=0;
 uint16_t posA=0;
 uint16_t posB=0;
+uint16_t adcVal=0;
 
 uint32_t rateA=0;
 uint32_t rateB=0;
 int8_t signA=1;
 int8_t signB=1;
 
+unsigned long time;
+
 unsigned long last_stampA;
 unsigned long last_stampB;
 
+const unsigned long COMM_HZ = (1000000/10); //100Hz, in microseconds
+
+#define ADC_EN_BIT 	 0X08
 #define VELOCITY_BIT 0X04
 #define LASER_BIT    0X02
 #define DEBUG_BIT    0X01
-
-#define stamp_func micros
 
 void setup() {
   // initialize the digital pin as an output.
@@ -40,6 +45,10 @@ void setup() {
 
   digitalWrite(LASER, LOW);
   analogOut.setValue_AB(posA,posB);
+
+  analogReference(INTERNAL); //1.1V
+
+  time = micros();
 }
 
 void set_stuff( int32_t speed, uint32_t* rate, int8_t *sign ) {
@@ -66,9 +75,10 @@ void set_stuff( int32_t speed, uint32_t* rate, int8_t *sign ) {
 }
 
 void loop() {
+  uint8_t cmd = 0;
+  unsigned long cur_stamp = micros();
 
   if (velocity_mode) {
-    unsigned long cur_stamp = stamp_func();
 	unsigned long dtA = (cur_stamp-last_stampA);
 	unsigned long dtB = (cur_stamp-last_stampB);
 
@@ -98,7 +108,8 @@ void loop() {
   }
 
   while (Serial.available() > 0) {
-    uint8_t cmd = Serial.parseInt();
+    cmd = Serial.parseInt();
+
     int32_t cmdA = Serial.parseInt();
     int32_t cmdB = Serial.parseInt();
 
@@ -113,7 +124,7 @@ void loop() {
 			set_stuff( cmdA, &rateA, &signA );
 			set_stuff( cmdB, &rateB, &signB );
 
-			unsigned long cur_stamp = stamp_func();
+			unsigned long cur_stamp = micros();
 			last_stampA = cur_stamp-rateA; // trigger update next cycle
 			last_stampB = cur_stamp-rateB;
 
@@ -124,19 +135,28 @@ void loop() {
 			analogOut.setValue_AB(posA,posB);
 		}
 
-		if (cmd & DEBUG_BIT) {
+		enable_adc = cmd & ADC_EN_BIT;
 
-			Serial.print(cmd, DEC);
-			Serial.write(" ");
-			Serial.print(cmdA, DEC);
-			Serial.write(" ");
-			Serial.print(cmdB, DEC);
-			Serial.write(" ");
-			Serial.print(posA, DEC);
-			Serial.write(" ");
-			Serial.println(posB, DEC);
-		}
     }
   }
+
+  unsigned long dt = cur_stamp - time;
+  if (cmd || (dt > COMM_HZ)) {
+
+		if (enable_adc) {
+			adcVal = analogRead(A0);
+		}
+
+		Serial.print(velocity_mode, DEC);
+		Serial.write(" ");
+		Serial.print(posA, DEC);
+		Serial.write(" ");
+		Serial.print(posB, DEC);
+		Serial.write(" ");
+		Serial.println(adcVal, DEC);
+
+        time = cur_stamp;
+  }
+
 }
 

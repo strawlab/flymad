@@ -6,7 +6,7 @@ import time
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
-from std_msgs.msg import UInt8, String
+from std_msgs.msg import UInt8, UInt16, String, Float32
 from flymad.msg import MicroVelocity, MicroPosition
 from flymad.util import myint16, dac_value_wrap
 
@@ -16,9 +16,16 @@ class FlyMADMicro(object):
         _ = rospy.Subscriber('~laser', UInt8, self.laser_callback)
         _ = rospy.Subscriber('~position', MicroPosition, self.position_callback)
         _ = rospy.Subscriber('~velocity', MicroVelocity, self.velocity_callback)
-        self.pub_dac_position = rospy.Publisher('/flymad_micro/position_echo',
+        self._pub_dac_position = rospy.Publisher('~position_echo',
                                                 MicroPosition,
                                                 tcp_nodelay=True)
+        self._pub_adc_raw = rospy.Publisher('~adc',
+                                        UInt16,
+                                        tcp_nodelay=True)
+        self._pub_adc_sca = rospy.Publisher('~adc_scaled',
+                                        Float32,
+                                        tcp_nodelay=True)
+
         self._send_timezone()
 
         port = rospy.get_param( '~port', default = '/dev/ttyUSB0' )
@@ -32,12 +39,22 @@ class FlyMADMicro(object):
         except serial.serialutil.SerialException, err:
             rospy.logwarn('could not open serial port: %s'%(str(err),))
             self.ser = None
+
         self._buf = ''
         self.laser = 0
         self.velocity_mode = False
-        self._debug = False
+
+        self._debug = rospy.get_param('~debug', 0)
+        #an adc_scale of 0 disables adc sampling
+        self._adc_scale = float(rospy.get_param('~adc_scale', 1.0))
+
         if self._debug:
-            print 'debug mode on'
+            print 'debug mode on (%d)' % self._debug
+            print '\t0 = disabled'
+            print '\t1 = print sent commands'
+            print '\t2 = print recieved commands'
+        else:
+            rospy.loginfo('debug mode disabled (set param debug > 0) to enable')
 
         self.lock = threading.Lock()
         with self.lock:
@@ -63,13 +80,13 @@ class FlyMADMicro(object):
 
     def position_callback(self,msg):
         if self._debug:
-            print 'got position:',msg.posA, msg.posB
+            print 'msg: position:',msg.posA, msg.posB
 
         self._update(posA=msg.posA, posB=msg.posB)
 
     def velocity_callback(self,msg):
         if self._debug:
-            print 'got velocity:',msg.velA, msg.velB
+            print 'msg: velocity:',msg.velA, msg.velB
 
         self._update(velA=msg.velA, velB=msg.velB)
 
@@ -81,9 +98,12 @@ class FlyMADMicro(object):
             self.laser = laser
 
 
-        cmd = 0x01
+        cmd = 0x00
         argA = 0
         argB = 0
+
+        if self._adc_scale > 0:
+            cmd |= 0x08
 
         if self.laser:
             cmd |= 0x02
@@ -129,7 +149,7 @@ class FlyMADMicro(object):
 
         serstr = '%d %d %d\n'%(cmd, argA, argB)
         if self._debug:
-            print 'sending: ',repr(serstr)
+            print 'tx : 0x%X %d %d' % (cmd, argA, argB)
         if self.ser is not None:
             self.ser.write(serstr)
 
@@ -151,7 +171,7 @@ class FlyMADMicro(object):
         msg = MicroPosition()
         msg.posA = a
         msg.posB = b
-        self.pub_dac_position.publish(msg)
+        self._pub_dac_position.publish(msg)
 
     def run(self):
         while not rospy.is_shutdown():
@@ -168,15 +188,23 @@ class FlyMADMicro(object):
         line = None
         for line in lines:
             if self._debug:
-                print '                                      read: ',repr(line)
+                print 'rx :',repr(line)
 
         # take last line (most current) and update it
         if line is not None:
-            dacA, dacB = map(int,line.split()[-2:])
+            try:
+                mode, dacA, dacB, adc = map(int,line.split())
+            except:
+                print 'invalid comm packet'
+                return
+
             dacA = dac_value_wrap(dacA)
             dacB = dac_value_wrap(dacB)
             if self._debug:
-                print '                                      last: %d %d'%(dacA, dacB)
+                print 'rxu: %d %d %d'%(mode, dacA, dacB)
+
+            self._pub_adc_raw.publish(adc)
+            self._pub_adc_sca.publish(adc * self._adc_scale)
 
             with self.lock:
                 self._last_posA = dacA
