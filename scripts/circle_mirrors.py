@@ -9,8 +9,7 @@ import math
 class Circler:
     def __init__(self):
         rospy.init_node('circler')
-        dest = '/flymad_micro'
-        self.pub = rospy.Publisher( dest+'/position', MicroPosition )
+        self.pub = rospy.Publisher( 'flymad_micro/position', MicroPosition )
 
     def run(self):
         r = rospy.Rate(100) # 100hz
