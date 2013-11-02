@@ -25,7 +25,7 @@ def prepare_data(path):
     if os.path.isdir(path):
         path = path + "/"
         dat = {"coupled":[]}
-        for b in glob.glob(os.path.join(path,"*.bag")):
+        for b in sorted(glob.glob(os.path.join(path,"*.bag"))):
             dat["coupled"].append({"bag":os.path.basename(b)})
         with open(os.path.join(path,"example.json"), "w") as f:
             json.dump(dat, f)
