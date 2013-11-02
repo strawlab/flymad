@@ -23,17 +23,22 @@ MAXLEN = 100
 TARGET_OUT_W, TARGET_OUT_H = 1280, 1024
 MARGIN = 2
 
+FMFFrame = collections.namedtuple('FMFFrame', 'offset timestamp')
+FrameDescriptor = collections.namedtuple('FrameDescriptor', 'w_frame z_frame row epoch')
+
 class _FMFPlotter:
+
+    t0 = 0
 
     def __init__(self, path):
         self.fmf = motmot.FlyMovieFormat.FlyMovieFormat.FlyMovie(path)
-        _,self.f0 = self.fmf.get_frame(0)
 
-    def get_frame(self, timestamp_as_framenumber, color=False):
-        rel_framenumber = timestamp_as_framenumber - self.f0
-        f,ts = self.fmf.get_frame(rel_framenumber)
+    def get_frame(self, frame, color=False):
+        assert isinstance(frame, FMFFrame)
 
-        assert ts == timestamp_as_framenumber
+        f,ts = self.fmf.get_frame(frame.offset)
+
+        assert ts == frame.timestamp
 
         if color:
             return cv2.cvtColor(f,cv2.COLOR_BAYER_GR2RGB)
@@ -50,9 +55,6 @@ class _FMFPlotter:
             device_y1 = device_y1,
         )
 
-    def get_frame0_framenumber(self):
-        return self.f0
-
 class FMFTrajectoryPlotter(_FMFPlotter):
 
     name = 'w'
@@ -62,7 +64,8 @@ class FMFTrajectoryPlotter(_FMFPlotter):
         self.xhist = collections.deque(maxlen=MAXLEN)
         self.yhist = collections.deque(maxlen=MAXLEN)
 
-    def render(self, canv, panel, framenumber, row):
+    def render(self, canv, panel, desc):
+        row = desc.row
         x,y = row['fly_x'],row['fly_y']
 
         lx,ly,mode = row['laser_x'],row['laser_y'],row['mode']
@@ -70,7 +73,7 @@ class FMFTrajectoryPlotter(_FMFPlotter):
         self.xhist.append(x)
         self.yhist.append(y)
 
-        img = self.get_frame(framenumber)
+        img = self.get_frame(desc.w_frame)
         with canv.set_user_coords_from_panel(panel):
             canv.imshow(img, 0,0, filter='best' )
             canv.scatter( [x],
@@ -85,6 +88,11 @@ class FMFTrajectoryPlotter(_FMFPlotter):
                               [ly],
                               color_rgba=(1,0,0,0.3), radius=2.0 )
 
+            canv.text(str(desc.w_frame.timestamp),
+                      panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
+
+            dt = desc.epoch - self.t0
+            canv.text("%.1fs" % dt,panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
 
 
 class FMFTTLPlotter(_FMFPlotter):
@@ -95,11 +103,12 @@ class FMFTTLPlotter(_FMFPlotter):
         _FMFPlotter.__init__(self, path)
         self.hx = self.hy = 0
 
-    def render(self, canv, panel, framenumber, row):
+    def render(self, canv, panel, desc):
+        row = desc.row
         hx,hy = row['head_x'],row['head_y']
         tx,ty = row['target_x'],row['target_y']
 
-        img = self.get_frame(framenumber)
+        img = self.get_frame(desc.z_frame)
         with canv.set_user_coords_from_panel(panel):
             canv.imshow(img, 0,0, filter='best' )
             canv.scatter( [hx],
@@ -108,6 +117,9 @@ class FMFTTLPlotter(_FMFPlotter):
             canv.scatter( [tx],
                           [ty],
                           color_rgba=(0,0,1,0.3), radius=5.0 )
+
+            canv.text(str(desc.z_frame.timestamp),
+                      panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
 
 ### keep in sync with refined_utils.py
 def target_dx_dy_from_message(row):
@@ -131,21 +143,22 @@ def target_dx_dy_from_message(row):
 
 class TTLPlotter:
 
-    IFI  = 1.0/100
     HIST = 3.0
 
-    def __init__(self):
-        maxlen = self.HIST / self.IFI
+    def __init__(self, t0, ifi):
+        self.t0 = t0
+        self.ifi = ifi
+        maxlen = self.HIST / self.ifi
         self.dx = collections.deque(maxlen=maxlen)
         self.dy = collections.deque(maxlen=maxlen)
 
-    def render(self, canv, panel, framenumber, row):
-        head_dx, head_dy = target_dx_dy_from_message(row)
+    def render(self, canv, panel, desc):
+        head_dx, head_dy = target_dx_dy_from_message(desc.row)
 
         self.dx.appendleft(head_dx)
         self.dy.appendleft(head_dy)
 
-        time = np.array(range(len(self.dx)))*self.IFI*-1.0
+        time = np.array(range(len(self.dx)))*self.ifi*-1.0
 
         with canv.set_user_coords_from_panel(panel):
             with canv.get_figure(panel) as fig:
@@ -215,34 +228,18 @@ class Assembler:
         self.wfmf = wfmf
         self.zfmf = zfmf
         self.plotttm = plotttm
-
-        self.w0 = self.wfmf.get_frame0_framenumber()
-        self.z0 = self.zfmf.get_frame0_framenumber()
-
         self.i = 0
         self.moviemaker = moviemaker
 
-    def render_row(self, row):
-        if row.isnull().values.any():
-            print "row missing data"
-            return None
-
-        w_framenumber = row['t_framenumber']
-        z_framenumber = row['h_framenumber']
-
-        if w_framenumber < self.w0:
-            print "no frame for wide fmf"
-            return None
-        if z_framenumber < self.z0:
-            print "no frame for zoom fmf"
-            return None
+    def render_frame(self, desc):
+        assert isinstance(desc, FrameDescriptor)
 
         png = self.moviemaker.next_frame()
         canv = benu.benu.Canvas(png, self.w, self.h)
 
-        self.wfmf.render(canv, self.panels['wide'], w_framenumber, row)
-        self.zfmf.render(canv, self.panels['zoom'], z_framenumber, row)
-        self.plotttm.render(canv, self.panels['plot'], self.i, row)
+        self.wfmf.render(canv, self.panels['wide'], desc)
+        self.zfmf.render(canv, self.panels['zoom'], desc)
+        self.plotttm.render(canv, self.panels['plot'], desc)
 
         canv.save()
         self.i += 1
@@ -255,19 +252,79 @@ def get_progress_bar(name, maxval):
     pbar = progressbar.ProgressBar(widgets=widgets,maxval=maxval).start()
     return pbar
 
-if __name__ == "__main__":
-    png = "test.png"
+def build_framedesc_list(pool_df, wt, zt):
+    frames = []
 
+    for z in zt:
+        z_frameoffset = np.where(zt == z)[0][0]
+        z_frameno = int(z)
+        assert z_frameno == z
+
+        row = None
+
+        for idx,hmatchingrow in (pool_df[pool_df['h_framenumber'] == z_frameno]).iterrows():
+
+            if hmatchingrow.isnull().values.any():
+                #missing data
+                continue
+
+            try:
+                t_frameno = int(hmatchingrow['t_framenumber'])
+                assert t_frameno == hmatchingrow['t_framenumber']
+            except ValueError:
+                #nan
+                continue
+
+            try:
+                w_frameoffset = np.where(wt == t_frameno)[0][0]
+                row = hmatchingrow
+                w_frameno = t_frameno
+            except IndexError:
+                continue
+
+        if row is not None:
+
+            w_frame = FMFFrame(w_frameoffset, w_frameno)
+            z_frame = FMFFrame(z_frameoffset, z_frameno)
+            epoch = idx.asm8.astype(np.int64) / 1e9
+
+            fd = FrameDescriptor(w_frame, z_frame, hmatchingrow, epoch)
+
+            frames.append(fd)
+
+    return frames
+
+if __name__ == "__main__":
     from pprint import pprint
 
-    wfmf = FMFTrajectoryPlotter('/mnt/strawscience_smb/data/FlyMAD/aversion_movies_newbag/w_aversion_movie_new3_h20131028_221436.fmf')
-    zfmf = FMFTTLPlotter('/mnt/strawscience_smb/data/FlyMAD/aversion_movies_newbag/z_aversion_movie_new3_h20131028_221435.fmf')
-    b = '/mnt/strawscience_smb/data/FlyMAD/aversion_movies_newbag/2013-10-28-22-14-37.bag'
+    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/z_new_movie_aversion_h20131030_180450.fmf'
+    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/w_new_movie_aversion_h20131030_180453.fmf'
+    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/2013-10-30-18-04-55.bag'
+
+    wfmf = FMFTrajectoryPlotter(WIDE_FMF)
+    zfmf = FMFTTLPlotter(ZOOM_FMF)
 
     arena = madplot.Arena()
-    pool_df = madplot.load_bagfile_single_dataframe(b, arena)
-    #resample to 10ms to better match the fmf videos (100 fps)
-    pool_df = pool_df.resample('10L', how='last')
+
+    print "loading data"
+    df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena)
+    wt = wfmf.fmf.get_all_timestamps()
+    zt = zfmf.fmf.get_all_timestamps()
+
+    frames = build_framedesc_list(df, wt, zt)
+    if not frames:
+        print "no frames to render"
+        sys.exit(0)
+    else:
+        print len(frames),"frames to render"
+
+    moviet0 = frames[0].epoch
+    movielen = (frames[-1].epoch - moviet0)
+    movieifi = movielen/len(frames)
+
+    ttlplotter = TTLPlotter(moviet0,movieifi)
+    wfmf.t0 = moviet0
+    zfmf.t0 = moviet0
 
     panels = {}
     #left half of screen
@@ -296,23 +353,24 @@ if __name__ == "__main__":
             device_y0=actual_h-PH, device_y1=actual_h
     )
 
-    moviemaker = MovieMaker(obj_id=os.path.basename(b))
+    moviemaker = MovieMaker(obj_id=os.path.basename(BAG_FILE))
 
     ass = Assembler(actual_w, actual_h,
                     panels, 
-                    wfmf,zfmf,TTLPlotter(),
+                    wfmf,zfmf,ttlplotter,
                     moviemaker,
     )
 
-    pbar = get_progress_bar(moviemaker.movie_fname, len(pool_df))
+    pbar = get_progress_bar(moviemaker.movie_fname, len(frames))
 
-    for i,(ix,row) in enumerate(pool_df.iterrows()):
-        ass.render_row(row)
+    for i,desc in enumerate(frames):
+        ass.render_frame(desc)
         pbar.update(i)
 
     pbar.finish()
 
-    moviemaker.render(os.path.dirname(b))
+    moviefname = moviemaker.render(os.path.dirname(BAG_FILE))
+    print "wrote", moviefname
 
     
 
