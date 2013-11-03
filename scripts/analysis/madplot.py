@@ -189,8 +189,8 @@ def load_bagfile(bagpath, arena, filter_short=100):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile_single_dataframe(*args, **kwargs):
-    l_df, t_df, h_df, geom = load_bagfile(*args, **kwargs)
+def load_bagfile_single_dataframe(bagpath, arena, ffill, **kwargs):
+    l_df, t_df, h_df, geom = load_bagfile(bagpath, arena, **kwargs)
 
     #merge the dataframes
     #check we have about the same amount of data
@@ -198,8 +198,11 @@ def load_bagfile_single_dataframe(*args, **kwargs):
     if size_similarity < 0.9:
         print "WARNING: ONLY %.1f%% TARGETED MESSAGES FOR ALL TRACKED MESSAGES" % (size_similarity*100)
 
-    pool_df = pd.concat([t_df, l_df, h_df], axis=1).fillna(method='ffill')
-    return pool_df
+    pool_df = pd.concat([t_df, l_df, h_df], axis=1)
+    if ffill:
+        return pool_df.fillna(method='ffill')
+    else:
+        return pool_df
 
 def calculate_time_in_area(df, maxtime=None, interval=20):
     pct = []
