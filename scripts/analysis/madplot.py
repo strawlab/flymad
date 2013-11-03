@@ -68,7 +68,7 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
         ax.add_patch(intersect_patch)
 
     first = True
-    for name, group in df.groupby('obj_id'):
+    for name, group in df.groupby('lobj_id'):
         fly_x = group['fly_x'].values
         fly_y = group['fly_y'].values
 
@@ -90,7 +90,7 @@ def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlenpct=0.10, **kwargs)
         ax.set_xlim(*xlim)
         ax.set_ylim(*ylim)
 
-    for name, group in df.groupby('obj_id'):
+    for name, group in df.groupby('tobj_id'):
         lenpct = len(group) / float(len(df))
         if lenpct < minlenpct:
             print "\tskip: skipping obj_id", name, "len", lenpct
@@ -113,12 +113,14 @@ def load_bagfile(bagpath, arena, filter_short=100):
 
     geom_msg = None
 
+    #KEEP TRACKED AND LASER OBJECT ID SEPARATE
+
     l_index = []
-    l_data = {k:[] for k in ("obj_id","fly_x","fly_y","laser_x","laser_y","laser_power","mode")}
-    l_data_names = l_data.keys()
+    l_data = {k:[] for k in ("lobj_id","fly_x","fly_y","laser_x","laser_y","laser_power","mode")}
+    l_data_names = ("fly_x","fly_y","laser_x","laser_y","laser_power","mode")
 
     t_index = []
-    t_data = {k:[] for k in ("obj_id","x","y","vx","vy",'v','t_framenumber')}
+    t_data = {k:[] for k in ("tobj_id","x","y","vx","vy",'v','t_framenumber')}
 
     h_index = []
     h_data = {k:[] for k in ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type", "h_framenumber", "h_processing_time")}
@@ -132,12 +134,13 @@ def load_bagfile(bagpath, arena, filter_short=100):
             l_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
             for k in l_data_names:
                 l_data[k].append( getattr(msg,k) )
+            l_data['lobj_id'].append(msg.obj_id)
         elif topic == "/flymad/tracked":
             if msg.is_living:
                 vx = msg.state_vec[2]
                 vy = msg.state_vec[3]
                 t_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
-                t_data['obj_id'].append(msg.obj_id)
+                t_data['tobj_id'].append(msg.obj_id)
                 t_data['t_framenumber'].append(msg.framenumber)
                 t_data['x'].append(msg.state_vec[0])
                 t_data['y'].append(msg.state_vec[1])
@@ -176,13 +179,13 @@ def load_bagfile(bagpath, arena, filter_short=100):
     if filter_short:
         #find short trials here
         short_tracks = []
-        for name, group in t_df.groupby('obj_id'):
+        for name, group in t_df.groupby('tobj_id'):
             if len(group) < filter_short:
                 print '\tload ignoring trajectory with obj_id %s (%s samples long)' % (name, len(group))
                 short_tracks.append(name)
 
-        l_df = l_df[~l_df['obj_id'].isin(short_tracks)]
-        t_df = t_df[~t_df['obj_id'].isin(short_tracks)]
+        l_df = l_df[~l_df['lobj_id'].isin(short_tracks)]
+        t_df = t_df[~t_df['tobj_id'].isin(short_tracks)]
 
     return l_df, t_df, h_df, geom
 
@@ -240,7 +243,7 @@ def calculate_time_in_area(df, maxtime=None, interval=20):
 def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.10):
     tts = []
 
-    for name, group in tdf.groupby('obj_id'):
+    for name, group in tdf.groupby('tobj_id'):
         lenpct = len(group) / float(len(tdf))
         if lenpct < minlenpct:
             print "\tskip: skipping obj_id", name, "len", lenpct
