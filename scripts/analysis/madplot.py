@@ -308,7 +308,19 @@ def get_progress_bar(name, maxval):
     return pbar
 
 FMFFrame = collections.namedtuple('FMFFrame', 'offset timestamp')
-FrameDescriptor = collections.namedtuple('FrameDescriptor', 'w_frame z_frame row epoch')
+
+class FrameDescriptor:
+    def __init__(self, w_frame, z_frame, df_or_series, epoch):
+        self.w_frame = w_frame
+        self.z_frame = z_frame
+        self.df = df_or_series
+        self.epoch = epoch
+
+    def get_row(self, *cols):
+        if isinstance(self.df, pd.Series):
+            return self.df
+        elif isinstance(self.df, pd.DataFrame):
+            return self.df.dropna(subset=cols)
 
 class _FMFPlotter:
 
@@ -354,6 +366,55 @@ class _FMFPlotter:
             device_y1 = device_y1,
         )
 
+class FMFImagePlotter(_FMFPlotter):
+
+    def __init__(self, path, framename):
+        _FMFPlotter.__init__(self, path)
+        self.name = framename[0]
+        self._framename = framename
+
+    def render(self, canv, panel, desc):
+        img = self.get_frame(getattr(desc,self._framename))
+        with canv.set_user_coords_from_panel(panel):
+            canv.imshow(img, 0,0, filter='best' )
+
+class FMFMultiTrajectoryPlotter(_FMFPlotter):
+
+    name = 'w'
+
+    def __init__(self, path):
+        _FMFPlotter.__init__(self, path)
+        self.trajs_x = {}
+        self.trajs_y = {}
+        self.trajs_colors = {}
+        self.trajs_last_seen = {}
+        self.traj_n = 0
+
+        self._traj_color = colors_hsv_circle(10)
+
+    def render(self, canv, panel, desc):
+        for oid,row in desc.df.groupby('tobj_id'):
+            if oid not in self.trajs_x:
+                self.trajs_x[oid] = collections.deque(maxlen=100)
+                self.trajs_y[oid] = collections.deque(maxlen=100)
+                self.trajs_colors[oid] = self._traj_color[self.traj_n]
+                self.traj_n += 1
+
+            self.trajs_x[oid].append(row['x'])
+            self.trajs_y[oid].append(row['y'])
+            self.trajs_last_seen[oid] = row['t_framenumber']
+
+        img = self.get_frame(desc.w_frame)
+        with canv.set_user_coords_from_panel(panel):
+            canv.imshow(img, 0,0, filter='best' )
+            for oid in self.trajs_colors:
+                canv.scatter( self.trajs_x[oid],
+                              self.trajs_y[oid],
+                              color_rgba=self.trajs_colors[oid], radius=0.5 )
+
+            canv.text(str(int(desc.w_frame.timestamp)),
+                      panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
+
 class FMFTrajectoryPlotter(_FMFPlotter):
 
     name = 'w'
@@ -364,10 +425,7 @@ class FMFTrajectoryPlotter(_FMFPlotter):
         self.yhist = collections.deque(maxlen=100)
 
     def render(self, canv, panel, desc):
-        row = desc.row
-
-        #this can only render one trajectory at a time
-        assert isinstance(row, pd.Series)
+        row = desc.get_row('fly_x', 'fly_y', 'laser_x', 'laser_y', 'mode')
 
         x,y = row['fly_x'],row['fly_y']
         lx,ly,mode = row['laser_x'],row['laser_y'],row['mode']
@@ -390,7 +448,7 @@ class FMFTrajectoryPlotter(_FMFPlotter):
                               [ly],
                               color_rgba=(1,0,0,0.3), radius=2.0 )
 
-            canv.text(str(desc.w_frame.timestamp),
+            canv.text(str(int(desc.w_frame.timestamp)),
                       panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
 
             dt = desc.epoch - self.t0
@@ -406,7 +464,8 @@ class FMFTTLPlotter(_FMFPlotter):
         self.hx = self.hy = 0
 
     def render(self, canv, panel, desc):
-        row = desc.row
+        row = desc.get_row('head_x','head_y','target_x','target_y')
+
         hx,hy = row['head_x'],row['head_y']
         tx,ty = row['target_x'],row['target_y']
 
@@ -420,7 +479,7 @@ class FMFTTLPlotter(_FMFPlotter):
                           [ty],
                           color_rgba=(0,0,1,0.3), radius=5.0 )
 
-            canv.text(str(desc.z_frame.timestamp),
+            canv.text(str(int(desc.z_frame.timestamp)),
                       panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
 
 ### keep in sync with refined_utils.py
@@ -455,7 +514,9 @@ class TTLPlotter:
         self.dy = collections.deque(maxlen=maxlen)
 
     def render(self, canv, panel, desc):
-        head_dx, head_dy = target_dx_dy_from_message(desc.row)
+        row = desc.get_row('target_type', 'head_x', 'head_y', 'body_x', 'body_y', 'target_x', 'target_y')
+
+        head_dx, head_dy = target_dx_dy_from_message(row)
 
         self.dx.appendleft(head_dx)
         self.dy.appendleft(head_dy)
