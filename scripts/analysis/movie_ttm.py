@@ -29,19 +29,34 @@ FrameDescriptor = collections.namedtuple('FrameDescriptor', 'w_frame z_frame row
 class _FMFPlotter:
 
     t0 = 0
+    force_color = False
+    alpha = None
+    beta = None
 
     def __init__(self, path):
         self.fmf = motmot.FlyMovieFormat.FlyMovieFormat.FlyMovie(path)
 
-    def get_frame(self, frame, color=False):
+    def enable_force_rgb(self):
+        self.force_color = True
+
+    def enable_color_correction(self, brightness, contrast):
+        assert 0 < brightness < 100
+        assert 1.0 <= contrast <= 3.0
+        self.alpha = contrast
+        self.beta = brightness
+
+    def get_frame(self, frame):
         assert isinstance(frame, FMFFrame)
 
         f,ts = self.fmf.get_frame(frame.offset)
 
         assert ts == frame.timestamp
 
-        if color:
-            return cv2.cvtColor(f,cv2.COLOR_BAYER_GR2RGB)
+        if self.force_color:
+            return cv2.cvtColor(f,cv2.COLOR_GRAY2RGB)
+        elif (self.alpha is not None) and (self.beta is not None):
+            mul_f = cv2.multiply(f,np.array([self.alpha],dtype=float))
+            return cv2.add(mul_f,np.array([self.beta],dtype=float))
         else:
             return f
 
@@ -303,6 +318,7 @@ if __name__ == "__main__":
 
     wfmf = FMFTrajectoryPlotter(WIDE_FMF)
     zfmf = FMFTTLPlotter(ZOOM_FMF)
+    zfmf.enable_color_correction(brightness=20, contrast=1.5)
 
     arena = madplot.Arena()
 
