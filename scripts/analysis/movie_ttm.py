@@ -307,9 +307,13 @@ if __name__ == "__main__":
     arena = madplot.Arena()
 
     print "loading data"
-    df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena)
+    df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena, ffill=True)
     wt = wfmf.fmf.get_all_timestamps()
     zt = zfmf.fmf.get_all_timestamps()
+
+    if len(df['tobj_id'].dropna().unique()) != 1:
+        print "TTM movies require single unique object IDs, I think..."
+        sys.exit(1)
 
     frames = build_framedesc_list(df, wt, zt)
     if not frames:
