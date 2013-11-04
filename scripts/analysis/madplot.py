@@ -13,6 +13,8 @@ import pandas as pd
 import shapely.geometry as sg
 import matplotlib.pyplot as plt
 import matplotlib.patches
+import matplotlib.colors
+import progressbar
 
 import motmot.FlyMovieFormat.FlyMovieFormat
 import benu.benu
@@ -58,6 +60,11 @@ class Arena:
     def get_limits(self):
         #(xlim, ylim)
         return (150,570), (47,463)
+
+def colors_hsv_circle(n, alpha=1.0):
+    _hsv = np.dstack( (np.linspace(0,2/3.,n), [1]*n, [1]*n) )
+    _rgb = matplotlib.colors.hsv_to_rgb(_hsv)
+    return np.dstack((_rgb, [alpha]*n))[0]
 
 def get_path(path, dat, bname):
     bpath = dat.get('_base',os.path.abspath(os.path.dirname(path)))
@@ -293,6 +300,12 @@ def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.10):
             tts.append( t1 - t00 )
 
     return tts
+
+def get_progress_bar(name, maxval):
+    widgets = ["%s: " % name, progressbar.Percentage(),
+               progressbar.Bar(), progressbar.ETA()]
+    pbar = progressbar.ProgressBar(widgets=widgets,maxval=maxval).start()
+    return pbar
 
 FMFFrame = collections.namedtuple('FMFFrame', 'offset timestamp')
 FrameDescriptor = collections.namedtuple('FrameDescriptor', 'w_frame z_frame row epoch')

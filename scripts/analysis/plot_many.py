@@ -15,12 +15,6 @@ import matplotlib.gridspec as gridspec
 
 import madplot
 
-def colors_hsv_circle(n, alpha=1.0):
-    _hsv = np.dstack( (np.linspace(0,2/3.,n), [1]*n, [1]*n) )
-    _rgb = matplotlib.colors.hsv_to_rgb(_hsv)
-    return np.dstack((_rgb, [alpha]*n))[0]
-    
-
 def prepare_data(path):
     if os.path.isdir(path):
         path = path + "/"
@@ -123,7 +117,7 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
         ax = fig.add_subplot(1,1,1)
 
         colormap = plt.cm.gnuplot
-        ax.set_color_cycle(colors_hsv_circle(len(ordered_trials)))
+        ax.set_color_cycle(madplot.colors_hsv_circle(len(ordered_trials)))
 
         for lbl,data in zip(pct_in_area_per_time_lbls[exp], pct_in_area_per_time[exp]):
             offset,pct = data

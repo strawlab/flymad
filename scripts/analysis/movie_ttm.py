@@ -2,7 +2,6 @@ import sys
 import os.path
 
 import numpy as np
-import progressbar
 
 import benu.benu
 import benu.utils
@@ -39,12 +38,6 @@ class Assembler:
         self.i += 1
 
         return png
-
-def get_progress_bar(name, maxval):
-    widgets = ["%s: " % name, progressbar.Percentage(),
-               progressbar.Bar(), progressbar.ETA()]
-    pbar = progressbar.ProgressBar(widgets=widgets,maxval=maxval).start()
-    return pbar
 
 def build_framedesc_list(pool_df, wt, zt):
     frames = []
@@ -158,7 +151,7 @@ if __name__ == "__main__":
                     moviemaker,
     )
 
-    pbar = get_progress_bar(moviemaker.movie_fname, len(frames))
+    pbar = madplot.get_progress_bar(moviemaker.movie_fname, len(frames))
 
     for i,desc in enumerate(frames):
         ass.render_frame(desc)
