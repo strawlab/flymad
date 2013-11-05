@@ -157,6 +157,8 @@ if __name__ == "__main__":
         ass.render_frame(desc)
         pbar.update(i)
 
+#        if i > 20: break
+
     pbar.finish()
 
     moviefname = moviemaker.render(os.path.dirname(BAG_FILE))

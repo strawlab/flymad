@@ -76,6 +76,7 @@ if __name__ == "__main__":
 
     wfmf = madplot.FMFMultiTrajectoryPlotter(WIDE_FMF)
     zfmf = madplot.FMFTTLPlotter(ZOOM_FMF)
+    zfmf.enable_color_correction(brightness=20, contrast=1.5)
 
     wts = wfmf.fmf.get_all_timestamps()
     zts = zfmf.fmf.get_all_timestamps()
@@ -111,6 +112,8 @@ if __name__ == "__main__":
                 )
 
                 frames.append(fd)
+
+#                if len(frames) > 50: break
 
             except (IndexError, TypeError):
                 import traceback

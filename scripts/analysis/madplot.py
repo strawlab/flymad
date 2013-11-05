@@ -390,12 +390,17 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
         self.trajs_last_seen = {}
         self.traj_n = 0
 
-        self._traj_color = colors_hsv_circle(10)
+        #ignore the red color (color 0), we use it for target indication
+        self._traj_color = colors_hsv_circle(10)[1:]
 
     def render(self, canv, panel, desc):
         w_framenumber = desc.w_frame.timestamp
         to_kill = []
 
+        #get the targeted fly
+        rowt = desc.get_row('lobj_id','fly_x', 'fly_y')
+
+        #birth and update the trajectory history of all previous flies
         for oid,_row in desc.df.groupby('tobj_id'):
             row = _row.tail(1)
             t_framenumber = row['t_framenumber'].values[0]
@@ -413,6 +418,7 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
         with canv.set_user_coords_from_panel(panel):
             canv.imshow(img, 0,0, filter='best' )
 
+            #draw all trajectories
             for oid in self.trajs_colors:
 
                 #check for old, dead trajectories
@@ -424,8 +430,18 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
                               self.trajs_y[oid],
                               color_rgba=self.trajs_colors[oid], radius=0.5 )
 
+            #draw the targeted fly (if during this frame interval we targeted
+            #a single fly only)
+            if len(rowt) == 1:
+                canv.scatter( [rowt['fly_x']],
+                              [rowt['fly_y']],
+                              color_rgba=(1,0,0,0.3), radius=10.0 )
+
             canv.text(str(int(desc.w_frame.timestamp)),
                       panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
+
+            canv.text("%.1fs" % (desc.epoch - self.t0),
+                      panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
 
         for oid in to_kill:
             del self.trajs_colors[oid]
@@ -435,6 +451,8 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
 class FMFTrajectoryPlotter(_FMFPlotter):
 
     name = 'w'
+    show_lxly = False
+    show_fxfy = True
 
     def __init__(self, path):
         _FMFPlotter.__init__(self, path)
@@ -453,23 +471,25 @@ class FMFTrajectoryPlotter(_FMFPlotter):
         img = self.get_frame(desc.w_frame)
         with canv.set_user_coords_from_panel(panel):
             canv.imshow(img, 0,0, filter='best' )
-            canv.scatter( [x],
-                          [y],
-                          color_rgba=(0,1,0,0.3), radius=2.0 )
             canv.scatter( self.xhist,
                           self.yhist,
                           color_rgba=(0,1,0,0.3), radius=0.5 )
 
-            if mode == 2:
+            if self.show_fxfy:
+                canv.scatter( [x],
+                              [y],
+                              color_rgba=(1,0,0,0.3), radius=10.0 )
+
+            if self.show_lxly and (mode == 2):
                 canv.scatter( [lx],
                               [ly],
-                              color_rgba=(1,0,0,0.3), radius=2.0 )
+                              color_rgba=(0,0,1,0.3), radius=2.0 )
 
             canv.text(str(int(desc.w_frame.timestamp)),
                       panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
 
-            dt = desc.epoch - self.t0
-            canv.text("%.1fs" % dt,panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
+            canv.text("%.1fs" % (desc.epoch - self.t0),
+                      panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
 
 
 class FMFTTLPlotter(_FMFPlotter):
@@ -483,6 +503,8 @@ class FMFTTLPlotter(_FMFPlotter):
     def render(self, canv, panel, desc):
         row = desc.get_row('head_x','head_y','target_x','target_y')
 
+        mode_s = row_to_target_mode_string(desc.get_row('mode'))
+
         hx,hy = row['head_x'],row['head_y']
         tx,ty = row['target_x'],row['target_y']
 
@@ -494,10 +516,13 @@ class FMFTTLPlotter(_FMFPlotter):
                           color_rgba=(0,1,0,0.3), radius=10.0 )
             canv.scatter( [tx],
                           [ty],
-                          color_rgba=(0,0,1,0.3), radius=5.0 )
+                          color_rgba=(1,0,0,0.3), radius=5.0 )
 
             canv.text(str(int(desc.z_frame.timestamp)),
                       panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
+
+            canv.text(mode_s,
+                      panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
 
 ### keep in sync with refined_utils.py
 def target_dx_dy_from_message(row):
@@ -518,6 +543,14 @@ def target_dx_dy_from_message(row):
         dy = row['target_y'] - ty
 
     return dx, dy
+
+def row_to_target_mode_string(row):
+    if row['mode'] == 1:
+        return "Wide"
+    elif row['mode'] == 2:
+        return "TTM"
+    else:
+        return "Idle"
 
 class TTLPlotter:
 
@@ -548,6 +581,7 @@ class TTLPlotter:
                 ax.set_ylim([-200,200])
                 ax.set_xlim([0,-1.0*self.HIST])
                 ax.axhline(0, color='k')
+                ax.yaxis.set_ticks([-150, -100, -50, 0, 50, 100, 150])
                 benu.utils.set_foregroundcolor(ax, 'white')
                 benu.utils.set_backgroundcolor(ax, 'black')
                 fig.patch.set_facecolor('black')
