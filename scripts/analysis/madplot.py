@@ -378,20 +378,26 @@ class FMFImagePlotter(_FMFPlotter):
         with canv.set_user_coords_from_panel(panel):
             canv.imshow(img, 0,0, filter='best' )
 
-class FMFMultiTrajectoryPlotter(_FMFPlotter):
+class _MultiTrajectoryColorManager:
+    def __init__(self, objids):
+        #ignore the red color (color 0), we use it for target indication
+        n_objids = len(objids)
+        colors = colors_hsv_circle(n_objids+1)[1:]
+
+        self.trajs_colors = {}
+        for oid,col in zip(objids,colors):
+            self.trajs_colors[int(oid)] = col
+
+class FMFMultiTrajectoryPlotter(_FMFPlotter, _MultiTrajectoryColorManager):
 
     name = 'w'
 
-    def __init__(self, path):
+    def __init__(self, path, objids):
         _FMFPlotter.__init__(self, path)
+        _MultiTrajectoryColorManager.__init__(self, objids)
         self.trajs_x = {}
         self.trajs_y = {}
-        self.trajs_colors = {}
         self.trajs_last_seen = {}
-        self.traj_n = 0
-
-        #ignore the red color (color 0), we use it for target indication
-        self._traj_color = colors_hsv_circle(10)[1:]
 
     def render(self, canv, panel, desc):
         w_framenumber = desc.w_frame.timestamp
@@ -407,8 +413,6 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
             if oid not in self.trajs_x:
                 self.trajs_x[oid] = collections.deque(maxlen=100)
                 self.trajs_y[oid] = collections.deque(maxlen=100)
-                self.trajs_colors[oid] = self._traj_color[self.traj_n]
-                self.traj_n += 1
 
             self.trajs_x[oid].append(row['x'])
             self.trajs_y[oid].append(row['y'])
@@ -419,7 +423,7 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
             canv.imshow(img, 0,0, filter='best' )
 
             #draw all trajectories
-            for oid in self.trajs_colors:
+            for oid in self.trajs_x:
 
                 #check for old, dead trajectories
                 if (w_framenumber - self.trajs_last_seen[oid]) > 5:
@@ -428,7 +432,7 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
 
                 canv.scatter( self.trajs_x[oid],
                               self.trajs_y[oid],
-                              color_rgba=self.trajs_colors[oid], radius=0.5 )
+                              color_rgba=self.trajs_colors[int(oid)], radius=0.5 )
 
             #draw the targeted fly (if during this frame interval we targeted
             #a single fly only)
@@ -444,7 +448,6 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
                       panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
 
         for oid in to_kill:
-            del self.trajs_colors[oid]
             del self.trajs_x[oid]
             del self.trajs_y[oid]
 
@@ -500,10 +503,14 @@ class FMFTTLPlotter(_FMFPlotter):
         _FMFPlotter.__init__(self, path)
         self.hx = self.hy = 0
 
+    def get_fly_color(self, oid):
+        return (0,1,0,0.3)
+
     def render(self, canv, panel, desc):
         row = desc.get_row('head_x','head_y','target_x','target_y')
 
-        mode_s = row_to_target_mode_string(desc.get_row('mode'))
+        rowl = desc.get_row('mode','lobj_id')
+        mode_s = row_to_target_mode_string(rowl)
 
         hx,hy = row['head_x'],row['head_y']
         tx,ty = row['target_x'],row['target_y']
@@ -513,7 +520,7 @@ class FMFTTLPlotter(_FMFPlotter):
             canv.imshow(img, 0,0, filter='best' )
             canv.scatter( [hx],
                           [hy],
-                          color_rgba=(0,1,0,0.3), radius=10.0 )
+                          color_rgba=self.get_fly_color(rowl['lobj_id']), radius=10.0 )
             canv.scatter( [tx],
                           [ty],
                           color_rgba=(1,0,0,0.3), radius=5.0 )
@@ -523,6 +530,18 @@ class FMFTTLPlotter(_FMFPlotter):
 
             canv.text(mode_s,
                       panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
+
+class FMFMultiTTLPlotter(FMFTTLPlotter, _MultiTrajectoryColorManager):
+
+    def __init__(self, path, objids):
+        FMFTTLPlotter.__init__(self, path)
+        _MultiTrajectoryColorManager.__init__(self, objids)
+
+    def get_fly_color(self, oid):
+        try:
+            return self.trajs_colors[int(oid)]
+        except (KeyError, ValueError):
+            return (0,0,0,0.3)
 
 ### keep in sync with refined_utils.py
 def target_dx_dy_from_message(row):

@@ -74,8 +74,10 @@ if __name__ == "__main__":
     arena = madplot.Arena()
     df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena, ffill=False)
 
-    wfmf = madplot.FMFMultiTrajectoryPlotter(WIDE_FMF)
-    zfmf = madplot.FMFTTLPlotter(ZOOM_FMF)
+    objids = df['tobj_id'].dropna().unique()
+
+    wfmf = madplot.FMFMultiTrajectoryPlotter(WIDE_FMF, objids)
+    zfmf = madplot.FMFMultiTTLPlotter(ZOOM_FMF, objids)
     zfmf.enable_color_correction(brightness=20, contrast=1.5)
 
     wts = wfmf.fmf.get_all_timestamps()
