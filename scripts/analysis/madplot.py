@@ -393,7 +393,12 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
         self._traj_color = colors_hsv_circle(10)
 
     def render(self, canv, panel, desc):
-        for oid,row in desc.df.groupby('tobj_id'):
+        w_framenumber = desc.w_frame.timestamp
+        to_kill = []
+
+        for oid,_row in desc.df.groupby('tobj_id'):
+            row = _row.tail(1)
+            t_framenumber = row['t_framenumber'].values[0]
             if oid not in self.trajs_x:
                 self.trajs_x[oid] = collections.deque(maxlen=100)
                 self.trajs_y[oid] = collections.deque(maxlen=100)
@@ -402,18 +407,30 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter):
 
             self.trajs_x[oid].append(row['x'])
             self.trajs_y[oid].append(row['y'])
-            self.trajs_last_seen[oid] = row['t_framenumber']
+            self.trajs_last_seen[oid] = t_framenumber
 
         img = self.get_frame(desc.w_frame)
         with canv.set_user_coords_from_panel(panel):
             canv.imshow(img, 0,0, filter='best' )
+
             for oid in self.trajs_colors:
+
+                #check for old, dead trajectories
+                if (w_framenumber - self.trajs_last_seen[oid]) > 5:
+                    to_kill.append(oid)
+                    continue
+
                 canv.scatter( self.trajs_x[oid],
                               self.trajs_y[oid],
                               color_rgba=self.trajs_colors[oid], radius=0.5 )
 
             canv.text(str(int(desc.w_frame.timestamp)),
                       panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
+
+        for oid in to_kill:
+            del self.trajs_colors[oid]
+            del self.trajs_x[oid]
+            del self.trajs_y[oid]
 
 class FMFTrajectoryPlotter(_FMFPlotter):
 
