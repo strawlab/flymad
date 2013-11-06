@@ -385,7 +385,8 @@ class FrameDescriptor:
         if isinstance(self.df, pd.Series):
             return self.df
         elif isinstance(self.df, pd.DataFrame):
-            return self.df.dropna(subset=cols)
+            #return the most recent row always
+            return self.df.dropna(subset=cols).tail(1)
 
 class _FMFPlotter:
 
