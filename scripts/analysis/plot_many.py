@@ -67,6 +67,11 @@ def load_data(path):
 def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
     arena = madplot.Arena(dat)
 
+    if os.path.isdir(path):
+        plotdir = path
+    else:
+        plotdir = os.path.dirname(path)
+
     exps = [e for e in exps if e in dat]
     exps_colors = [plt.cm.gnuplot(i) for i in np.linspace(0, 1.0, len(exps))]
 
@@ -112,6 +117,8 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
 
             latency_to_first_contact[exp].append(madplot.calculate_latency_to_stay(tdf, 20))
 
+        fig.savefig(os.path.join(plotdir,'%s_trajectories.png' % exp))
+
         #need more colors
         fig = plt.figure("%s Time in Area" % exp.title())
         ax = fig.add_subplot(1,1,1)
@@ -125,6 +132,8 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
             ax.plot(offset[:-1], pct[:-1], linestyle='solid', label=lbl)
 
         ax.legend()
+
+        plt.savefig(os.path.join(plotdir,'%s_time.png' % exp))
 
     #check all trials have the same number
     trial_lens = set(map(len, (dat[e] for e in exps)))
@@ -157,6 +166,9 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
         ax.set_xticklabels( [str(i) for i in range(ntrials)] )
         ax.legend()
 
+    figb.savefig(os.path.join(plotdir,'timeinarea.png'))
+    figl.savefig(os.path.join(plotdir,'timeinarea_l.png'))
+
     #plot latency to first 20s in area
     figb = plt.figure("Latency to first 20s contact")
     axb = figb.add_subplot(1,1,1)
@@ -179,6 +191,9 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
         ax.set_ylabel('Latency to first 20s contact')
         ax.set_xticklabels( [str(i) for i in range(ntrials)] )
         ax.legend()
+
+    figb.savefig(os.path.join(plotdir,'latency.png'))
+    figl.savefig(os.path.join(plotdir,'latency_l.png'))
 
 
 if __name__ == "__main__":
