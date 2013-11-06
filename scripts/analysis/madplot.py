@@ -5,6 +5,7 @@ import math
 import collections
 import tempfile
 import shutil
+import itertools
 
 import sh
 import cv2
@@ -24,6 +25,12 @@ import roslib; roslib.load_manifest('rosbag')
 import rosbag
 
 assert benu.__version__ >= "0.1.0"
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return itertools.izip(a, b)
 
 class Arena:
     def __init__(self, jsonconf=dict()):
@@ -99,7 +106,7 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
 
         first = False
 
-def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlenpct=0.10, **kwargs):
+def plot_tracked_trajectory(ax, tdf, limits=None, ds=1, minlenpct=0.10, **kwargs):
     ax.set_aspect('equal')
 
     if limits is not None:
@@ -107,15 +114,47 @@ def plot_tracked_trajectory(ax, df, limits=None, ds=1, minlenpct=0.10, **kwargs)
         ax.set_xlim(*xlim)
         ax.set_ylim(*ylim)
 
-    for name, group in df.groupby('tobj_id'):
-        lenpct = len(group) / float(len(df))
-        if lenpct < minlenpct:
-            print "\tskip: skipping obj_id", name, "len", lenpct
-            continue
+    for experiment,df in tdf.groupby('experiment'):
+        print "\ttraj: EXPERIMENT #",experiment
 
-        print "\ttraj: obj_id", name, "len", lenpct
+        for name, group in df.groupby('tobj_id'):
+            lenpct = len(group) / float(len(df))
+            if lenpct < minlenpct:
+                print "\tskip: traj skipping obj_id", name, "len", lenpct
+                continue
 
-        ax.plot(group['x'].values[::ds],group['y'].values[::ds],**kwargs)
+            print "\ttraj: obj_id", name, "len", lenpct
+
+            ax.plot(group['x'].values[::ds],group['y'].values[::ds],**kwargs)
+
+def merge_bagfiles(bfs, geom_must_interect=True):
+    expn = 0
+    l_df, t_df, h_df, geom = bfs[0]
+    t_df['experiment'] = expn
+
+    if len(bfs) == 1:
+        print "merge not needed"
+        return l_df, t_df, h_df, geom
+
+    for (_l_df, _t_df, _h_df, _geom) in bfs[1:]:
+        expn += 1
+        _t_df['experiment'] = expn
+
+        l_df = l_df.append(_l_df, verify_integrity=True)
+        t_df = t_df.append(_t_df, verify_integrity=True)
+        h_df = h_df.append(_h_df, verify_integrity=True)
+
+        #check this is the same trial
+        oldgp = sg.Polygon(list(zip(*_geom)))
+        newgp = sg.Polygon(list(zip(*geom)))
+        if not oldgp.intersects(newgp):
+            print "warning: geometry does not intersect", oldgp, "vs", newgp
+            if geom_must_interect:
+                raise ValueError("Cool tile geometry does not intersect "\
+                                 "(set json _geom_must_intersect key to "\
+                                 "false to override")
+
+    return l_df, t_df, h_df, geom
 
 def load_bagfile(bagpath, arena, filter_short=100):
     def in_area(row, poly):
@@ -224,80 +263,106 @@ def load_bagfile_single_dataframe(bagpath, arena, ffill, **kwargs):
 
     return pool_df
 
-def calculate_time_in_area(df, maxtime=None, interval=20):
-    pct = []
-    offset = []
+def calculate_total_pct_in_area(tdf, maxtime):
+    pcts = []
 
-    #put the df into 10ms bins
-    #df = tdf.resample('10L')
+    for experiment,df in tdf.groupby('experiment'):
+        print "\ttpct: EXPERIMENT #",experiment
 
-    #maybe pandas has a built in way to do this?
-    t0 = t1 = df.index[0]
-    tend = df.index[-1] if maxtime else (t0 + datetime.timedelta(seconds=maxtime))
-    toffset = 0
+        t00 = df.index[0]
+        tend = min(t00 + datetime.timedelta(seconds=maxtime), df.index[-1])
 
-    while t1 < tend:
-        if maxtime:
-            t1 = t0 + datetime.timedelta(seconds=interval)
-        else:
-            t1 = min(t0 + datetime.timedelta(seconds=interval), tend)
-        
+        npts = df['in_area'].sum()
+        #percentage of time in area
+        total_pct = 100.0 * (npts / float(len(df)))
+
+        pcts.append(total_pct)
+
+    return pcts
+
+def calculate_time_in_area(tdf, maxtime, toffsets):
+    exp_pcts = []
+
+    def _get_time_in_area(_df, _t0, _t1):
+        print "\ttime: group",_t0,":",_t1
+
         #get trajectories of that timespan
-        idf = df[t0:t1]
+        idf = _df[_t0:_t1]
         #number of timepoints in the area
         npts = idf['in_area'].sum()
         #percentage of time in area
-        pct.append( 100.0 * (npts / float(len(idf))) )
+        try:
+            pct = 100.0 * (npts / float(len(idf)))
+        except ZeroDivisionError:
+            #short dataframe - see below
+            pct = 0
+        return pct
 
-        offset.append( toffset )
+    for experiment,df in tdf.groupby('experiment'):
+        print "\ttime: EXPERIMENT #",experiment
+        pcts = []
 
-        t0 = t1
-        toffset += interval
+        #put the df into 10ms bins
+        #df = tdf.resample('10L')
 
-    #-ve offset means calculated over the whole time
-    npts = df['in_area'].sum()
-    #percentage of time in area
-    total_pct = 100.0 * (npts / float(len(df)))
-    offset.append(-1)
-    pct.append(total_pct)
+        #maybe pandas has a built in way to do this?
+        t00 = df.index[0]
+        tend = min(t00 + datetime.timedelta(seconds=maxtime), df.index[-1])
 
-    return offset, pct
+        for offset0,offset1 in pairwise(toffsets):
+            t0 = t00 + datetime.timedelta(seconds=offset0)
+            t1 = t00 + datetime.timedelta(seconds=offset1)
+
+            if t1 > tend:
+                print "WARNING: DATAFRAME SHORTER THAN MAX TIME",maxtime,"ONLY", df.index[-1] - df.index[0],"LONG"
+
+            pcts.append( _get_time_in_area(df,t0,t1) )
+
+        #the last time period
+        pcts.append( _get_time_in_area(df,t1,tend) )
+
+        exp_pcts.append(pcts)
+
+    #rows are experiments, cols are the time bins
+    return np.r_[exp_pcts]
 
 def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.10):
     tts = []
 
-    for name, group in tdf.groupby('tobj_id'):
-        lenpct = len(group) / float(len(tdf))
-        if lenpct < minlenpct:
-            print "\tskip: skipping obj_id", name, "len", lenpct
-            continue
+    for experiment,df in tdf.groupby('experiment'):
+        print "\tltcy: EXPERIMENT #",experiment
+        for name, group in df.groupby('tobj_id'):
+            lenpct = len(group) / float(len(df))
+            if lenpct < minlenpct:
+                print "\tskip: ltcy skipping obj_id", name, "len", lenpct
+                continue
 
-        t0 = group.head(1)
-        if t0['in_area']:
-            print "\tskip: skipping obj_id", name, "already in area"
-            continue
+            t0 = group.head(1)
+            if t0['in_area']:
+                print "\tskip: ltcy skipping obj_id", name, "already in area"
+                continue
 
-        print "\tltcy: obj_id", name, "len", lenpct
+            print "\tltcy: obj_id", name, "len", lenpct
 
-        #timestamp of experiment start
-        t00 = t0 = t1 = t0.index[0].asm8.astype(np.int64) / 1e9
+            #timestamp of experiment start
+            t00 = t0 = t1 = t0.index[0].asm8.astype(np.int64) / 1e9
 
-        t_in_area = 0
-        for ix,row in group.iterrows():
+            t_in_area = 0
+            for ix,row in group.iterrows():
 
-            t1 = ix.asm8.astype(np.int64) / 1e9
-            dt = t1 - t0
+                t1 = ix.asm8.astype(np.int64) / 1e9
+                dt = t1 - t0
 
-            if row['in_area']:
-                t_in_area += dt
-                if t_in_area > holdtime:
-                    break
+                if row['in_area']:
+                    t_in_area += dt
+                    if t_in_area > holdtime:
+                        break
 
-            t0 = t1
+                t0 = t1
 
-        #did the fly finish inside, and start outside
-        if row['in_area'] and (t_in_area > holdtime):
-            tts.append( t1 - t00 )
+            #did the fly finish inside, and start outside
+            if row['in_area'] and (t_in_area > holdtime):
+                tts.append( t1 - t00 )
 
     return tts
 

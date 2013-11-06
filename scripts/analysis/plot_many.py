@@ -19,14 +19,16 @@ def prepare_data(path):
     if os.path.isdir(path):
         path = path + "/"
         dat = {"coupled":[]}
-        for b in sorted(glob.glob(os.path.join(path,"*.bag"))):
-            dat["coupled"].append({"bag":os.path.basename(b)})
+        for trialn,b in enumerate(sorted(glob.glob(os.path.join(path,"*.bag")))):
+            dat["coupled"].append({"bag":os.path.basename(b),
+                                   "label":"trial %d" % trialn}
+            )
         with open(os.path.join(path,"example.json"), "w") as f:
             json.dump(dat, f)
-        fname = "example.pkl"
+        fname = "example"
     else:
         dat = json.load(open(path))
-        fname = os.path.basename(path)
+        fname = os.path.splitext(os.path.basename(path))[0]
 
     arena = madplot.Arena(dat)
 
@@ -36,12 +38,19 @@ def prepare_data(path):
     for k in dat:
         if k.startswith("_"):
             continue
-        for bag in dat[k]:
-            bname = bag["bag"]
-            bpath = madplot.get_path(path, dat, bname)
-            jobs[bname] = pool.apply_async(
-                                madplot.load_bagfile,
-                                (bpath, arena))
+        for trialn,trials in enumerate(dat[k]):
+            bags = trials["bag"]
+            if not isinstance(bags,list):
+                bags = [bags]
+            else:
+                if not "label" in trials:
+                    print "WARNING: Trial missing label"
+
+            for bname in bags:
+                bpath = madplot.get_path(path, dat, bname)
+                jobs[bname] = pool.apply_async(
+                                    madplot.load_bagfile,
+                                    (bpath, arena))
 
     pool.close()
     pool.join()
@@ -49,11 +58,20 @@ def prepare_data(path):
     for k in dat:
         if k.startswith("_"):
             continue
-        for bag in dat[k]:
-            bname = bag["bag"]
-            bag["data"] = jobs[bname].get()
+        for trialn,trials in enumerate(dat[k]):
+            bags = trials["bag"]
+            if not isinstance(bags,list):
+                bags = [bags]
 
-    with open(madplot.get_path(path, dat, fname), 'wb') as f:
+            data = []
+            for bname in bags:
+                print "merge", bname, "to trial", trialn
+                data.append( jobs[bname].get() )
+            trials["data"] = madplot.merge_bagfiles(
+                                        data,
+                                        dat.get('_geom_must_intersect', True))
+
+    with open(madplot.get_path(path, dat, fname+".pkl"), 'wb') as f:
         cPickle.dump(dat, f, -1)
 
     return dat
@@ -64,7 +82,7 @@ def load_data(path):
     with open(madplot.get_path(path, dat, fname+".pkl"), 'rb') as f:
         return cPickle.load(f)
 
-def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
+def plot_data(path, dat):
     arena = madplot.Arena(dat)
 
     if os.path.isdir(path):
@@ -72,12 +90,17 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
     else:
         plotdir = os.path.dirname(path)
 
-    exps = [e for e in exps if e in dat]
+    plot_exps = data.get('_plot', ['coupled'])
+
+    exps = [e for e in plot_exps if e in dat]
     exps_colors = [plt.cm.gnuplot(i) for i in np.linspace(0, 1.0, len(exps))]
 
+    pct_in_area_total = {k:[] for k in exps}
     pct_in_area_per_time = {k:[] for k in exps}
     pct_in_area_per_time_lbls = {k:[] for k in exps}
     latency_to_first_contact = {k:[] for k in exps}
+
+    pct_in_area_per_time_bins = range(0,300,30)
 
     for exp in exps:
         ordered_trials = dat[exp]
@@ -94,10 +117,10 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
         fig = plt.figure("%s Trajectories" % exp.title(), figsize=(16,8))
 
         for i,trial in enumerate(ordered_trials):
-            label = trial.get('label',os.path.basename(trial['bag']))
+            label = trial['label']
             ldf, tdf, hdf, geom = trial['data']
 
-            print exp.title(), "Trial %d" % i, label
+            print exp.title(), label
 
             ax = fig.add_subplot(gs[i])
             madplot.plot_tracked_trajectory(ax, tdf,
@@ -113,9 +136,16 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
             ax.yaxis.set_visible(False)
 
             pct_in_area_per_time_lbls[exp].append( label )
-            pct_in_area_per_time[exp].append ( madplot.calculate_time_in_area(tdf, 300, interval=30) )
 
-            latency_to_first_contact[exp].append(madplot.calculate_latency_to_stay(tdf, 20))
+            pct_in_area_per_time[exp].append(
+                        madplot.calculate_time_in_area(tdf, 300,
+                                                       pct_in_area_per_time_bins))
+
+            pct_in_area_total[exp].append(
+                        madplot.calculate_total_pct_in_area(tdf, 300))
+
+            latency_to_first_contact[exp].append(
+                        madplot.calculate_latency_to_stay(tdf, 20))
 
         fig.savefig(os.path.join(plotdir,'%s_trajectories.png' % exp))
 
@@ -126,10 +156,10 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
         colormap = plt.cm.gnuplot
         ax.set_color_cycle(madplot.colors_hsv_circle(len(ordered_trials)))
 
-        for lbl,data in zip(pct_in_area_per_time_lbls[exp], pct_in_area_per_time[exp]):
-            offset,pct = data
-            #the last point is the total pct, use that later
-            ax.plot(offset[:-1], pct[:-1], linestyle='solid', label=lbl)
+        for lbl,pct in zip(pct_in_area_per_time_lbls[exp], pct_in_area_per_time[exp]):
+            mean = pct.mean(axis=0)
+            std = pct.mean(axis=0)
+            ax.plot(pct_in_area_per_time_bins, mean, linestyle='solid', label=lbl)
 
         ax.legend()
 
@@ -151,13 +181,14 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
     axl = figl.add_subplot(1,1,1)
 
     for i,exp in enumerate(exps):
-        pcts = []
-        for offset,pct in pct_in_area_per_time[exp]:
-            assert offset[-1] == -1
-            pcts.append(pct[-1])
+        means = []
+        stds = []
+        for pct in pct_in_area_total[exp]:
+            means.append( np.mean(pct) )
+            stds.append( np.std(pct) )
 
-        axb.bar(ind+(i*width), pcts, width, label=exp, color=exps_colors[i])
-        axl.plot(ind, pcts, label=exp, color=exps_colors[i])
+        axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
+        axl.errorbar(ind, means, label=exp, color=exps_colors[i], yerr=stds)
 
     axb.set_xticks(ind+width)
     for ax in [axb, axl]:
@@ -176,8 +207,8 @@ def plot_data(path, dat, exps=('coupled','uncoupled','grey')):
     axl = figl.add_subplot(1,1,1)
 
     for i,exp in enumerate(exps):
-        stds = []
         means = []
+        stds = []
         for tts in latency_to_first_contact[exp]:
             means.append(np.mean(tts))
             stds.append(np.std(tts))
