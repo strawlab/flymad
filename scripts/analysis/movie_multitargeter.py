@@ -71,6 +71,10 @@ if __name__ == "__main__":
     ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser/reiser_movie_220131030_173442.fmf'
     BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/reiser/2013-10-30-17-34-49.bag'
 
+#    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/2013-11-05-12-20-23.bag'
+#    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/w_reiser_movie_better20131105_122018.fmf'
+#    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/z_reiser_movie_better20131105_122015.fmf'
+
     arena = madplot.Arena()
     df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena, ffill=False)
 
@@ -80,17 +84,21 @@ if __name__ == "__main__":
     zfmf = madplot.FMFMultiTTLPlotter(ZOOM_FMF, objids)
     zfmf.enable_color_correction(brightness=20, contrast=1.5)
 
+    print 'loading w timestamps'
     wts = wfmf.fmf.get_all_timestamps()
+    print 'loading z timestamps'
     zts = zfmf.fmf.get_all_timestamps()
 
     frames = []    
 
-    for wt0,wt1 in iter_last_and_this(wts):
+    pbar = madplot.get_progress_bar("computing frames", len(wts))
+
+    for i,(wt0,wt1) in enumerate(iter_last_and_this(wts)):
+
+        pbar.update(i)
 
         fdf = get_framedf(df,wt1)
         lfdf = len(fdf)
-
-        print wt1,lfdf
 
         if lfdf:
             try:
@@ -120,7 +128,9 @@ if __name__ == "__main__":
             except (IndexError, TypeError):
                 import traceback
                 traceback.print_exc()
-                print "error preparing frame descriptor for\n",fdf
+                print "frame",i,"error: no frame descriptor generated\n",fdf
+
+    pbar.finish()
 
     if not frames:
         print "no frames to render"
