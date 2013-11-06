@@ -584,12 +584,15 @@ class FMFTTLPlotter(_FMFPlotter):
         img = self.get_frame(desc.z_frame)
         with canv.set_user_coords_from_panel(panel):
             canv.imshow(img, 0,0, filter='best' )
-            canv.scatter( [hx],
-                          [hy],
-                          color_rgba=self.get_fly_color(rowl['lobj_id']), radius=10.0 )
+
             canv.scatter( [tx],
                           [ty],
                           color_rgba=(1,0,0,0.3), radius=5.0 )
+
+            if mode_s != NO_TARGET_STRING:
+                canv.scatter( [hx],
+                              [hy],
+                              color_rgba=self.get_fly_color(rowl['lobj_id']), radius=10.0 )
 
             canv.text(str(int(desc.z_frame.timestamp)),
                       panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
@@ -608,6 +611,7 @@ class FMFMultiTTLPlotter(FMFTTLPlotter, _MultiTrajectoryColorManager):
             return self.trajs_colors[int(oid)]
         except (KeyError, ValueError):
             return (0,0,0,0.3)
+
 
 ### keep in sync with refined_utils.py
 def target_dx_dy_from_message(row):
@@ -629,13 +633,15 @@ def target_dx_dy_from_message(row):
 
     return dx, dy
 
+NO_TARGET_STRING = "Idle"
+
 def row_to_target_mode_string(row):
     if row['mode'] == 1:
         return "Wide"
     elif row['mode'] == 2:
         return "TTM"
     else:
-        return "Idle"
+        return NO_TARGET_STRING
 
 class TTLPlotter:
 
