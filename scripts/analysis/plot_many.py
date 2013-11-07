@@ -82,6 +82,32 @@ def load_data(path):
     with open(madplot.get_path(path, dat, fname+".pkl"), 'rb') as f:
         return cPickle.load(f)
 
+def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, xticklabels, exps_colors, filename, plotdir):
+    figb = plt.figure(title)
+    axb = figb.add_subplot(1,1,1)
+    figl = plt.figure("%s L" % title)
+    axl = figl.add_subplot(1,1,1)
+
+    for i,exp in enumerate(exps):
+        means = []
+        stds = []
+        for v in per_exp_data[exp]:
+            means.append( np.mean(v) )
+            stds.append( np.std(v) )
+
+        axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
+        axl.errorbar(ind, means, label=exp, color=exps_colors[i], yerr=stds)
+
+    axb.set_xticks(ind+width)
+    for ax in [axb, axl]:
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_xticklabels(xticklabels)
+        ax.legend()
+
+    figb.savefig(os.path.join(plotdir,'%s.png' % filename))
+    figl.savefig(os.path.join(plotdir,'%s_l.png' % filename))
+
 def plot_data(path, dat):
     arena = madplot.Arena(dat)
 
@@ -99,6 +125,8 @@ def plot_data(path, dat):
     pct_in_area_per_time = {k:[] for k in exps}
     pct_in_area_per_time_lbls = {k:[] for k in exps}
     latency_to_first_contact = {k:[] for k in exps}
+    velocity_outside_area = {k:[] for k in exps}
+    velocity_inside_area = {k:[] for k in exps}
 
     pct_in_area_per_time_bins = range(0,300,30)
 
@@ -144,8 +172,13 @@ def plot_data(path, dat):
             pct_in_area_total[exp].append(
                         madplot.calculate_total_pct_in_area(tdf, 300))
 
-            latency_to_first_contact[exp].append(
-                        madplot.calculate_latency_to_stay(tdf, 20))
+            tts, vel_out, vel_in = madplot.calculate_latency_and_velocity_to_stay(
+                                                tdf, 20,
+                                                tout_reset_time=1, arena=arena, geom=geom)
+
+            latency_to_first_contact[exp].append(tts)
+            velocity_outside_area[exp].append(vel_out)
+            velocity_inside_area[exp].append(vel_in)
 
         fig.savefig(os.path.join(plotdir,'%s_trajectories.png' % exp))
 
@@ -171,61 +204,35 @@ def plot_data(path, dat):
         raise Exception("experiments contain different numbers of trials")
     ntrials = trial_lens.pop()
 
-    #plot time in area percent
     ind = np.arange(ntrials)  # the x locations for the groups
     width = 0.35              # the width of the bars
+    ticklabels = [str(i) for i in range(ntrials)]
 
-    figb = plt.figure("Time in Area")
-    axb = figb.add_subplot(1,1,1)
-    figl = plt.figure("Time in Area L")
-    axl = figl.add_subplot(1,1,1)
-
-    for i,exp in enumerate(exps):
-        means = []
-        stds = []
-        for pct in pct_in_area_total[exp]:
-            means.append( np.mean(pct) )
-            stds.append( np.std(pct) )
-
-        axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
-        axl.errorbar(ind, means, label=exp, color=exps_colors[i], yerr=stds)
-
-    axb.set_xticks(ind+width)
-    for ax in [axb, axl]:
-        ax.set_xlabel('Trial')
-        ax.set_ylabel('Percentage of time spent in area')
-        ax.set_xticklabels( [str(i) for i in range(ntrials)] )
-        ax.legend()
-
-    figb.savefig(os.path.join(plotdir,'timeinarea.png'))
-    figl.savefig(os.path.join(plotdir,'timeinarea_l.png'))
+    #plot time in area percent
+    _plot_bar_and_line(pct_in_area_total, exps,
+                       'Time in Area', 'Trial', 'Percentage of time spent in area',
+                        ind, width,
+                        ticklabels, exps_colors,
+                        'timeinarea', plotdir)
 
     #plot latency to first 20s in area
-    figb = plt.figure("Latency to first 20s contact")
-    axb = figb.add_subplot(1,1,1)
-    figl = plt.figure("Latency to first 20s contact L")
-    axl = figl.add_subplot(1,1,1)
+    _plot_bar_and_line(latency_to_first_contact, exps,
+                       'Latency to first 20s contact', 'Trial', 'Latency to first 20s contact',
+                        ind, width,
+                        ticklabels, exps_colors,
+                        'latency', plotdir)
 
-    for i,exp in enumerate(exps):
-        means = []
-        stds = []
-        for tts in latency_to_first_contact[exp]:
-            means.append(np.mean(tts))
-            stds.append(np.std(tts))
-
-        axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
-        axl.errorbar(ind, means, label=exp, color=exps_colors[i], yerr=stds)
-
-    axb.set_xticks(ind+width)
-    for ax in [axb, axl]:
-        ax.set_xlabel('Trial')
-        ax.set_ylabel('Latency to first 20s contact')
-        ax.set_xticklabels( [str(i) for i in range(ntrials)] )
-        ax.legend()
-
-    figb.savefig(os.path.join(plotdir,'latency.png'))
-    figl.savefig(os.path.join(plotdir,'latency_l.png'))
-
+    #velocity
+    _plot_bar_and_line(velocity_outside_area, exps,
+                       'Velocity Outside Area', 'Trial', 'Velocity Outside Area',
+                        ind, width,
+                        ticklabels, exps_colors,
+                        'velocity_out', plotdir)
+    _plot_bar_and_line(velocity_inside_area, exps,
+                       'Velocity Inside Area', 'Trial', 'Velocity Inside Area',
+                        ind, width,
+                        ticklabels, exps_colors,
+                        'velocity_in', plotdir)
 
 if __name__ == "__main__":
 
