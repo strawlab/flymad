@@ -326,8 +326,10 @@ def calculate_time_in_area(tdf, maxtime, toffsets):
     #rows are experiments, cols are the time bins
     return np.r_[exp_pcts]
 
-def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.10):
+def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tout_reset_time=1, arena=None, geom=None, debug_plot=False):
     tts = []
+    vel_out = []
+    vel_in = []
 
     for experiment,df in tdf.groupby('experiment'):
         print "\tltcy: EXPERIMENT #",experiment
@@ -345,18 +347,25 @@ def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.10):
             print "\tltcy: obj_id", name, "len", lenpct
 
             #timestamp of experiment start
-            t00 = t0 = t1 = t0.index[0].asm8.astype(np.int64) / 1e9
+            t0ix = t0.index[0]
+            t00 = t0 = t1 = t0ix.asm8.astype(np.int64) / 1e9
 
             t_in_area = 0
+            t_out_area = 0
             for ix,row in group.iterrows():
 
                 t1 = ix.asm8.astype(np.int64) / 1e9
                 dt = t1 - t0
 
                 if row['in_area']:
+                    t_out_area = 0
                     t_in_area += dt
                     if t_in_area > holdtime:
                         break
+                else:
+                    t_out_area += dt
+                    if (t_out_area > tout_reset_time):
+                        t_in_area = 0
 
                 t0 = t1
 
@@ -364,7 +373,40 @@ def calculate_latency_to_stay(tdf, holdtime=20, minlenpct=0.10):
             if row['in_area'] and (t_in_area > holdtime):
                 tts.append( t1 - t00 )
 
-    return tts
+                print "\tltcy: obj_id %s finished inside after %.1f (in for %.1f)" % (name, tts[-1], t_in_area)
+                #the time they first got to the area, more or less beucause there
+                #could is tout_reset_time hysteresis is the most recent index minus
+                #the t_in_area
+                t_first_in_area_ix = ix - datetime.timedelta(seconds=t_in_area)
+                t_last_in_area = ix
+
+                dfo = group[:t_first_in_area_ix]
+                dfi = group[t_first_in_area_ix:t_last_in_area]
+
+                vel_out.append( dfo['v'].mean() )
+                vel_in.append( dfi['v'].mean() )
+
+                if debug_plot:
+
+                    xlim,ylim = arena.get_limits()
+
+                    ax = plt.figure("v %s exp %s" % (name,experiment)).gca()
+                    ax.plot(dfo.index.astype(np.int64)/1e9, dfo['v'].values, 'b')
+                    ax.plot(dfi.index.astype(np.int64)/1e9, dfi['v'].values, 'r')
+
+                    ax = plt.figure("p %s" % name).gca()
+                    ax.plot(dfo['x'],dfo['y'],'b,')
+                    ax.plot(dfi['x'],dfi['y'],'r,')
+                    ax.set_xlim(*xlim)
+                    ax.set_ylim(*ylim)
+
+                    patch = arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2)
+                    ax.add_patch(patch)
+
+            else:
+                print "\tltcy: obj_id %s finished outside" % name
+
+    return tts, vel_out, vel_in
 
 def get_progress_bar(name, maxval):
     widgets = ["%s: " % name, progressbar.Percentage(),
