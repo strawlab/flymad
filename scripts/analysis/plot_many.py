@@ -82,7 +82,7 @@ def load_data(path):
     with open(madplot.get_path(path, dat, fname+".pkl"), 'rb') as f:
         return cPickle.load(f)
 
-def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, xticklabels, exps_colors, filename, plotdir):
+def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, ntrials, xticklabels, exps_colors, filename, plotdir):
     figb = plt.figure(title)
     axb = figb.add_subplot(1,1,1)
     figl = plt.figure("%s L" % title)
@@ -98,12 +98,17 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, xt
         axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
         axl.errorbar(ind, means, label=exp, color=exps_colors[i], yerr=stds)
 
-    axb.set_xticks(ind+width)
     for ax in [axb, axl]:
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
-        ax.set_xticklabels(xticklabels)
         ax.legend()
+
+    axl.set_xlim([0, ntrials-1])
+    axl.set_xticks(range(ntrials))
+    axl.set_xticklabels(xticklabels)
+
+    axb.set_xticks(ind+(len(exps)/2.0 * width))
+    axb.set_xticklabels(xticklabels)
 
     figb.savefig(os.path.join(plotdir,'%s.png' % filename))
     figl.savefig(os.path.join(plotdir,'%s_l.png' % filename))
@@ -155,9 +160,11 @@ def plot_data(path, dat):
                     limits=arena.get_limits()
             )
 
-            patch = arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2)
+            patch = arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.4, zorder=9)
             if patch is not None:
                 ax.add_patch(patch)
+
+            ax.add_patch(arena.get_patch(fill=False, color='k', zorder=10))
 
             ax.set_title(label)
             ax.xaxis.set_visible(False)
@@ -205,32 +212,33 @@ def plot_data(path, dat):
     ntrials = trial_lens.pop()
 
     ind = np.arange(ntrials)  # the x locations for the groups
-    width = 0.35              # the width of the bars
+    width = 1.0 / len(exps)   # no gaps between
+    width -= (0.2 * width)    # 20% gap
     ticklabels = [str(i) for i in range(ntrials)]
 
     #plot time in area percent
     _plot_bar_and_line(pct_in_area_total, exps,
                        'Time in Area', 'Trial', 'Percentage of time spent in area',
-                        ind, width,
+                        ind, width, ntrials,
                         ticklabels, exps_colors,
                         'timeinarea', plotdir)
 
     #plot latency to first 20s in area
     _plot_bar_and_line(latency_to_first_contact, exps,
                        'Latency to first 20s contact', 'Trial', 'Latency to first 20s contact',
-                        ind, width,
+                        ind, width, ntrials,
                         ticklabels, exps_colors,
                         'latency', plotdir)
 
     #velocity
     _plot_bar_and_line(velocity_outside_area, exps,
                        'Velocity Outside Area', 'Trial', 'Velocity Outside Area',
-                        ind, width,
+                        ind, width, ntrials,
                         ticklabels, exps_colors,
                         'velocity_out', plotdir)
     _plot_bar_and_line(velocity_inside_area, exps,
                        'Velocity Inside Area', 'Trial', 'Velocity Inside Area',
-                        ind, width,
+                        ind, width, ntrials,
                         ticklabels, exps_colors,
                         'velocity_in', plotdir)
 
