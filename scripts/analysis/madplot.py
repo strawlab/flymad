@@ -243,6 +243,8 @@ def load_bagfile(bagpath, arena, filter_short=100):
         l_df = l_df[~l_df['lobj_id'].isin(short_tracks)]
         t_df = t_df[~t_df['tobj_id'].isin(short_tracks)]
 
+    t_df['experiment'] = 0
+
     return l_df, t_df, h_df, geom
 
 def load_bagfile_single_dataframe(bagpath, arena, ffill, **kwargs):
