@@ -118,13 +118,28 @@ def plot_data(path, dat):
 
     if os.path.isdir(path):
         plotdir = path
+        conf = dat
     else:
+        if path.endswith('.json'):
+            conf = json.load(open(path))
+        else:
+            conf = dat
         plotdir = os.path.dirname(path)
 
-    plot_exps = data.get('_plot', ['coupled'])
+    plot_exps = conf.get('_plot', ['coupled'])
 
     exps = [e for e in plot_exps if e in dat]
     exps_colors = [plt.cm.gnuplot(i) for i in np.linspace(0, 1.0, len(exps))]
+
+    if '_ntrials' in conf:
+        ntrials = conf['_ntrials']
+    else:
+        #check all trials have the same number
+        trial_lens = set(map(len, (dat[e] for e in exps)))
+        if len(trial_lens) != 1:
+            raise Exception("experiments contain different numbers of trials")
+
+        ntrials = trial_lens.pop()
 
     pct_in_area_total = {k:[] for k in exps}
     pct_in_area_per_time = {k:[] for k in exps}
@@ -136,7 +151,7 @@ def plot_data(path, dat):
     pct_in_area_per_time_bins = range(0,300,30)
 
     for exp in exps:
-        ordered_trials = dat[exp]
+        ordered_trials = dat[exp][0:ntrials]
 
         if len(ordered_trials) <= 8:
             gs = gridspec.GridSpec(2, 4)
@@ -204,12 +219,6 @@ def plot_data(path, dat):
         ax.legend()
 
         plt.savefig(os.path.join(plotdir,'%s_time.png' % exp))
-
-    #check all trials have the same number
-    trial_lens = set(map(len, (dat[e] for e in exps)))
-    if len(trial_lens) != 1:
-        raise Exception("experiments contain different numbers of trials")
-    ntrials = trial_lens.pop()
 
     ind = np.arange(ntrials)  # the x locations for the groups
     width = 1.0 / len(exps)   # no gaps between
