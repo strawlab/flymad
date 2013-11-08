@@ -540,11 +540,11 @@ class ArenaPlotter:
                       color_rgba=(1.,1.,1.,1.))
 
             canv.text(str(int(row['t_framenumber'])),
-                      15,40,
+                      15,50,
                       color_rgba=(1.,1.,1.,1.))
 
             canv.text("%.1fs" % (desc.epoch - self.t0),
-                      15,55,
+                      15,75,
                       color_rgba=(1.,1.,1.,1.))
 
 
