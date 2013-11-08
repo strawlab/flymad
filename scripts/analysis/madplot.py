@@ -534,10 +534,12 @@ class ArenaPlotter:
                               radius=1 )
 
             canv.text("%.1fs" % (desc.epoch - self.t0),
-                      10,self.h-25, color_rgba=(0.5,0.5,0.5,1.0))
+                      10,self.h-30,
+                      color_rgba=(1.,1.,1.,1.))
 
             canv.text(str(int(row['t_framenumber'])),
-                      10,self.h-10, color_rgba=(0.5,0.5,0.5,1.0))
+                      10,self.h-12,
+                      color_rgba=(1.,1.,1.,1.)t)
 
 class FMFImagePlotter(_FMFPlotter):
 
