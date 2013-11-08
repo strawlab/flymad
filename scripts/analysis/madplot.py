@@ -40,6 +40,16 @@ class Arena:
         self._x, self._y, self._r = x,y,r
         self._circ = sg.Point(x,y).buffer(r)
 
+    @property
+    def cx(self):
+        return self._x
+    @property
+    def cy(self):
+        return self._y
+    @property
+    def r(self):
+        return self._r
+
     def get_intersect_polygon(self, geom):
         if geom:
             poly = sg.Polygon(list(zip(*geom)))
