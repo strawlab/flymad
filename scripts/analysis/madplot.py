@@ -257,14 +257,15 @@ def load_bagfile(bagpath, arena, filter_short=100):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile_single_dataframe(bagpath, arena, ffill, **kwargs):
+def load_bagfile_single_dataframe(bagpath, arena, ffill, warn=False, **kwargs):
     l_df, t_df, h_df, geom = load_bagfile(bagpath, arena, **kwargs)
 
     #merge the dataframes
-    #check we have about the same amount of data
-    size_similarity = min(len(t_df),len(l_df),len(h_df)) / float(max(len(t_df),len(l_df),len(h_df)))
-    if size_similarity < 0.9:
-        print "WARNING: ONLY %.1f%% TARGETED MESSAGES FOR ALL TRACKED MESSAGES" % (size_similarity*100)
+    if warn:
+        #check we have about the same amount of data
+        size_similarity = min(len(t_df),len(l_df),len(h_df)) / float(max(len(t_df),len(l_df),len(h_df)))
+        if size_similarity < 0.9:
+            print "WARNING: ONLY %.1f%% TARGETED MESSAGES FOR ALL TRACKED MESSAGES" % (size_similarity*100)
 
     pool_df = pd.concat([t_df, l_df, h_df], axis=1)
     if ffill is True:
