@@ -9,6 +9,7 @@ import itertools
 
 import sh
 import cv2
+import pytz
 import numpy as np
 import pandas as pd
 import shapely.geometry as sg
@@ -494,11 +495,12 @@ class ArenaPlotter:
 
     t0 = 0
 
-    def __init__(self, w, h, arena, bgcolor=(0.0,0.0,0.0,1)):
+    def __init__(self, w, h, arena, bgcolor=(0.0,0.0,0.0,1), tzname='CET'):
         self.w = w
         self.h = h
         self.arena = arena
         self.bgcolor = bgcolor
+        self.tz = pytz.timezone( tzname )
 
     def get_benu_panel(self, device_x0, device_x1, device_y0, device_y1):
         return dict(
@@ -533,13 +535,18 @@ class ArenaPlotter:
                               color_rgba=(1,0,0,1),
                               radius=1 )
 
-            canv.text("%.1fs" % (desc.epoch - self.t0),
-                      10,self.h-30,
+            canv.text(str(datetime.datetime.fromtimestamp(desc.epoch, self.tz)),
+                      15,25,
                       color_rgba=(1.,1.,1.,1.))
 
             canv.text(str(int(row['t_framenumber'])),
-                      10,self.h-12,
-                      color_rgba=(1.,1.,1.,1.)t)
+                      15,40,
+                      color_rgba=(1.,1.,1.,1.))
+
+            canv.text("%.1fs" % (desc.epoch - self.t0),
+                      15,55,
+                      color_rgba=(1.,1.,1.,1.))
+
 
 class FMFImagePlotter(_FMFPlotter):
 
