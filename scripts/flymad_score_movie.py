@@ -45,32 +45,54 @@ class OCRThread(threading.Thread):
     T_CROP = (85, 0, 245 , 35)
     T_RE = r"([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
 
-    def __init__(self, callback, key, tid, force_date):
+    F_CROP = (0, 35, 150, 55)
+    F_RE = r"([0-9]+)"
+
+    MODE_NORMAL = 'normal'
+    MODE_FORCE_DATE = 'force date'
+    MODE_FRAMENUMBER = 'framenumber'
+
+    CROPS = {MODE_NORMAL:DT_CROP,
+             MODE_FORCE_DATE:T_CROP,
+             MODE_FRAMENUMBER:F_CROP}
+    RES = {MODE_NORMAL:DT_RE,
+           MODE_FORCE_DATE:T_RE,
+           MODE_FRAMENUMBER:F_RE}
+
+    def __init__(self, callback, key, tid, mode, force_date):
         threading.Thread.__init__(self)
         self._cb = callback
         self._key = key
         self._tid = tid
         self._tdir = tempfile.mkdtemp(prefix='img')
+        self._mode = mode
 
         self._force_date = force_date
-        self._crop = self.T_CROP if self._force_date else self.DT_CROP
-        self._re = re.compile(self.T_RE if self._force_date else self.DT_RE)
+        self._crop = self.CROPS[mode]
+        self._re = re.compile(self.RES[mode])
 
     def input_image(self, fn="in.png"):
         return os.path.join(self._tdir, fn)
 
     def run_regex(self, stdout):
-        if self._force_date:
+
+        t = None
+        if self._mode == self.MODE_NORMAL:
+            y,_,m,_,d,H,_,M,_,S,_,ms = self._re.match(stdout).groups()
+        elif self._mode == self.MODE_FORCE_DATE:
             y,m,d = self._force_date
             H,_,M,_,S,_,ms = self._re.match(stdout).groups()
+        elif self._mode == self.MODE_FRAMENUMBER:
+            t, = self._re.match(stdout).groups()
         else:
-            y,_,m,_,d,H,_,M,_,S,_,ms = self._re.match(stdout).groups()
+            raise Exception("Unknown Mode")
 
-        t = datetime.datetime(
-                int(y),int(m),int(d),
-                int(H),int(M),int(S),
-                int(float("0."+ms)*1e6), #us
-        )
+        if t is None:
+            t = datetime.datetime(
+                    int(y),int(m),int(d),
+                    int(H),int(M),int(S),
+                    int(float("0."+ms)*1e6), #us
+            )
 
         return t
 
@@ -102,8 +124,11 @@ class OCRThread(threading.Thread):
                 #remove spaces
                 stdout = stdout.replace(' ','')
                 dt = self.run_regex(stdout)
-                #convert to seconds since epoch in UTC
-                now = time.mktime(dt.timetuple())+1e-6*dt.microsecond
+                if self._mode == self.MODE_FRAMENUMBER:
+                    now = int(dt)
+                else:
+                    #convert to seconds since epoch in UTC
+                    now = time.mktime(dt.timetuple())+1e-6*dt.microsecond
                 print stdout.replace('\n','')," = ",dt, now
             except Exception, e:
                 err = 'error parsing string %s' % stdout
@@ -205,7 +230,7 @@ class VideoScorer(Gtk.Window):
     }
 
 
-    def __init__(self, force_date):
+    def __init__(self, mode, force_date):
         Gtk.Window.__init__(self)
         self.vlc = DecoratedVLCWidget()
         self.connect("key-press-event",self._on_key_press)
@@ -221,6 +246,8 @@ class VideoScorer(Gtk.Window):
 
         self._pending_lock = threading.Lock()
         self._pending_ocr = {}
+
+        self._mode = mode
 
         if force_date:
             self._force_date = map(int,args.force_date.split('/'))
@@ -241,25 +268,36 @@ class VideoScorer(Gtk.Window):
         self.vlc.show_result("merging bag file, please wait")
         while Gtk.events_pending():
             Gtk.main_iteration()
-        bdf = bagconv.create_df(bname)
 
         cols = set(self.KEYS.values())
 
         dfd = {k:[] for k in cols}
+        if self._mode == OCRThread.MODE_FRAMENUMBER:
+            dfd["framenumber"] = []
+
         idx = []
         for t in sorted(self._annots):
             idx.append(t)
             key = self._annots[t]
             thiscol = self.KEYS[key]
+
             for col in cols:
                 dfd[col].append( key if thiscol == col else np.nan )
+
+            if self._mode == OCRThread.MODE_FRAMENUMBER:
+                dfd["framenumber"].append(t)
 
         df = pd.DataFrame(
                 dfd,
                 index=(np.array(idx)*bagconv.SECOND_TO_NANOSEC).astype(np.int64)
         )
 
-        final = pd.concat((df,bdf),axis=1)
+        if self.bname:
+            bdf = bagconv.create_df(self.bname)
+            final = pd.concat((df,bdf),axis=1)
+        else:
+            final = df
+
 #        print "annot index", df.index,
 #        print " unique ",df.index.is_unique
 #        print "bag index", bdf.index,
@@ -268,7 +306,13 @@ class VideoScorer(Gtk.Window):
 #        print "dfd", dfd
 #        print "idx", idx
 
-        final.fillna(method='pad').to_csv(self.fname+".csv")
+        filled = final.fillna(method='pad')
+
+        fname = self.fname+".csv"
+        filled.to_csv(fname)
+        filled.to_pickle(self.fname+".df")
+
+        print "wrote", fname
 
         if self._failures:
             dlg = Gtk.MessageDialog(self, 0, Gtk.MessageType.QUESTION,
@@ -315,7 +359,7 @@ class VideoScorer(Gtk.Window):
 
         if key in self.KEYS:
             for i in range(self.THREAD_REPEAT):
-                t = OCRThread(self._on_processing_finished, key, tid, self._force_date)
+                t = OCRThread(self._on_processing_finished, key, tid, self._mode, self._force_date)
                 self.vlc.player.video_take_snapshot(0,t.input_image(),0,0)
                 t.start()
             return True
@@ -323,44 +367,65 @@ class VideoScorer(Gtk.Window):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('directory', metavar='/moviedir', nargs=1)
+    parser.add_argument('directory', metavar='movie_or_directory_of_movies', nargs=1)
     parser.add_argument('--force-date', metavar='YYYY/MM/DD',
                 help='force the date of the events, only extract the time '\
                      'from the video')
+    parser.add_argument('--framenumber', action='store_true',
+                help='extract the framenumber from the video instead')
+    parser.add_argument('--no-merge-bags', action='store_true',
+                help='dont attempt to merge with bag files')
 
     args = parser.parse_args()
+
+    mode = OCRThread.MODE_NORMAL
 
     if args.force_date:
         try:
             y,m,d = map(int,args.force_date.split('/'))
+            mode = OCRThread.MODE_FORCE_DATE
         except:
             parser.error("could not parse date string: %s" % args.force_date)
+    elif args.framenumber:
+        mode = OCRThread.MODE_FRAMENUMBER
 
     BAG_DATE_FMT = "rosbagOut_%Y-%m-%d-%H-%M-%S.bag"
     MP4_DATE_FMT = "%Y%m%d_%H%M%S.mp4"
 
     directory = args.directory[0]
-    inputmp4s = glob.glob(directory + "/*.mp4")
-    inputbags = glob.glob(directory + "/*.bag")
+
+    if os.path.isdir(directory):
+        inputmp4s = glob.glob(directory + "/*.mp4")
+        inputbags = glob.glob(directory + "/*.bag")
+    elif os.path.isfile(directory):
+        p = VideoScorer(mode, args.force_date)
+        p.main(directory, "")
+        sys.exit(0)
+    else:
+        sys.exit(1)
 
     for mp4 in inputmp4s:
         fname = mp4
-		
-        mp4fn = os.path.basename(mp4)
-        genotype,datestr = mp4fn.split("_",1)
-        mp4time = time.strptime(datestr, MP4_DATE_FMT)
-        for bag in inputbags:
-        	if  mp4time == time.strptime(os.path.basename(bag), BAG_DATE_FMT):
-        	    bname = bag
-        	else:
-        		continue
 
-        assert os.path.exists(bname)
+        if args.no_merge_bags:
+            bname = None
+        else:
+            mp4fn = os.path.basename(mp4)
+            genotype,datestr = mp4fn.split("_",1)
+            mp4time = time.strptime(datestr, MP4_DATE_FMT)
+            for bag in inputbags:
+                if  mp4time == time.strptime(os.path.basename(bag), BAG_DATE_FMT):
+                    bname = bag
+                else:
+                    continue
+            assert os.path.exists(bname)
+
         assert os.path.exists(fname)
 
         if not os.path.isfile(fname):
             print "movie file must exist. give input dir, not dir/"
             sys.exit(2)
 
-        p = VideoScorer(args.force_date)
+        p = VideoScorer(mode, args.force_date)
         p.main(fname, bname)
+
