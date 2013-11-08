@@ -487,6 +487,9 @@ class _FMFPlotter:
             device_y1 = device_y1,
         )
 
+    def imshow(self, canv, frame):
+        canv.imshow(self.get_frame(frame), 0,0, filter='best')
+
 class FMFImagePlotter(_FMFPlotter):
 
     def __init__(self, path, framename):
@@ -495,9 +498,8 @@ class FMFImagePlotter(_FMFPlotter):
         self._framename = framename
 
     def render(self, canv, panel, desc):
-        img = self.get_frame(getattr(desc,self._framename))
         with canv.set_user_coords_from_panel(panel):
-            canv.imshow(img, 0,0, filter='best' )
+            self.imshow(canv, getattr(desc,self._framename))
 
 class _MultiTrajectoryColorManager:
     def __init__(self, objids):
@@ -539,9 +541,8 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter, _MultiTrajectoryColorManager):
             self.trajs_y[oid].append(row['y'])
             self.trajs_last_seen[oid] = t_framenumber
 
-        img = self.get_frame(desc.w_frame)
         with canv.set_user_coords_from_panel(panel):
-            canv.imshow(img, 0,0, filter='best' )
+            self.imshow(canv, desc.w_frame)
 
             #draw all trajectories
             for oid in self.trajs_x:
@@ -592,9 +593,9 @@ class FMFTrajectoryPlotter(_FMFPlotter):
         self.xhist.append(x)
         self.yhist.append(y)
 
-        img = self.get_frame(desc.w_frame)
         with canv.set_user_coords_from_panel(panel):
-            canv.imshow(img, 0,0, filter='best' )
+            self.imshow(canv, desc.w_frame)
+
             canv.scatter( self.xhist,
                           self.yhist,
                           color_rgba=(0,1,0,0.3), radius=0.5 )
@@ -636,9 +637,8 @@ class FMFTTLPlotter(_FMFPlotter):
         hx,hy = row['head_x'],row['head_y']
         tx,ty = row['target_x'],row['target_y']
 
-        img = self.get_frame(desc.z_frame)
         with canv.set_user_coords_from_panel(panel):
-            canv.imshow(img, 0,0, filter='best' )
+            self.imshow(canv, desc.z_frame)
 
             canv.scatter( [tx],
                           [ty],
