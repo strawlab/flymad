@@ -17,6 +17,7 @@ import datetime
 import glob
 import zipfile
 import argparse
+import collections
 
 import numpy as np
 import pandas as pd
@@ -242,7 +243,7 @@ class VideoScorer(Gtk.Window):
         self._failures = {}
 
         #annots[time] = value
-        self._annots = {}
+        self._annots = collections.OrderedDict()
 
         self._pending_lock = threading.Lock()
         self._pending_ocr = {}
@@ -363,6 +364,14 @@ class VideoScorer(Gtk.Window):
                 self.vlc.player.video_take_snapshot(0,t.input_image(),0,0)
                 t.start()
             return True
+        elif key  == 'Delete':
+            try:
+                key, val = self._annots.popitem()
+                self.vlc.show_result("deleted annotation %s = '%s' (%d remain)" % (key,val,len(self._annots)))
+            except KeyError:
+                pass #empty
+            return True
+
         return False
 
 if __name__ == '__main__':
