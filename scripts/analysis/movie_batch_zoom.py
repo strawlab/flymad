@@ -22,7 +22,7 @@ import rosbag
 
 import madplot
 
-USE_MULTIPROCESSING = False
+USE_MULTIPROCESSING = True
 
 Pair = collections.namedtuple('Pair', 'fmf bag')
 
@@ -192,9 +192,5 @@ if __name__ == "__main__":
     else:
         for match in matching:
             doit_using_framenumber(match)
-            break
-
-
-
 
 
