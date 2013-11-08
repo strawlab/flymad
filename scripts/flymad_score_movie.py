@@ -255,10 +255,12 @@ class VideoScorer(Gtk.Window):
         else:
             self._force_date = tuple()
 
-    def main(self, fname, bagname):
+    def main(self, fname, bagname, set_title):
         self.fname = fname
         self.bname = bagname
         self.vlc.player.set_media(instance.media_new(fname))
+        if set_title:
+            self.set_title(os.path.basename(fname))
         self.show_all()
         Gtk.main()
 
@@ -384,6 +386,9 @@ if __name__ == '__main__':
                 help='extract the framenumber from the video instead')
     parser.add_argument('--no-merge-bags', action='store_true',
                 help='dont attempt to merge with bag files')
+    parser.add_argument('--set-title', action='store_true',
+                help='set the window title to the current movie '\
+                     'warning: this might bias your scoring')
 
     args = parser.parse_args()
 
@@ -408,7 +413,7 @@ if __name__ == '__main__':
         inputbags = glob.glob(directory + "/*.bag")
     elif os.path.isfile(directory):
         p = VideoScorer(mode, args.force_date)
-        p.main(directory, "")
+        p.main(directory, "", args.set_title)
         sys.exit(0)
     else:
         sys.exit(1)
@@ -436,5 +441,5 @@ if __name__ == '__main__':
             sys.exit(2)
 
         p = VideoScorer(mode, args.force_date)
-        p.main(fname, bname)
+        p.main(fname, bname, args.set_title)
 
