@@ -178,3 +178,6 @@ if __name__ == "__main__":
     moviefname = moviemaker.render(os.path.dirname(BAG_FILE))
     print "wrote", moviefname
 
+    moviemaker.cleanup()
+
+
