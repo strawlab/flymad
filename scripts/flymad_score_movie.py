@@ -313,7 +313,6 @@ class VideoScorer(Gtk.Window):
 
         fname = self.fname+".csv"
         filled.to_csv(fname)
-        filled.to_pickle(self.fname+".df")
 
         print "wrote", fname
 
@@ -343,8 +342,11 @@ class VideoScorer(Gtk.Window):
                 annot = self.KEYS[key]
                 if not np.isnan(t):
                     self._annots[t] = key
-                    dt = datetime.datetime.fromtimestamp(t)
-                    GObject.idle_add(self.vlc.show_result, "%s = '%s'" % (dt,key))
+                    if self._mode == OCRThread.MODE_FRAMENUMBER:
+                        res = t
+                    else:
+                        res = datetime.datetime.fromtimestamp(t)
+                    GObject.idle_add(self.vlc.show_result, "%s = '%s'" % (res,key))
                 else:
                     GObject.idle_add(self.vlc.show_result, "failed to scored '%s' (no time calculated)" % key)
 
