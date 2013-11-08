@@ -490,6 +490,55 @@ class _FMFPlotter:
     def imshow(self, canv, frame):
         canv.imshow(self.get_frame(frame), 0,0, filter='best')
 
+class ArenaPlotter:
+
+    t0 = 0
+
+    def __init__(self, w, h, arena, bgcolor=(0.0,0.0,0.0,1)):
+        self.w = w
+        self.h = h
+        self.arena = arena
+        self.bgcolor = bgcolor
+
+    def get_benu_panel(self, device_x0, device_x1, device_y0, device_y1):
+        return dict(
+            width = self.w,
+            height = self.h,
+            device_x0 = device_x0,
+            device_x1 = device_x1,
+            device_y0 = device_y0,
+            device_y1 = device_y1,
+        )
+
+    def render(self, canv, panel, desc):
+        with canv.set_user_coords_from_panel(panel):
+            canv.poly([0,0,self.w,self.w,0],
+                      [0,self.h,self.h,0,0],
+                      color_rgba=self.bgcolor)
+
+            canv.scatter( [self.arena.cx],
+                          [self.arena.cy],
+                          radius=self.arena.r )
+
+            row = desc.get_row()
+
+            canv.scatter( [row['x']],
+                          [row['y']],
+                          color_rgba=(0,1,0,1),
+                          radius=2 )
+
+            if row['laser_power']:
+                canv.scatter( [row['laser_x']],
+                              [row['laser_y']],
+                              color_rgba=(1,0,0,1),
+                              radius=1 )
+
+            canv.text("%.1fs" % (desc.epoch - self.t0),
+                      10,self.h-25, color_rgba=(0.5,0.5,0.5,1.0))
+
+            canv.text(str(int(row['t_framenumber'])),
+                      10,self.h-10, color_rgba=(0.5,0.5,0.5,1.0))
+
 class FMFImagePlotter(_FMFPlotter):
 
     def __init__(self, path, framename):
