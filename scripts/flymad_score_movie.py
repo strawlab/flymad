@@ -391,6 +391,8 @@ if __name__ == '__main__':
     parser.add_argument('--set-title', action='store_true',
                 help='set the window title to the current movie '\
                      'warning: this might bias your scoring')
+    parser.add_argument('--skip-existing', action='store_true',
+                help='do not re-score mp4s that have already been scored')
 
     args = parser.parse_args()
 
@@ -422,6 +424,10 @@ if __name__ == '__main__':
 
     for mp4 in inputmp4s:
         fname = mp4
+
+        if args.skip_existing and os.path.exists(fname+'.csv'):
+            print "skipping", fname
+            continue
 
         if args.no_merge_bags:
             bname = None
