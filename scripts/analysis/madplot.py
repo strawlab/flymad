@@ -550,6 +550,11 @@ class ArenaPlotter:
                       color_rgba=(1.,1.,1.,1.),
                       font_face="Ubuntu", bold=False, font_size=14)
 
+            canv.text("%.1f px/s" % row['v'],
+                      15,panel["height"]-15,
+                      color_rgba=(1.,1.,1.,1.),
+                      font_face="Ubuntu", bold=False, font_size=14)
+
 
 class FMFImagePlotter(_FMFPlotter):
 
