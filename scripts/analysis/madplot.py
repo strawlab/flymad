@@ -537,15 +537,18 @@ class ArenaPlotter:
 
             canv.text(str(datetime.datetime.fromtimestamp(desc.epoch, self.tz)),
                       15,25,
-                      color_rgba=(1.,1.,1.,1.))
+                      color_rgba=(1.,1.,1.,1.),
+                      font_face="Ubuntu", bold=False, font_size=14)
 
             canv.text(str(int(row['t_framenumber'])),
                       15,50,
-                      color_rgba=(1.,1.,1.,1.))
+                      color_rgba=(1.,1.,1.,1.),
+                      font_face="Ubuntu", bold=False, font_size=14)
 
             canv.text("%.1fs" % (desc.epoch - self.t0),
                       15,75,
-                      color_rgba=(1.,1.,1.,1.))
+                      color_rgba=(1.,1.,1.,1.),
+                      font_face="Ubuntu", bold=False, font_size=14)
 
 
 class FMFImagePlotter(_FMFPlotter):
