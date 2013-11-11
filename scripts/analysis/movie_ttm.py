@@ -82,9 +82,9 @@ def build_framedesc_list(pool_df, wt, zt):
     return frames
 
 if __name__ == "__main__":
-    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/z_new_movie_aversion_h20131030_180450.fmf'
-    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/w_new_movie_aversion_h20131030_180453.fmf'
-    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/2013-10-30-18-04-55.bag'
+    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/aversion/z_new_movie_aversion_h20131030_180450.fmf'
+    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/aversion/w_new_movie_aversion_h20131030_180453.fmf'
+    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/aversion/2013-10-30-18-04-55.bag'
 
     wfmf = madplot.FMFTrajectoryPlotter(WIDE_FMF)
     zfmf = madplot.FMFTTLPlotter(ZOOM_FMF)
@@ -157,7 +157,8 @@ if __name__ == "__main__":
         ass.render_frame(desc)
         pbar.update(i)
 
-#        if i > 20: break
+        if 'TEST_MOVIES' in os.environ:
+            if i > 50: break
 
     pbar.finish()
 

@@ -138,6 +138,16 @@ def plot_tracked_trajectory(ax, tdf, limits=None, ds=1, minlenpct=0.10, **kwargs
 
             ax.plot(group['x'].values[::ds],group['y'].values[::ds],**kwargs)
 
+def get_offset_and_nearest_fmf_timestamp(tss, timestamp):
+    at_or_before_timestamp_cond = tss <= timestamp
+    nz = np.nonzero(at_or_before_timestamp_cond)[0]
+    if len(nz)==0:
+        raise ValueError("no frames at or before timestamp given")
+    return nz[-1], tss[nz[-1]]
+
+def get_framedf(df, framenumber):
+    return df[df['t_framenumber'] == framenumber]
+
 def merge_bagfiles(bfs, geom_must_interect=True):
     expn = 0
     l_df, t_df, h_df, geom = bfs[0]
@@ -451,6 +461,11 @@ class _FMFPlotter:
     alpha = None
     beta = None
 
+    show_timestamp = True
+    show_epoch = True
+    show_lxly = False
+    show_fxfy = True
+
     def __init__(self, path):
         self.fmf = motmot.FlyMovieFormat.FlyMovieFormat.FlyMovie(path)
 
@@ -581,12 +596,13 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter, _MultiTrajectoryColorManager):
 
     name = 'w'
 
-    def __init__(self, path, objids):
+    def __init__(self, path, objids,maxlen=100):
         _FMFPlotter.__init__(self, path)
         _MultiTrajectoryColorManager.__init__(self, objids)
         self.trajs_x = {}
         self.trajs_y = {}
         self.trajs_last_seen = {}
+        self.maxlen=maxlen
 
     def render(self, canv, panel, desc):
         w_framenumber = desc.w_frame.timestamp
@@ -600,8 +616,8 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter, _MultiTrajectoryColorManager):
             row = _row.tail(1)
             t_framenumber = row['t_framenumber'].values[0]
             if oid not in self.trajs_x:
-                self.trajs_x[oid] = collections.deque(maxlen=100)
-                self.trajs_y[oid] = collections.deque(maxlen=100)
+                self.trajs_x[oid] = collections.deque(maxlen=self.maxlen)
+                self.trajs_y[oid] = collections.deque(maxlen=self.maxlen)
 
             self.trajs_x[oid].append(row['x'])
             self.trajs_y[oid].append(row['y'])
@@ -624,16 +640,18 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter, _MultiTrajectoryColorManager):
 
             #draw the targeted fly (if during this frame interval we targeted
             #a single fly only)
-            if len(rowt) == 1:
+            if self.show_fxfy and (len(rowt) == 1):
                 canv.scatter( [rowt['fly_x']],
                               [rowt['fly_y']],
                               color_rgba=(1,0,0,0.3), radius=10.0 )
 
-            canv.text(str(int(desc.w_frame.timestamp)),
-                      panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
+            if self.show_timestamp:
+                canv.text(str(int(desc.w_frame.timestamp)),
+                          panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
 
-            canv.text("%.1fs" % (desc.epoch - self.t0),
-                      panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
+            if self.show_epoch:
+                canv.text("%.1fs" % (desc.epoch - self.t0),
+                          panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
 
         for oid in to_kill:
             del self.trajs_x[oid]
@@ -642,13 +660,11 @@ class FMFMultiTrajectoryPlotter(_FMFPlotter, _MultiTrajectoryColorManager):
 class FMFTrajectoryPlotter(_FMFPlotter):
 
     name = 'w'
-    show_lxly = False
-    show_fxfy = True
 
-    def __init__(self, path):
+    def __init__(self, path,maxlen=100):
         _FMFPlotter.__init__(self, path)
-        self.xhist = collections.deque(maxlen=100)
-        self.yhist = collections.deque(maxlen=100)
+        self.xhist = collections.deque(maxlen=maxlen)
+        self.yhist = collections.deque(maxlen=maxlen)
 
     def render(self, canv, panel, desc):
         row = desc.get_row('fly_x', 'fly_y', 'laser_x', 'laser_y', 'mode')
@@ -676,11 +692,13 @@ class FMFTrajectoryPlotter(_FMFPlotter):
                               [ly],
                               color_rgba=(0,0,1,0.3), radius=2.0 )
 
-            canv.text(str(int(desc.w_frame.timestamp)),
-                      panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
+            if self.show_timestamp:
+                canv.text(str(int(desc.w_frame.timestamp)),
+                          panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
 
-            canv.text("%.1fs" % (desc.epoch - self.t0),
-                      panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
+            if self.show_epoch:
+                canv.text("%.1fs" % (desc.epoch - self.t0),
+                          panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))
 
 
 class FMFTTLPlotter(_FMFPlotter):
@@ -715,8 +733,9 @@ class FMFTTLPlotter(_FMFPlotter):
                               [hy],
                               color_rgba=self.get_fly_color(rowl['lobj_id']), radius=10.0 )
 
-            canv.text(str(int(desc.z_frame.timestamp)),
-                      panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
+            if self.show_timestamp:
+                canv.text(str(int(desc.z_frame.timestamp)),
+                          panel["dw"]-40,panel["dh"]-5, color_rgba=(0.5,0.5,0.5,1.0))
 
             canv.text(mode_s,
                       panel["dw"]-40,panel["dh"]-17, color_rgba=(0.5,0.5,0.5,1.0))

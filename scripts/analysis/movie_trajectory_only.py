@@ -1,30 +1,33 @@
-import sys
-import os.path
+#!/usr/bin/env python
 
+import time
+import os.path
+import glob
+import tempfile
+import shutil
+import re
+import collections
+import operator
+import multiprocessing
+
+import motmot.FlyMovieFormat.FlyMovieFormat as fmf
 import pandas as pd
 import numpy as np
-import progressbar
 
 import benu.benu
 import benu.utils
 
-import madplot
-
-assert benu.__version__ >= "0.1.0"
-
-TARGET_OUT_W, TARGET_OUT_H = 1280, 1024
-MARGIN = 2
+import roslib; roslib.load_manifest('rosbag')
+import rosbag
 
 import madplot
-import motmot.FlyMovieFormat.FlyMovieFormat
 
 class Assembler:
-    def __init__(self, w, h, panels, wfmf, zfmf, moviemaker):
+    def __init__(self, w, h, panels, wfmf, moviemaker):
         self.panels = panels
         self.w = w
         self.h = h
         self.wfmf = wfmf
-        self.zfmf = zfmf
         self.i = 0
         self.moviemaker = moviemaker
 
@@ -36,8 +39,6 @@ class Assembler:
 
         try:
             self.wfmf.render(canv, self.panels['wide'], desc)
-            self.zfmf.render(canv, self.panels['zoom'], desc)
-
             canv.save()
             self.i += 1
         except Exception:
@@ -47,34 +48,34 @@ class Assembler:
 
         return png
 
+
 if __name__ == "__main__":
+    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/misc_fmfs/flies_running_around_dark/flies_running_around_dark_120131108_183404.fmf'
+    BAG_FILE = '/mnt/strawscience/data/FlyMAD/misc_fmfs/flies_running_around_dark/2013-11-08-18-34-13.bag'
 
-    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser/reiser_movie_120131030_173444.fmf'
-    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser/reiser_movie_220131030_173442.fmf'
-    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/reiser/2013-10-30-17-34-49.bag'
-
-#    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/2013-11-05-12-20-23.bag'
-#    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/w_reiser_movie_better20131105_122018.fmf'
-#    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/z_reiser_movie_better20131105_122015.fmf'
+#    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/misc_fmfs/flies_running_around_dark_2/flies_running_around_dark_220131108_184058.fmf'
+#    BAG_FILE = '/mnt/strawscience/data/FlyMAD/misc_fmfs/flies_running_around_dark_2/2013-11-08-18-41-01.bag'
 
     arena = madplot.Arena()
     df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena, ffill=False)
 
     objids = df['tobj_id'].dropna().unique()
 
-    wfmf = madplot.FMFMultiTrajectoryPlotter(WIDE_FMF, objids)
-    zfmf = madplot.FMFMultiTTLPlotter(ZOOM_FMF, objids)
-    zfmf.enable_color_correction(brightness=20, contrast=1.5)
+    wfmf = madplot.FMFMultiTrajectoryPlotter(WIDE_FMF, objids, maxlen=400)
+    wfmf.show_lxly = False
+    wfmf.show_fxfy = False
+    wfmf.show_timestamp = False
+    wfmf.show_epoch = False
+
+    fmfwidth = wfmf.fmf.width
+    fmfheight = wfmf.fmf.height
 
     print 'loading w timestamps'
     wts = wfmf.fmf.get_all_timestamps()
-    print 'loading z timestamps'
-    zts = zfmf.fmf.get_all_timestamps()
-
-    frames = []    
 
     pbar = madplot.get_progress_bar("computing frames", len(wts))
 
+    frames = []
     for i,(wt0,wt1) in enumerate(madplot.pairwise(wts)):
 
         pbar.update(i)
@@ -91,14 +92,12 @@ if __name__ == "__main__":
 
                 last_laser_row = minidf[minidf['lobj_id'].notnull()].tail(1)
 
-                z_frame = madplot.FMFFrame(
-                            *madplot.get_offset_and_nearest_fmf_timestamp(zts, float(last_head_row['h_framenumber'])))
                 w_frame = madplot.FMFFrame(
                             *madplot.get_offset_and_nearest_fmf_timestamp(wts, float(wt1)))
 
                 epoch = most_recent_time.asm8.astype(np.int64) / 1e9
                 fd = madplot.FrameDescriptor(
-                                w_frame, z_frame, 
+                                w_frame, None, 
                                 fdf.merge(pd.merge(last_head_row, last_laser_row, 'outer'),'outer'),
                                 epoch
                 )
@@ -124,29 +123,22 @@ if __name__ == "__main__":
     moviet0 = frames[0].epoch
     movielen = (frames[-1].epoch - moviet0)
     movieifi = movielen/len(frames)
-
-    ttlplotter = madplot.TTLPlotter(moviet0,movieifi)
     wfmf.t0 = moviet0
-    zfmf.t0 = moviet0
 
     panels = {}
     #left half of screen
     panels["wide"] = wfmf.get_benu_panel(
-            device_x0=0, device_x1=0.5*TARGET_OUT_W,
-            device_y0=0, device_y1=TARGET_OUT_H
-    )
-    panels["zoom"] = zfmf.get_benu_panel(
-            device_x0=0.5*TARGET_OUT_W, device_x1=TARGET_OUT_W,
-            device_y0=0, device_y1=TARGET_OUT_H
+            device_x0=0, device_x1=fmfwidth,
+            device_y0=0, device_y1=fmfheight
     )
 
-    actual_w, actual_h = benu.utils.negotiate_panel_size_same_height(panels, TARGET_OUT_W)
+    actual_w, actual_h = benu.utils.negotiate_panel_size_same_height(panels, fmfwidth)
 
     moviemaker = madplot.MovieMaker(obj_id=os.path.basename(BAG_FILE))
 
     ass = Assembler(actual_w, actual_h,
                     panels, 
-                    wfmf,zfmf,
+                    wfmf,
                     moviemaker,
     )
 
@@ -162,5 +154,4 @@ if __name__ == "__main__":
     print "wrote", moviefname
 
     moviemaker.cleanup()
-
 
