@@ -11,7 +11,7 @@ import roslib; roslib.load_manifest('rosbag')
 import rosbag
 
 import madplot
-import movie_batch_zoom
+import generate_mw_ttm_movies
 
 Scored = collections.namedtuple('Scored', 'fmf bag mp4 csv')
 
@@ -59,9 +59,9 @@ def prepare_data(path):
 
     data = {}
     for gt in GENOTYPES:
-        bag_re = movie_batch_zoom.get_bag_re(gt)
+        bag_re = generate_mw_ttm_movies.get_bag_re(gt)
         targets = {}
-        for pair in movie_batch_zoom.get_matching_fmf_and_bag(gt, path):
+        for pair in generate_mw_ttm_movies.get_matching_fmf_and_bag(gt, path):
             mp4dir = os.path.join(os.path.dirname(pair.fmf), 'mp4s')
             mp4 = os.path.join(mp4dir, os.path.basename(pair.fmf))+'.mp4'
             csv = mp4+'.csv'
