@@ -152,15 +152,19 @@ def get_matching_bag(fmftime, bagdir):
     else:
         return None
 
-def get_matching_fmf_and_bag(bag_re, base_dir):
+def get_bag_re(gt):
+    return re.compile("%s_movie_([abh+]{1,3})_([0-9_]{1,3})(2013)(.*)" % gt)
 
+def get_matching_fmf_and_bag(gt, base_dir):
+
+    bag_re = get_bag_re(gt)
     matching = []
 
-    for fmffile in glob.glob(os.path.join(base_dir,'Moonw_movie*.fmf')):
+    for fmffile in glob.glob(os.path.join(base_dir,'%s_movie*.fmf' % gt)):
         fmfname = os.path.basename(fmffile)
         try:
             target,trial,year,date = bag_re.search(fmfname).groups()
-            bagdir = os.path.join(base_dir,'Moonw_%s_%s' % (target, trial))
+            bagdir = os.path.join(base_dir,'%s_%s_%s' % (gt, target, trial))
             if os.path.isdir(bagdir):
                 #we found a directory with matching bag files
                 fmftime = time.strptime("%s%s" % (year,date), FMF_DATE_FMT)
@@ -180,9 +184,8 @@ def get_matching_fmf_and_bag(bag_re, base_dir):
 if __name__ == "__main__":
 
     BASE_DIR ="/mnt/strawscience/data/FlyMAD/MW/07_11/"
-    BAG_RE = re.compile("Moonw_movie_([abh+]{1,3})_([0-9_]{1,3})(2013)(.*)")
 
-    matching = get_matching_fmf_and_bag(BAG_RE, BASE_DIR)
+    matching = get_matching_fmf_and_bag('Moonw', BASE_DIR)
 
     if USE_MULTIPROCESSING:
         pool = multiprocessing.Pool()
