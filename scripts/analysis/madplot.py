@@ -232,7 +232,7 @@ def load_bagfile(bagpath, arena, filter_short=100):
             h_index.append( datetime.datetime.fromtimestamp(rostime.to_sec()) )
             for k in h_data_names:
                 h_data[k].append( getattr(msg,k,np.nan) )
-            h_data["h_framenumber"].append( msg.framenumber )
+            h_data["h_framenumber"].append( getattr(msg,"framenumber",0) )
             h_data["h_processing_time"].append( msg.processing_time )
 
     if geom_msg is not None:

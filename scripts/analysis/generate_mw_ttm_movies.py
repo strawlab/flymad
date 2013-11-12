@@ -23,6 +23,7 @@ import rosbag
 import madplot
 
 USE_MULTIPROCESSING = True
+BASE_DIR ="/mnt/strawscience/data/FlyMAD/MW/11_11/"
 
 Pair = collections.namedtuple('Pair', 'fmf bag')
 
@@ -126,7 +127,11 @@ def doit_using_framenumber(match):
     if not USE_MULTIPROCESSING:
         pbar.finish()
 
-    moviefname = moviemaker.render('/mnt/strawscience/data/FlyMAD/MW/07_11/mp4s')
+    mdir = os.path.join(BASE_DIR,'mp4s')
+    if not os.path.exists(mdir):
+        os.makedirs(mdir)
+
+    moviefname = moviemaker.render(mdir)
     print "wrote", moviefname
 
     moviemaker.cleanup()
@@ -153,14 +158,18 @@ def get_matching_bag(fmftime, bagdir):
         return None
 
 def get_bag_re(gt):
-    return re.compile("%s_movie_([abh+]{1,3})_([0-9_]{1,3})(2013)(.*)" % gt)
+    #the non-control MW experiment movies are names Moonw_movie
+    #return re.compile("%s_movie_([abh+]{1,3})_([0-9_]{1,3})(2013)(.*)" % gt)
+    return re.compile("%s_([abh+]{1,3})_([0-9_]{1,3})(2013)(.*)" % gt)
+
+
 
 def get_matching_fmf_and_bag(gt, base_dir):
 
     bag_re = get_bag_re(gt)
     matching = []
 
-    for fmffile in glob.glob(os.path.join(base_dir,'%s_movie*.fmf' % gt)):
+    for fmffile in glob.glob(os.path.join(base_dir,'%s_*.fmf' % gt)):
         fmfname = os.path.basename(fmffile)
         try:
             target,trial,year,date = bag_re.search(fmfname).groups()
@@ -176,16 +185,16 @@ def get_matching_fmf_and_bag(gt, base_dir):
             else:
                 print "no bags for",fmffile
             #    
-        except:
-            print "ERROR"
+        except AttributeError:
+            #no regex match
+            print "error: incorrectly named fmf file?", fmffile
 
     return matching
 
 if __name__ == "__main__":
 
-    BASE_DIR ="/mnt/strawscience/data/FlyMAD/MW/07_11/"
 
-    matching = get_matching_fmf_and_bag('Moonw', BASE_DIR)
+    matching = get_matching_fmf_and_bag('cs', BASE_DIR)
 
     if USE_MULTIPROCESSING:
         pool = multiprocessing.Pool()

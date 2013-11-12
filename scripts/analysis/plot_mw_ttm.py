@@ -54,8 +54,8 @@ def load_bagfile_get_laseron(score):
     else:
         return None, None
 
-def prepare_data(path):
-    GENOTYPES = ("Moonw",)
+def prepare_data(path, genotype):
+    GENOTYPES = (genotype,)
 
     data = {}
     for gt in GENOTYPES:
@@ -92,8 +92,8 @@ def prepare_data(path):
 def load_data(path):
     return cPickle.load(open(os.path.join(path,'data.pkl'),'rb'))
 
-def plot_data(path, data):
-    targets = data['Moonw']['targets']
+def plot_data(path, data, genotype):
+    targets = data[genotype]['targets']
 
     for trg in targets:
         vals = []
@@ -117,12 +117,11 @@ def plot_data(path, data):
 if __name__ == "__main__":
     import argparse
 
-    BASE_DIR ="/mnt/strawscience/data/FlyMAD/MW/07_11/"
-
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to mp4s')
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--genotype', default='Moonw')
 
     args = parser.parse_args()
     path = args.path[0]
@@ -130,9 +129,9 @@ if __name__ == "__main__":
     if args.only_plot:
         data = load_data(path)
     else:
-        data = prepare_data(path)
+        data = prepare_data(path, args.genotype)
 
-    plot_data(path, data)
+    plot_data(path, data, args.genotype)
 
     if args.show:
         plt.show()
