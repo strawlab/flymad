@@ -2,6 +2,7 @@ import json
 import os.path
 import datetime
 import math
+import time
 import collections
 import tempfile
 import shutil
@@ -78,6 +79,11 @@ class Arena:
     def get_limits(self):
         #(xlim, ylim)
         return (150,570), (47,463)
+
+def strptime_bagfile(bag):
+    assert os.path.isfile(bag)
+    BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S.bag"
+    return time.strptime(os.path.basename(bag), BAG_DATE_FMT)
 
 def colors_hsv_circle(n, alpha=1.0):
     _hsv = np.dstack( (np.linspace(0,2/3.,n), [1]*n, [1]*n) )

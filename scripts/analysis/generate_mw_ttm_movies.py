@@ -27,7 +27,6 @@ BASE_DIR ="/mnt/strawscience/data/FlyMAD/MW/11_11/"
 
 Pair = collections.namedtuple('Pair', 'fmf bag')
 
-BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S.bag"
 FMF_DATE_FMT = "%Y%m%d_%H%M%S.fmf"
 
 assert benu.__version__ >= "0.1.0"
@@ -144,7 +143,7 @@ def make_movie(wide,zoom,bag,imagepath,filename):
 def get_matching_bag(fmftime, bagdir):
     bags = []
     for bag in glob.glob(os.path.join(bagdir,'*.bag')):
-        btime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
+        btime = madplot.strptime_bagfile(bag)
         dt = abs(time.mktime(fmftime) - time.mktime(btime))
         bags.append( (bag, dt) )
 
