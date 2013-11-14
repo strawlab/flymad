@@ -91,6 +91,8 @@ def plot_data(path, data):
 
     #keep the same order
     for k in [t for t in 'ahbxw' if len(pooled_on.get(t,[]))]:
+        print "-- AVERSION N --------------\n\t%s = %s" % (k,len(pooled_on[k]))
+
         on = pd.concat(pooled_on[k])
         off = pd.concat(pooled_off[k])
 

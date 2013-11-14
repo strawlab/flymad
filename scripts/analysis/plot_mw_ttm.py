@@ -121,6 +121,9 @@ def plot_data(path, data, genotype):
     targets = data[genotype]['targets']
 
     for trg in targets:
+
+        print "-- MW %s N --------------\n\t%s = %s" % (genotype,trg,len(targets[trg]))
+
         vals = []
         fig = plt.figure(trg)
         ax = fig.add_subplot(1,1,1)
