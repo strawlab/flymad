@@ -126,7 +126,7 @@ def doit_using_framenumber(match):
     if not USE_MULTIPROCESSING:
         pbar.finish()
 
-    mdir = os.path.join(BASE_DIR,'mp4s')
+    mdir = 'mp4s'
     if not os.path.exists(mdir):
         os.makedirs(mdir)
 
@@ -191,11 +191,22 @@ def get_matching_fmf_and_bag(gt, base_dir):
     return matching
 
 if __name__ == "__main__":
+    import argparse
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', nargs=1, help='path to data (a dir of fmfs and subdir of bags)')
+    parser.add_argument('--genotype', required=True, help='genotype (the prefix of the fmfs; cs, Moonw, etc)')
+    parser.add_argument('--disable-multiprocessing', action='store_true')
 
-    matching = get_matching_fmf_and_bag('cs', BASE_DIR)
+    args = parser.parse_args()
+    path = args.path[0]
 
-    if USE_MULTIPROCESSING:
+    if not os.path.isdir(path):
+        parser.error('must be a directory')
+
+    matching = get_matching_fmf_and_bag(args.genotype, path)
+
+    if (not args.disable_multiprocessing) and USE_MULTIPROCESSING:
         pool = multiprocessing.Pool()
         pool.map(doit_using_framenumber, matching)
         pool.close()
