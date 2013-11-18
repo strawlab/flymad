@@ -475,6 +475,8 @@ class _FMFPlotter:
     show_lxly = False
     show_fxfy = True
 
+    show_arena = False
+
     def __init__(self, path):
         if path:
             self.fmf = motmot.FlyMovieFormat.FlyMovieFormat.FlyMovie(path)
@@ -482,6 +484,9 @@ class _FMFPlotter:
             self.height = self.fmf.height
         else:
             self.fmf = None
+
+    def enable_show_arena(self, arena):
+        self.show_arena = arena
 
     def enable_force_rgb(self):
         self.force_color = True
@@ -521,43 +526,30 @@ class _FMFPlotter:
         )
 
     def imshow(self, canv, frame):
-        if self.fmf is None:
+        if (self.fmf is None) or (frame is None):
             canv.poly([0,0,self.width,self.width,0],
                       [0,self.height,self.height,0,0],
                       color_rgba=(0,0,0,1))
         else:
             canv.imshow(self.get_frame(frame), 0,0, filter='best')
 
-class ArenaPlotter:
+        if self.show_arena:
+            canv.scatter( [self.show_arena.cx],
+                          [self.show_arena.cy],
+                          radius=self.show_arena.r )
 
-    t0 = 0
+class ArenaPlotter(_FMFPlotter):
 
-    def __init__(self, w, h, arena, bgcolor=(0.0,0.0,0.0,1), tzname='CET'):
-        self.w = w
-        self.h = h
-        self.arena = arena
+    def __init__(self, arena, bgcolor=(0.0,0.0,0.0,1), tzname='CET'):
+        _FMFPlotter.__init__(self, None) #no fmf
         self.bgcolor = bgcolor
         self.tz = pytz.timezone( tzname )
-
-    def get_benu_panel(self, device_x0, device_x1, device_y0, device_y1):
-        return dict(
-            width = self.w,
-            height = self.h,
-            device_x0 = device_x0,
-            device_x1 = device_x1,
-            device_y0 = device_y0,
-            device_y1 = device_y1,
-        )
+        self.enable_show_arena(arena)
 
     def render(self, canv, panel, desc):
         with canv.set_user_coords_from_panel(panel):
-            canv.poly([0,0,self.w,self.w,0],
-                      [0,self.h,self.h,0,0],
-                      color_rgba=self.bgcolor)
-
-            canv.scatter( [self.arena.cx],
-                          [self.arena.cy],
-                          radius=self.arena.r )
+            #draw the arena
+            self.imshow(canv, None)
 
             row = desc.get_row()
 

@@ -65,7 +65,7 @@ def doit_using_framenumber(match):
     arena = madplot.Arena()
     zoom = madplot.FMFImagePlotter(zoomf, 'z_frame')
     zoom.enable_color_correction(brightness=15, contrast=1.5)
-    wide = madplot.ArenaPlotter(659,494, arena)
+    wide = madplot.ArenaPlotter(arena)
 
     renderlist = []
 
