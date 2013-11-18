@@ -118,6 +118,7 @@ def load_data(path, gt):
     return cPickle.load(open(os.path.join(path,'data_%s.pkl' % gt),'rb'))
 
 def plot_data(path, data, genotype):
+
     targets = data[genotype]['targets']
 
     for trg in targets:
@@ -135,10 +136,18 @@ def plot_data(path, data, genotype):
             ser = pd.Series(vfwd.values, index=np.arange(0,len(vfwd))-lon)
 
             pooled[i] = ser
-            ax.plot(ser.index, ser.values,'k',label=os.path.basename(score.mp4),alpha=0.2)
+            pser = ser.loc[-100:900]
+
+            ax.plot(pser.index, pser.values,'k',label=os.path.basename(score.mp4),alpha=0.2)
 
         m = pd.DataFrame(pooled).mean(axis=1)
-        ax.plot(m.index, m.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
+        pm = m.loc[-100:900]
+
+        ax.plot(pm.index, pm.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
+        ax.set_xlim([-100,900])
+        ax.set_ylim([-20,40])
+
+        fig.savefig(os.path.join(path,'velocity_%s_%s.png' % (genotype,trg)))
 
 if __name__ == "__main__":
     import argparse
