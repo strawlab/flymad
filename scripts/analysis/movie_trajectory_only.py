@@ -116,6 +116,10 @@ if __name__ == "__main__":
 
                 frames.append(fd)
 
+                #FIXME: fails at movies longer than 27000 frames for unknown
+                #reasons
+                if len(frames) > 27000: break
+
                 if 'TEST_MOVIES' in os.environ:
                     if len(frames) > 50: break
 
