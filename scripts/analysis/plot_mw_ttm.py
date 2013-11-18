@@ -125,29 +125,52 @@ def plot_data(path, data, genotype):
 
         print "-- MW %s N --------------\n\t%s = %s" % (genotype,trg,len(targets[trg]))
 
-        pooled = {}
+        pooled_vfwd = {}
+        pooled_theta = {}
 
         vals = []
-        fig = plt.figure(trg)
-        ax = fig.add_subplot(1,1,1)
+        figv = plt.figure('velocity %s %s' % (genotype, trg))
+        axv = figv.add_subplot(1,1,1)
+        figt = plt.figure('dtheta %s %s' % (genotype, trg))
+        axt = figt.add_subplot(1,1,1)
         for i,(score,t_df,lon) in enumerate(targets[trg]):
 
+            #forward velocity
             vfwd = t_df['Vfwd']
             ser = pd.Series(vfwd.values, index=np.arange(0,len(vfwd))-lon)
-
-            pooled[i] = ser
+            pooled_vfwd[i] = ser
             pser = ser.loc[-100:900]
+            axv.plot(pser.index, pser.values,'k',label=os.path.basename(score.mp4),alpha=0.2)
 
-            ax.plot(pser.index, pser.values,'k',label=os.path.basename(score.mp4),alpha=0.2)
+            #dtheta
+            theta = t_df['theta']
+            if not np.any(theta.isnull()):
+                dtheta = np.abs(np.gradient(theta.values))
 
-        m = pd.DataFrame(pooled).mean(axis=1)
+                #discontinuities are wrap arounds, ignore....
+                dtheta[dtheta > (0.9*np.pi / 2.0)] = np.nan
+
+                ser = pd.Series(dtheta, index=np.arange(0,len(vfwd))-lon)
+                pooled_theta[i] = ser
+                pser = ser.loc[-100:900]
+                axt.plot(pser.index, pser.values,'k.',label=os.path.basename(score.mp4),alpha=0.2)
+
+        m = pd.DataFrame(pooled_vfwd).mean(axis=1)
         pm = m.loc[-100:900]
 
-        ax.plot(pm.index, pm.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
-        ax.set_xlim([-100,900])
-        ax.set_ylim([-20,40])
+        axv.plot(pm.index, pm.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
+        axv.set_xlim([-100,900])
+        axv.set_ylim([-20,40])
 
-        fig.savefig(os.path.join(path,'velocity_%s_%s.png' % (genotype,trg)))
+        m = pd.DataFrame(pooled_theta).mean(axis=1)
+        pm = m.loc[-100:900]
+        axt.plot(pm.index, pm.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
+        axt.set_xlim([-100,900])
+        axt.set_ylim([-0,0.3])
+
+        figv.savefig(os.path.join(path,'velocity_%s_%s.png' % (genotype,trg)))
+        figt.savefig(os.path.join(path,'dtheta_%s_%s.png' % (genotype,trg)))
+
 
 if __name__ == "__main__":
     import argparse
