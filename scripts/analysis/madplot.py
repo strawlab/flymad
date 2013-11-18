@@ -467,13 +467,21 @@ class _FMFPlotter:
     alpha = None
     beta = None
 
+    width = 659
+    height = 494
+
     show_timestamp = True
     show_epoch = True
     show_lxly = False
     show_fxfy = True
 
     def __init__(self, path):
-        self.fmf = motmot.FlyMovieFormat.FlyMovieFormat.FlyMovie(path)
+        if path:
+            self.fmf = motmot.FlyMovieFormat.FlyMovieFormat.FlyMovie(path)
+            self.width = self.fmf.width
+            self.height = self.fmf.height
+        else:
+            self.fmf = None
 
     def enable_force_rgb(self):
         self.force_color = True
@@ -486,6 +494,9 @@ class _FMFPlotter:
 
     def get_frame(self, frame):
         assert isinstance(frame, FMFFrame)
+
+        if self.fmf is None:
+            return None
 
         f,ts = self.fmf.get_frame(frame.offset)
 
@@ -501,8 +512,8 @@ class _FMFPlotter:
 
     def get_benu_panel(self, device_x0, device_x1, device_y0, device_y1):
         return dict(
-            width = self.fmf.width,
-            height = self.fmf.height,
+            width = self.width,
+            height = self.height,
             device_x0 = device_x0,
             device_x1 = device_x1,
             device_y0 = device_y0,
@@ -510,7 +521,12 @@ class _FMFPlotter:
         )
 
     def imshow(self, canv, frame):
-        canv.imshow(self.get_frame(frame), 0,0, filter='best')
+        if self.fmf is None:
+            canv.poly([0,0,self.width,self.width,0],
+                      [0,self.height,self.height,0,0],
+                      color_rgba=(0,0,0,1))
+        else:
+            canv.imshow(self.get_frame(frame), 0,0, filter='best')
 
 class ArenaPlotter:
 

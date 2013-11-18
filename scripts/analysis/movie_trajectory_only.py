@@ -50,28 +50,40 @@ class Assembler:
 
 
 if __name__ == "__main__":
-    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/misc_fmfs/flies_running_around_dark/flies_running_around_dark_120131108_183404.fmf'
-    BAG_FILE = '/mnt/strawscience/data/FlyMAD/misc_fmfs/flies_running_around_dark/2013-11-08-18-34-13.bag'
+    import argparse
 
-#    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/misc_fmfs/flies_running_around_dark_2/flies_running_around_dark_220131108_184058.fmf'
-#    BAG_FILE = '/mnt/strawscience/data/FlyMAD/misc_fmfs/flies_running_around_dark_2/2013-11-08-18-41-01.bag'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', nargs=1, help='path to bag file')
+    parser.add_argument('--wide-fmf', help='wide fmf file to render the trajectory over')
+    parser.add_argument('--outdir', help='destination directory for mp4')
+    parser.add_argument('--show-laser', action='store_true', default=False, help='show laser postion')
+    parser.add_argument('--show-target', action='store_true', default=False, help='show targeted fly')
+    parser.add_argument('--show-timestamp', action='store_true', default=False, help='show frame timestamp (likely framenumber)')
+    parser.add_argument('--show-epoch', action='store_true', default=False, help='show epoch')
+    parser.add_argument('--fps', type=int, default=20, help='framenumber')
+
+    args = parser.parse_args()
+    path = args.path[0]
 
     arena = madplot.Arena()
-    df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena, ffill=False)
+    df = madplot.load_bagfile_single_dataframe(path, arena, ffill=False)
 
     objids = df['tobj_id'].dropna().unique()
 
-    wfmf = madplot.FMFMultiTrajectoryPlotter(WIDE_FMF, objids, maxlen=400)
-    wfmf.show_lxly = False
-    wfmf.show_fxfy = False
-    wfmf.show_timestamp = False
-    wfmf.show_epoch = False
+    wfmf = madplot.FMFMultiTrajectoryPlotter(args.wide_fmf, objids, maxlen=400)
+    wfmf.show_lxly = args.show_laser
+    wfmf.show_fxfy = args.show_target
+    wfmf.show_timestamp = args.show_timestamp
+    wfmf.show_epoch = args.show_epoch
 
-    fmfwidth = wfmf.fmf.width
-    fmfheight = wfmf.fmf.height
+    fmfwidth = wfmf.width
+    fmfheight = wfmf.height
 
-    print 'loading w timestamps'
-    wts = wfmf.fmf.get_all_timestamps()
+    try:
+        print 'loading w timestamps'
+        wts = wfmf.fmf.get_all_timestamps()
+    except AttributeError:
+        wts = df['t_framenumber'].dropna().unique()
 
     pbar = madplot.get_progress_bar("computing frames", len(wts))
 
@@ -134,7 +146,7 @@ if __name__ == "__main__":
 
     actual_w, actual_h = benu.utils.negotiate_panel_size_same_height(panels, fmfwidth)
 
-    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(BAG_FILE))
+    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(path), fps=args.fps)
 
     ass = Assembler(actual_w, actual_h,
                     panels, 
@@ -150,7 +162,7 @@ if __name__ == "__main__":
 
     pbar.finish()
 
-    moviefname = moviemaker.render(os.path.dirname(BAG_FILE))
+    moviefname = moviemaker.render(args.outdir if args.outdir else os.path.dirname(path))
     print "wrote", moviefname
 
     moviemaker.cleanup()
