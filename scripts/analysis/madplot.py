@@ -209,10 +209,13 @@ def load_bagfile(bagpath, arena, filter_short=100):
     h_data = {k:[] for k in ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type", "h_framenumber", "h_processing_time")}
     h_data_names = ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type")
 
+    r_data = {k:[] for k in ("r_framenumber", "theta")}
+
     for topic,msg,rostime in bag.read_messages(topics=["/targeter/targeted",
                                                        "/flymad/tracked",
                                                        "/draw_geom/poly",
-                                                       "/flymad/laser_head_delta"]):
+                                                       "/flymad/laser_head_delta",
+                                                       "/flymad/raw_2d_positions"]):
         if topic == "/targeter/targeted":
             l_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
             for k in l_data_names:
@@ -240,6 +243,11 @@ def load_bagfile(bagpath, arena, filter_short=100):
                 h_data[k].append( getattr(msg,k,np.nan) )
             h_data["h_framenumber"].append( getattr(msg,"framenumber",0) )
             h_data["h_processing_time"].append( msg.processing_time )
+        elif topic == "/flymad/raw_2d_positions":
+            r_data["r_framenumber"].append(msg.framenumber)
+            if len(msg.points) == 1:
+                r_data["theta"].append(msg.points[0].theta)
+
 
     if geom_msg is not None:
         points_x = [pt.x for pt in geom_msg.points]
@@ -253,6 +261,12 @@ def load_bagfile(bagpath, arena, filter_short=100):
     l_df = pd.DataFrame(l_data, index=l_index)
     t_df = pd.DataFrame(t_data, index=t_index)
     h_df = pd.DataFrame(h_data, index=h_index)
+
+    r_df = pd.DataFrame(r_data)
+    if len(r_df) == len(t_df):
+        t_df['theta'] = r_df['theta'].values
+    else:
+        t_df['theta'] = np.nan
 
     #add a new colum if they were in the area
     t_df = pd.concat([t_df,
