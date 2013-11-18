@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-
+import sys
 import time
 import os.path
 import glob
@@ -23,9 +23,8 @@ import rosbag
 import madplot
 
 USE_MULTIPROCESSING = True
-BASE_DIR ="/mnt/strawscience/data/FlyMAD/MW/11_11/"
 
-Pair = collections.namedtuple('Pair', 'fmf bag')
+Pair = collections.namedtuple('Pair', 'fmf bag maxt')
 
 FMF_DATE_FMT = "%Y%m%d_%H%M%S.fmf"
 
@@ -61,6 +60,7 @@ class Assembler:
 def doit_using_framenumber(match):
     zoomf = match.fmf
     rosbagf = match.bag
+    maxt = match.maxt
 
     arena = madplot.Arena()
     zoom = madplot.FMFImagePlotter(zoomf, 'z_frame')
@@ -84,11 +84,17 @@ def doit_using_framenumber(match):
         frame = madplot.FMFFrame(offset=frameoffset, timestamp=idx)
         row = group.dropna(subset=['tobj_id']).tail(1)
         if len(row):
+            if maxt > 0:
+                dt = (row.index[0].asm8.astype(np.int64) / 1e9) - t0
+                if dt > maxt:
+                    break
+
             desc = madplot.FrameDescriptor(
                                 None,
                                 frame,
                                 row,
                                 row.index[0].asm8.astype(np.int64) / 1e9)
+
             renderlist.append(desc)
 
     wide.t0 = t0
@@ -159,11 +165,11 @@ def get_matching_bag(fmftime, bagdir):
 def get_bag_re(gt):
     #the non-control MW experiment movies are names Moonw_movie
     #return re.compile("%s_movie_([abh+]{1,3})_([0-9_]{1,3})(2013)(.*)" % gt)
-    return re.compile("%s_([abh+]{1,3})_([0-9_]{1,3})(2013)(.*)" % gt)
+    return re.compile("%s_([abh+]{1,3})_([0-9_]+)(2013)(.*)" % gt)
 
 
 
-def get_matching_fmf_and_bag(gt, base_dir):
+def get_matching_fmf_and_bag(gt, base_dir, maxtime):
 
     bag_re = get_bag_re(gt)
     matching = []
@@ -180,7 +186,7 @@ def get_matching_fmf_and_bag(gt, base_dir):
                 if bagfile is None:
                     print "no bag for",fmffile
                 else:
-                    matching.append( Pair(fmf=fmffile, bag=bagfile) )
+                    matching.append( Pair(fmf=fmffile, bag=bagfile, maxt=maxtime) )
             else:
                 print "no bags for",fmffile
             #    
@@ -196,7 +202,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to data (a dir of fmfs and subdir of bags)')
     parser.add_argument('--genotype', required=True, help='genotype (the prefix of the fmfs; cs, Moonw, etc)')
-    parser.add_argument('--disable-multiprocessing', action='store_true')
+    parser.add_argument('--disable-multiprocessing', action='store_true', default=False)
+    parser.add_argument('--dry-run', action='store_true', default=False)
+    parser.add_argument('--max-time', type=int, default=0, help='max time of video')
 
     args = parser.parse_args()
     path = args.path[0]
@@ -204,9 +212,16 @@ if __name__ == "__main__":
     if not os.path.isdir(path):
         parser.error('must be a directory')
 
-    matching = get_matching_fmf_and_bag(args.genotype, path)
+    matching = get_matching_fmf_and_bag(args.genotype, path, args.max_time)
+    print len(matching),"matching"
+
+    if args.dry_run:
+        for match in matching:
+            print match
+        sys.exit(0)
 
     if (not args.disable_multiprocessing) and USE_MULTIPROCESSING:
+        print "using multiprocessing"
         pool = multiprocessing.Pool()
         pool.map(doit_using_framenumber, matching)
         pool.close()
