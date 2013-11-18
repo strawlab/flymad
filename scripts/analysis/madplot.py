@@ -244,10 +244,9 @@ def load_bagfile(bagpath, arena, filter_short=100):
             h_data["h_framenumber"].append( getattr(msg,"framenumber",0) )
             h_data["h_processing_time"].append( msg.processing_time )
         elif topic == "/flymad/raw_2d_positions":
-            r_data["r_framenumber"].append(msg.framenumber)
             if len(msg.points) == 1:
+                r_data["r_framenumber"].append(msg.framenumber)
                 r_data["theta"].append(msg.points[0].theta)
-
 
     if geom_msg is not None:
         points_x = [pt.x for pt in geom_msg.points]
