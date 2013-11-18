@@ -169,7 +169,7 @@ def get_bag_re(gt):
 
 
 
-def get_matching_fmf_and_bag(gt, base_dir, maxtime):
+def get_matching_fmf_and_bag(gt, base_dir, maxtime=0):
 
     bag_re = get_bag_re(gt)
     matching = []

@@ -110,12 +110,12 @@ def prepare_data(path, genotype):
 
         data[gt] = {'targets':targets}
 
-    cPickle.dump(data, open(os.path.join(path,'data.pkl'),'wb'), -1)
+    cPickle.dump(data, open(os.path.join(path,'data_%s.pkl' % genotype),'wb'), -1)
 
     return data
 
-def load_data(path):
-    return cPickle.load(open(os.path.join(path,'data.pkl'),'rb'))
+def load_data(path, gt):
+    return cPickle.load(open(os.path.join(path,'data_%s.pkl' % gt),'rb'))
 
 def plot_data(path, data, genotype):
     targets = data[genotype]['targets']
@@ -124,23 +124,21 @@ def plot_data(path, data, genotype):
 
         print "-- MW %s N --------------\n\t%s = %s" % (genotype,trg,len(targets[trg]))
 
+        pooled = {}
+
         vals = []
         fig = plt.figure(trg)
         ax = fig.add_subplot(1,1,1)
-        for score,t_df,lon in targets[trg]:
+        for i,(score,t_df,lon) in enumerate(targets[trg]):
 
-            vfwd = t_df['Vfwd'].values
+            vfwd = t_df['Vfwd']
+            ser = pd.Series(vfwd.values, index=np.arange(0,len(vfwd))-lon)
 
-            #smash this into an array with zero=200
-            val = np.zeros(1100)
-            val[200-lon:200] = vfwd[:lon]
-            val[200:200+(len(vfwd)-lon)] = vfwd[lon:]
+            pooled[i] = ser
+            ax.plot(ser.index, ser.values,'k',label=os.path.basename(score.mp4),alpha=0.2)
 
-            vals.append(val)
-            ax.plot(val,'k',label=os.path.basename(score.mp4),alpha=0.2)
-
-        m = np.array(vals).mean(axis=0)
-        ax.plot(m,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
+        m = pd.DataFrame(pooled).mean(axis=1)
+        ax.plot(m.index, m.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
 
 if __name__ == "__main__":
     import argparse
@@ -155,7 +153,7 @@ if __name__ == "__main__":
     path = args.path[0]
 
     if args.only_plot:
-        data = load_data(path)
+        data = load_data(path, args.genotype)
     else:
         data = prepare_data(path, args.genotype)
 
