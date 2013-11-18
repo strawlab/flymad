@@ -554,6 +554,8 @@ class _FMFPlotter:
 
 class ArenaPlotter(_FMFPlotter):
 
+    show_theta = False
+
     def __init__(self, arena, bgcolor=(0.0,0.0,0.0,1), tzname='CET'):
         _FMFPlotter.__init__(self, None) #no fmf
         self.bgcolor = bgcolor
@@ -571,6 +573,21 @@ class ArenaPlotter(_FMFPlotter):
                           [row['y']],
                           color_rgba=(0,1,0,1),
                           radius=2 )
+
+            if self.show_theta and row['theta']:
+                try:
+                    theta = row['theta'].values[0]
+                    fx = float(row['x'])
+                    fy = float(row['y'])
+                except:
+                    theta = fx = fy = np.nan
+
+                if not np.isnan(theta):
+                    xarr = [fx-5, fx + 5]
+                    yarr = [fy-(5*np.arctan(theta)), fy+(5*np.arctan(theta))]
+                    canv.plot(xarr,yarr,
+                            color_rgba=(0,1,0,1),
+                            close_path=False)
 
             if row['laser_power']:
                 canv.scatter( [row['laser_x']],
