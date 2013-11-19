@@ -438,6 +438,7 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
                     t_out_area = 0
                     t_in_area += dt
                     if t_in_area > holdtime:
+                        #the fly made it
                         break
                 else:
                     t_out_area += dt
@@ -446,10 +447,13 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
 
                 t0 = t1
 
-            #did the fly finish inside, and start outside
-            if row['in_area'] and (t_in_area > holdtime):
-                tts.append( t1 - t00 )
+            #this is either the time for the fly to make it, or the total time of
+            #the experiment
+            tts.append( t1 - t00 )
 
+            #if the fly finished inside then slicing the trajectory into parts
+            #inside and outside makes sense.
+            if row['in_area'] and (t_in_area > holdtime):
                 print "\tltcy: obj_id %s finished inside after %.1f (in for %.1f)" % (name, tts[-1], t_in_area)
                 #the time they first got to the area, more or less beucause there
                 #could is tout_reset_time hysteresis is the most recent index minus
@@ -484,8 +488,9 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
                     ax.add_patch(patch)
 
             else:
+                #the fly didn't make it, so consider the whole trajectory
+                #for its outside velocity
                 vel_out.append( group['v'].mean() )
-
                 print "\tltcy: obj_id %s finished outside" % name
 
     return tts, vel_out, vel_in
