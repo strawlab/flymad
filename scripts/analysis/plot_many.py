@@ -82,6 +82,15 @@ def load_data(path):
     with open(madplot.get_path(path, dat, fname+".pkl"), 'rb') as f:
         return cPickle.load(f)
 
+def _label_rect_with_n(ax, rects, nens):
+    for rect,n in zip(rects,nens):
+        height = rect.get_height()
+        #protect against no bar
+        if not np.isnan(height):
+            ax.text(rect.get_x()+rect.get_width()/2.,
+                    1.05*height,
+                    str(n), ha='center', va='bottom')
+
 def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, ntrials, xticklabels, exps_colors, filename, plotdir):
     figb = plt.figure(title)
     axb = figb.add_subplot(1,1,1)
@@ -91,11 +100,16 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
     for i,exp in enumerate(exps):
         means = []
         stds = []
-        for v in per_exp_data[exp]:
+        pooled_nens = []
+
+        for j,v in enumerate(per_exp_data[exp]):
+            pooled_nens.append(len(v))
             means.append( np.mean(v) )
             stds.append( np.std(v) )
 
-        axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
+        rects = axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
+        _label_rect_with_n(axb, rects, pooled_nens)
+
         axl.errorbar(ind, means, label=exp, color=exps_colors[i], yerr=stds)
 
     for ax in [axb, axl]:
@@ -195,8 +209,8 @@ def plot_data(path, dat, debug_plot):
                         madplot.calculate_total_pct_in_area(tdf, 300))
 
             tts, vel_out, vel_in = madplot.calculate_latency_and_velocity_to_stay(
-                                                tdf, 20,
-                                                tout_reset_time=1, arena=arena, geom=geom,
+                                                tdf, holdtime=20,
+                                                tout_reset_time=2, arena=arena, geom=geom,
                                                 debug_plot=debug_plot, title=dbg_plot_title)
 
             latency_to_first_contact[exp].append(tts)
