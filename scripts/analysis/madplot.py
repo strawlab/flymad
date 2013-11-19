@@ -156,7 +156,7 @@ def plot_tracked_trajectory(ax, tdf, arena, ds=1, minlenpct=0.10, debug_plot=Tru
                 ins[name] = (group['x'].values.copy(),group['y'].values.copy())
 
     if debug_plot:
-        ax = plt.figure("P%s exp:%s" % (title,experiment), figsize=(6,4)).gca()
+        ax = plt.figure("P%se%s" % (title,experiment), figsize=(6,4)).gca()
         for oid in outs:
             x,y = outs[oid]
             ax.plot(x,y,'b,',label="o%s (%.1f%%)" % (oid,pcts[oid]*100))
@@ -467,11 +467,11 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
 
                     xlim,ylim = arena.get_limits()
 
-                    ax = plt.figure("V%s oid:%s exp:%s" % (title,name,experiment)).gca()
+                    ax = plt.figure("V%se%s oid:%s" % (title,experiment,name)).gca()
                     ax.plot(dfo.index.astype(np.int64)/1e9, dfo['v'].values, 'b')
                     ax.plot(dfi.index.astype(np.int64)/1e9, dfi['v'].values, 'r')
 
-                    ax = plt.figure("P oid:%s exp:%s" % (name,experiment)).gca()
+                    ax = plt.figure("P%se%s oid:%s" % (title,experiment,name)).gca()
                     ax.plot(dfo['x'],dfo['y'],'b,')
                     ax.plot(dfi['x'],dfi['y'],'r,')
                     ax.plot(group['x'].values[0],group['y'].values[0],'go')
