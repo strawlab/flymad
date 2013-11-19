@@ -123,26 +123,60 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
 
         first = False
 
-def plot_tracked_trajectory(ax, tdf, limits=None, ds=1, minlenpct=0.10, **kwargs):
+def plot_tracked_trajectory(ax, tdf, arena, ds=1, minlenpct=0.10, debug_plot=True, title='', **kwargs):
     ax.set_aspect('equal')
 
-    if limits is not None:
-        xlim,ylim = limits
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
+    if debug_plot:
+        outs = {}
+        ins = {}
+
+    pcts = {}
+
+    xlim,ylim = arena.get_limits()
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
 
     for experiment,df in tdf.groupby('experiment'):
         print "\ttraj: EXPERIMENT #",experiment
 
         for name, group in df.groupby('tobj_id'):
             lenpct = len(group) / float(len(df))
+            pcts[name] = lenpct
+
             if lenpct < minlenpct:
-                print "\tskip: traj skipping obj_id", name, "len", lenpct
+                print "\ttraj: skipping obj_id", name, "len", lenpct
+                if debug_plot:
+                    outs[name] = (group['x'].values.copy(),group['y'].values.copy())
                 continue
 
             print "\ttraj: obj_id", name, "len", lenpct
-
             ax.plot(group['x'].values[::ds],group['y'].values[::ds],**kwargs)
+
+            if debug_plot:
+                ins[name] = (group['x'].values.copy(),group['y'].values.copy())
+
+    if debug_plot:
+        ax = plt.figure("P%s exp:%s" % (title,experiment), figsize=(6,4)).gca()
+        for oid in outs:
+            x,y = outs[oid]
+            ax.plot(x,y,'b,',label="o%s (%.1f%%)" % (oid,pcts[oid]*100))
+
+        for oid in ins:
+            x,y = ins[oid]
+            ax.plot(x,y,'r,',label="i%s (%.1f%%)" % (oid,pcts[oid]*100))
+
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+        # Put a legend to the right of the current axis
+        ax.legend(loc='center left', ncol=1, numpoints=1, markerscale=3, columnspacing=1, bbox_to_anchor=(1, 0.5), prop={'size':9})
+
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+
+        patch = arena.get_patch(fill=False, color='k')
+        ax.add_patch(patch)
+
 
 def get_offset_and_nearest_fmf_timestamp(tss, timestamp):
     at_or_before_timestamp_cond = tss <= timestamp
@@ -369,7 +403,7 @@ def calculate_time_in_area(tdf, maxtime, toffsets):
     #rows are experiments, cols are the time bins
     return np.r_[exp_pcts]
 
-def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tout_reset_time=1, arena=None, geom=None, debug_plot=False):
+def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tout_reset_time=1, arena=None, geom=None, debug_plot=True, title=''):
     tts = []
     vel_out = []
     vel_in = []
@@ -379,12 +413,12 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
         for name, group in df.groupby('tobj_id'):
             lenpct = len(group) / float(len(df))
             if lenpct < minlenpct:
-                print "\tskip: ltcy skipping obj_id", name, "len", lenpct
+                print "\tltcy: skipping obj_id", name, "len", lenpct
                 continue
 
             t0 = group.head(1)
             if t0['in_area']:
-                print "\tskip: ltcy skipping obj_id", name, "already in area"
+                print "\tltcy: skipping obj_id", name, "already in area"
                 continue
 
             print "\tltcy: obj_id", name, "len", lenpct
@@ -433,20 +467,25 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
 
                     xlim,ylim = arena.get_limits()
 
-                    ax = plt.figure("v %s exp %s" % (name,experiment)).gca()
+                    ax = plt.figure("V%s oid:%s exp:%s" % (title,name,experiment)).gca()
                     ax.plot(dfo.index.astype(np.int64)/1e9, dfo['v'].values, 'b')
                     ax.plot(dfi.index.astype(np.int64)/1e9, dfi['v'].values, 'r')
 
-                    ax = plt.figure("p %s" % name).gca()
+                    ax = plt.figure("P oid:%s exp:%s" % (name,experiment)).gca()
                     ax.plot(dfo['x'],dfo['y'],'b,')
                     ax.plot(dfi['x'],dfi['y'],'r,')
+                    ax.plot(group['x'].values[0],group['y'].values[0],'go')
                     ax.set_xlim(*xlim)
                     ax.set_ylim(*ylim)
 
                     patch = arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.2)
                     ax.add_patch(patch)
+                    patch = arena.get_patch(fill=False, color='k')
+                    ax.add_patch(patch)
 
             else:
+                vel_out.append( group['v'].mean() )
+
                 print "\tltcy: obj_id %s finished outside" % name
 
     return tts, vel_out, vel_in

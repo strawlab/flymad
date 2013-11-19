@@ -113,7 +113,7 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
     figb.savefig(os.path.join(plotdir,'%s.png' % filename))
     figl.savefig(os.path.join(plotdir,'%s_l.png' % filename))
 
-def plot_data(path, dat):
+def plot_data(path, dat, debug_plot):
     arena = madplot.Arena(dat)
 
     if os.path.isdir(path):
@@ -168,12 +168,12 @@ def plot_data(path, dat):
             label = trial['label']
             ldf, tdf, hdf, geom = trial['data']
 
+            dbg_plot_title = " %s %s" % (exp,label)
+
             print exp.title(), label
 
             ax = fig.add_subplot(gs[i])
-            madplot.plot_tracked_trajectory(ax, tdf,
-                    limits=arena.get_limits()
-            )
+            madplot.plot_tracked_trajectory(ax, tdf, arena, debug_plot=debug_plot, title=dbg_plot_title)
 
             patch = arena.get_intersect_patch(geom, fill=True, color='r', closed=True, alpha=0.4, zorder=9)
             if patch is not None:
@@ -196,7 +196,8 @@ def plot_data(path, dat):
 
             tts, vel_out, vel_in = madplot.calculate_latency_and_velocity_to_stay(
                                                 tdf, 20,
-                                                tout_reset_time=1, arena=arena, geom=geom)
+                                                tout_reset_time=1, arena=arena, geom=geom,
+                                                debug_plot=debug_plot, title=dbg_plot_title)
 
             latency_to_first_contact[exp].append(tts)
             velocity_outside_area[exp].append(vel_out)
@@ -254,9 +255,12 @@ def plot_data(path, dat):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('path', nargs=1, help='path to json files')
+    parser.add_argument('path', nargs=1,
+                        help='path to json file or directory of bag files from '\
+                             'reiser experiments')
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--debug-plot', action='store_true', default=False)
 
     args = parser.parse_args()
     path = args.path[0]
@@ -266,7 +270,7 @@ if __name__ == "__main__":
     else:
         data = prepare_data(path)
 
-    plot_data(path, data)
+    plot_data(path, data, args.debug_plot)
 
     if args.show:
         plt.show()

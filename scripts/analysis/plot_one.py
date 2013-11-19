@@ -11,8 +11,7 @@ ax = fig.add_subplot(111)
 arena = madplot.Arena()
 
 ldf,tdf,hdf,geom = madplot.load_bagfile(sys.argv[1], arena)
-madplot.plot_tracked_trajectory(ax, tdf,
-            limits=arena.get_limits(),
+madplot.plot_tracked_trajectory(ax, tdf, arena,
             color='k',
 )
 ax.add_patch(arena.get_patch(color='k', alpha=0.1))
