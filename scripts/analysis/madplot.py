@@ -129,6 +129,19 @@ class Arena:
         #when scaling velocity, don't adjust for the origin
         return self.scale_y(y, origin=0.0)
 
+    def scale(self, v):
+        if self._convert:
+            if self._sx == self._sy:
+                s = self._sx
+            else:
+                print "warning: x and y scale not identical"
+                s = (self._sx + self._sy) / 2.0
+            if isinstance(v,list):
+                v = np.array(v)
+            return v*s*self._convert_mult
+        else:
+            return v
+
     def get_intersect_polygon(self, geom):
         if self._convert and geom:
             points_x, points_y = geom
