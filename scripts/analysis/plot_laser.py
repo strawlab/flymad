@@ -9,7 +9,8 @@ import numpy as np
 
 import madplot
 
-Target = collections.namedtuple('Target', 'obj_id from_idx to_idx v err dt_thisfly dt_ttm')
+Err = collections.namedtuple('Err', 'err dt_thisfly dt_ttm')
+Target = collections.namedtuple('Target', 'obj_id from_idx to_idx v ttm_err wf_err')
 
 arena = madplot.Arena()
 #pool_df = madplot.load_bagfile_single_dataframe(sys.argv[1], arena, ffill=False)
@@ -44,9 +45,7 @@ prev_id = prev.values[0]
 prev_ix = prev.index[0]
 
 target_ranges = {
-    (0,4):[],
-    (4,8):[],
-    (8,30):[],
+    (0,30):[],
 }
 
 for ix, row in pool_df.iterrows():
@@ -70,9 +69,12 @@ for ix, row in pool_df.iterrows():
 
             print "------------",v
 
-            errs = []
-            dts_thisfly = []
-            dts_ttm = []
+            ttm_errs = []
+            ttm_dts_thisfly = []
+            ttm_dts = []
+            wf_errs = []
+            wf_dts_thisfly = []
+            wf_dts = []
 
             #get the head detection data once we start ttm
             hdf = pool_df[to_ttm:ix]
@@ -83,26 +85,39 @@ for ix, row in pool_df.iterrows():
                 if hrow['head_x'] == 1e6:
                     continue
 
-                err = math.sqrt( (hrow['head_x']-hrow['target_x'])**2 +\
-                                 (hrow['head_y']-hrow['target_y'])**2)
+                ttm_err = math.sqrt( (hrow['head_x']-hrow['target_x'])**2 +\
+                                     (hrow['head_y']-hrow['target_y'])**2)
 
                 #if the first value is < 10 it is likely actually associated
                 #with the last fly TTM, so ignore it....
-                if (i == 0) and (err < 100):
+                if (i == 0) and (ttm_err < 100):
                     continue
 
                 #the time since we switched to this fly
-                dt_thisfly = (hix-prev_ix).total_seconds()
+                thisfly_dt = (hix-prev_ix).total_seconds()
+                #the time since we switched to TTM
+                ttm_dt = (hix-to_ttm).total_seconds()
+                ttm_errs.append(ttm_err)
+                ttm_dts_thisfly.append(thisfly_dt)
+                ttm_dts.append(ttm_dt)
+
+                wdf = ldf[:hix].tail(1)
+                wf_err = math.sqrt(  (wdf['fly_x']-wdf['laser_x'])**2 +\
+                                     (wdf['fly_y']-wdf['laser_y'])**2)
+
                 #the time since we switched to this fly
-                dt_ttm = (hix-to_ttm).total_seconds()
+                thisfly_dt = (wdf.index[0]-prev_ix).total_seconds()
+                #the time since we switched to TTM
+                ttm_dt = (wdf.index[0]-to_ttm).total_seconds()
+                wf_errs.append(wf_err)
+                wf_dts_thisfly.append(thisfly_dt)
+                wf_dts.append(ttm_dt)
 
-                errs.append(err)
-                dts_thisfly.append(dt_thisfly)
-                dts_ttm.append(dt_ttm)
+                print thisfly_dt, ttm_dt, ttm_err
 
-                print dt_thisfly, dt_ttm, err
-
-            trg = Target(lobj_id, prev_ix, ix, v, errs, dts_thisfly, dts_ttm)
+            ttm_err = Err(ttm_errs, ttm_dts_thisfly, ttm_dts)
+            wf_err = Err(wf_errs, wf_dts_thisfly, wf_dts)
+            trg = Target(lobj_id, prev_ix, ix, v, ttm_err, wf_err)
 
         except KeyError:
             #never switched to TTM
@@ -110,9 +125,9 @@ for ix, row in pool_df.iterrows():
             trg = None
             pass
 
-        except Exception:
-            print "UNKNOWN ERROR"
-            trg = None
+        #except Exception:
+        #    print "UNKNOWN ERROR"
+        #    trg = None
 
         #classify the target into which velocity range
         if trg is not None:
@@ -135,20 +150,37 @@ for k in target_ranges:
 
     figf = plt.figure("tFly %s/s" % fvels)
     axf = figf.add_subplot(1,1,1)
+    axf_w = axf.twinx()
     figt = plt.figure("tTTM %s/s" % fvels)
     axt = figt.add_subplot(1,1,1)
+    axt_w = axt.twinx()
 
     for trg in target_ranges[k]:
-        axf.plot(trg.dt_thisfly, trg.err, 'k', alpha=0.2)
-        axt.plot(trg.dt_ttm, trg.err, 'k', alpha=0.2)
+        ttm_err = trg.ttm_err
+        wf_err = trg.wf_err
+
+        axf.plot(ttm_err.dt_thisfly, ttm_err.err, 'k', alpha=0.2)
+        axt.plot(ttm_err.dt_ttm, ttm_err.err, 'k', alpha=0.2)
+
+        axf_w.plot(wf_err.dt_thisfly, wf_err.err, 'r', alpha=0.3)
+        axt_w.plot(wf_err.dt_ttm, wf_err.err, 'r', alpha=0.3)
 
         all_v.append(trg.v)
-        all_e.append(np.mean(trg.err))
+        all_e.append(np.mean(ttm_err.err))
 
     for ax in (axf,axt):
         ax.set_xlim([0, 0.25])
         ax.set_xlabel('time (s)')
-        ax.set_ylabel('error (px)')
+        ax.set_ylabel('ttm error (px)')
+        ax.set_ylim([0, 400])
+
+    for ax in (axf_w,axt_w):
+        ax.set_ylabel('deviation from WF COM (px)')
+        ax.set_ylim([0, 15])
+
+    for axttm,axwf in [(axt,axt_w),(axf,axf_w)]:
+        axttm.set_zorder(axwf.get_zorder()+1) # put ax in front of ax2
+        axttm.patch.set_visible(False)
 
     axf.set_title("Spacial accuracy of antenna targeting (fly velocity %s/s)\n"\
                   "(time since targeting this fly)" % fvels)
