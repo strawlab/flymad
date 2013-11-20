@@ -113,9 +113,11 @@ def plot_data(arena, path, data, genotype):
             #forward velocity
             vfwd = t_df['Vfwd']
             ser = pd.Series(vfwd.values, index=np.arange(0,len(vfwd))-lon)
-            pooled_vfwd[i] = ser
             pser = ser.loc[-100:900]
             axv.plot(pser.index, pser.values,'k',label=os.path.basename(score.mp4),alpha=0.2)
+
+            if len(ser) > 9000:
+                pooled_vfwd[i] = ser
 
             #dtheta
             theta = t_df['theta']
@@ -126,9 +128,11 @@ def plot_data(arena, path, data, genotype):
                 dtheta[dtheta > (0.9*np.pi / 2.0)] = np.nan
 
                 ser = pd.Series(dtheta, index=np.arange(0,len(vfwd))-lon)
-                pooled_theta[i] = ser
                 pser = ser.loc[-100:900]
                 axt.plot(pser.index, pser.values,'k.',label=os.path.basename(score.mp4),alpha=0.2)
+
+                if len(ser) > 9000:
+                    pooled_theta[i] = ser
 
         m = pd.DataFrame(pooled_vfwd).mean(axis=1)
         pm = m.loc[-100:900]
