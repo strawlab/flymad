@@ -17,6 +17,15 @@ path = sys.argv[1]
 arena = madplot.Arena(False)
 pool_df = madplot.load_bagfile_single_dataframe(path, arena, ffill=False, filter_short_pct=10.0)
 
+targets = pool_df['target_type'].dropna().unique()
+if len(targets) != 1:
+    raise Exception("Only head or body may be targeted")
+if targets[0] == 1:
+    target_name = "head"
+elif targets[0] == 2:
+    target_name = "body"
+else:
+    raise Exception("Only head or body may be targeted")
 
 ldf = pool_df[~pool_df['lobj_id'].isnull()]
 
@@ -27,17 +36,19 @@ ax.add_patch(arena.get_patch(color='k', alpha=0.1))
 
 madplot.plot_laser_trajectory(ax, ldf, arena)
 
-ax.set_title("The effect of TTM tracking on laser position.\nValues required to hit the fly head.")
+ax.set_title("The effect of TTM tracking on laser position.\n"\
+             "Values required to hit the fly %s" % target_name)
 ax.legend()
-fig.savefig('ttmeffect.png')
+fig.savefig('ttmeffect_%s.png' % target_name)
 
 hdf = pool_df[~pool_df['h_framenumber'].isnull()]
 
-fig = plt.figure("Image Processing Time")
+fig = plt.figure("Image Processing Time (%s)" %  target_name)
 ax = fig.add_subplot(1,1,1)
 ax.hist(hdf['h_processing_time'].values, bins=100)
 ax.set_xlabel('processing time (s)')
-fig.savefig('imgproc.png')
+ax.set_title("Distribution of time taken for %s detection" % target_name)
+fig.savefig('imgproc_%s.png' % target_name)
 
 #the first fly targeted
 prev = pool_df['lobj_id'].dropna().head(1)
@@ -45,10 +56,7 @@ prev_id = prev.values[0]
 prev_ix = prev.index[0]
 
 target_ranges = {
-    (0,4):[],
-    (4,8):[],
-    (8,30):[],
-    (0,30):[],
+    (0,100):[],
 }
 
 for ix, row in pool_df.iterrows():
@@ -88,8 +96,12 @@ for ix, row in pool_df.iterrows():
                 if hrow['head_x'] == 1e6:
                     continue
 
-                ttm_err = math.sqrt( (hrow['head_x']-hrow['target_x'])**2 +\
-                                     (hrow['head_y']-hrow['target_y'])**2)
+                if target_name == "head":
+                    ttm_err = math.sqrt( (hrow['head_x']-hrow['target_x'])**2 +\
+                                         (hrow['head_y']-hrow['target_y'])**2)
+                elif target_name == "body":
+                    ttm_err = math.sqrt( (hrow['body_x']-hrow['target_x'])**2 +\
+                                         (hrow['body_y']-hrow['target_y'])**2)
 
                 #if the first value is < 10 it is likely actually associated
                 #with the last fly TTM, so ignore it....
@@ -185,23 +197,23 @@ for k in target_ranges:
         axttm.set_zorder(axwf.get_zorder()+1) # put ax in front of ax2
         axttm.patch.set_visible(False)
 
-    axf.set_title("Spacial accuracy of antenna targeting (fly velocity %s/s)\n"\
-                  "(time since targeting this fly)" % fvels)
-    axt.set_title("Spacial accuracy of antenna targeting (fly velocity %s/s)\n"\
-                  "(time since switching to TTM targeting)" % fvels)
+    axf.set_title("Spacial accuracy of %s targeting (fly velocity %s/s)\n"\
+                  "(time since targeting this fly)" % (target_name,fvels))
+    axt.set_title("Spacial accuracy of %s targeting (fly velocity %s/s)\n"\
+                  "(time since switching to TTM targeting)" % (target_name,fvels))
 
-    figf.savefig('tFly%s.png' % fvels)
-    figt.savefig('tTTM%s.png' % fvels)
+    figf.savefig('tFly%s%s.png' % (target_name,fvels))
+    figt.savefig('tTTM%s%s.png' % (target_name,fvels))
 
 fig = plt.figure("Velocity")
 ax = fig.add_subplot(1,1,1)
 ax.scatter(all_v, all_e)
 ax.set_ylim([0, 400])
 ax.set_xlim([0, 10])
-ax.set_title("Spacial accuracy of antenna targeting")
+ax.set_title("Spacial accuracy of %s targeting" % target_name)
 ax.set_xlabel('fly velocity (px/s)')
 ax.set_ylabel('error (px)')
-fig.savefig('flyv_errpx.png')
+fig.savefig('flyv_errpx_%s.png' % target_name)
 
 plt.show()
 
