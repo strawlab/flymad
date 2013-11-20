@@ -218,14 +218,14 @@ for k in target_ranges:
     axt.set_title("Spacial accuracy of %s targeting (fly velocity %s/s)\n"\
                   "(time since switching to TTM targeting)" % (target_name,fvels))
 
-    figf.savefig('tFly%s%s.png' % (target_name,fvels))
-    figt.savefig('tTTM%s%s.png' % (target_name,fvels))
+    figf.savefig(('tFly%s%s.png' % (fvels,target_name)).replace(' ',''))
+    figt.savefig(('tTTM%s%s.png' % (fvels,target_name)).replace(' ',''))
 
 fig = plt.figure("Velocity")
 ax = fig.add_subplot(1,1,1)
 ax.scatter(wide_conv(all_v),all_e)
 ax.set_ylim([0, 1.5])
-ax.set_xlim([0, 3])
+ax.set_xlim([0, 2.5])
 ax.set_title("Spacial accuracy of %s targeting" % target_name)
 ax.set_xlabel('fly velocity (%s/s)' % wide_unit)
 ax.set_ylabel('error (%s)' % ttm_unit)
