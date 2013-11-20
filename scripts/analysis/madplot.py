@@ -301,7 +301,7 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100):
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0):
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -408,14 +408,23 @@ def load_bagfile(bagpath, arena, filter_short=100):
                       t_df.apply(in_area, axis=1, args=(poly,))],
                       axis=1)
 
-    if filter_short:
-        #find short trials here
-        short_tracks = []
-        for name, group in t_df.groupby('tobj_id'):
-            if len(group) < filter_short:
-                print '\tload ignoring trajectory with obj_id %s (%s samples long)' % (name, len(group))
-                short_tracks.append(name)
+    if (filter_short_pct > 0) or (filter_short > 0):
+        if filter_short_pct > 0:
+            filter_short = (float(filter_short_pct)/100.0) * len(t_df)
 
+
+    #optionally find short trials here, print the length of kept trials
+    short_tracks = []
+    for name, group in t_df.groupby('tobj_id'):
+        if len(group) < filter_short:
+            print '\tload: skip trajectory obj_id %s (%s (%.1f%%) long)' % (
+                            name, len(group), 100.0*len(group)/len(t_df))
+            short_tracks.append(name)
+        else:
+            print '\tload: trajectory obj_id %s (%s (%.1f%%) long)' % (
+                            name, len(group), 100.0*len(group)/len(t_df))
+
+    if short_tracks:
         l_df = l_df[~l_df['lobj_id'].isin(short_tracks)]
         t_df = t_df[~t_df['tobj_id'].isin(short_tracks)]
 

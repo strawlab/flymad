@@ -12,8 +12,11 @@ import madplot
 Err = collections.namedtuple('Err', 'err dt_thisfly dt_ttm')
 Target = collections.namedtuple('Target', 'obj_id from_idx to_idx v ttm_err wf_err')
 
+path = sys.argv[1]
+
 arena = madplot.Arena(False)
-pool_df = madplot.load_bagfile_single_dataframe(sys.argv[1], arena, ffill=False)
+pool_df = madplot.load_bagfile_single_dataframe(path, arena, ffill=False, filter_short_pct=10.0)
+
 
 ldf = pool_df[~pool_df['lobj_id'].isnull()]
 
