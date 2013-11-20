@@ -54,9 +54,9 @@ class Arena:
         self._ylim = ylim
         self._convert = convert
         self._convert_mult = self.CONVERT_OPTIONS[convert]
-        self._rw = float(jsonconf.get('rw',0.1))  #radius in m
-        self._sx = float(jsonconf.get('sx',0.1/192)) #scale factor px->m
-        self._sy = float(jsonconf.get('sy',0.1/201)) #scale factor px->m
+        self._rw = float(jsonconf.get('rw',0.045))   #radius in m
+        self._sx = float(jsonconf.get('sx',0.045/208)) #scale factor px->m
+        self._sy = float(jsonconf.get('sy',0.045/219)) #scale factor px->m
 
         #cache the simgear object for quick tests if the fly is in the area
         (sgcx,sgcy),sgr = self.circ
