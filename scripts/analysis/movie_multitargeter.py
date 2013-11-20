@@ -57,7 +57,7 @@ if __name__ == "__main__":
 #    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/w_reiser_movie_better20131105_122018.fmf'
 #    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/z_reiser_movie_better20131105_122015.fmf'
 
-    arena = madplot.Arena()
+    arena = madplot.Arena(False)
     df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena, ffill=False)
 
     objids = df['tobj_id'].dropna().unique()

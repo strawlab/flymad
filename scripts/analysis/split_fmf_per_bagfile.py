@@ -42,7 +42,7 @@ if __name__ == "__main__":
 
     ts = fmffile.get_all_timestamps().tolist()
 
-    arena = madplot.Arena()
+    arena = madplot.Arena(False)
 
     cuts = []
     for bag in sorted(bags):

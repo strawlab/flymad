@@ -16,37 +16,12 @@ import flymad.trackingparams
 
 Scored = collections.namedtuple('Scored', 'fmf bag mp4 csv')
 
-def load_bagfile_get_laseron(score, smooth=False):
+def load_bagfile_get_laseron(arena, score):
     FWD = 's'
     BWD = 'a'
     AS_MAP = {FWD:1,BWD:-1}
 
-    arena = madplot.Arena()
     l_df, t_df, h_df, geom = madplot.load_bagfile(score.bag, arena)
-
-    #FIXME: multi smoothing must be implemented better in the load_bagfile
-    #function
-    #
-    if smooth and (len(t_df['tobj_id'].dropna().unique()) == 1):
-        #we need dt in seconds to calculate velocity. numpy returns nanoseconds here
-        #because this is an array of type datetime64[ns] and I guess it retains the
-        #nano part when casting
-        dt = np.gradient(t_df.index.values.astype('float64')/1e9)
-
-        #smooth the positions, and recalculate the velocitys based on this.
-        kf = flymad.trackingparams.Kalman()
-        smoothed = kf.smooth(t_df['x'].values, t_df['y'].values)
-        _x = smoothed[:,0]
-        _y = smoothed[:,1]
-        _vx = np.gradient(_x) / dt
-        _vy = np.gradient(_y) / dt
-        _v = np.sqrt( (_vx**2) + (_vy**2) )
-
-        t_df['x'] = _x
-        t_df['y'] = _y
-        t_df['vx'] = _vx
-        t_df['vy'] = _vy
-        t_df['v'] = _v
 
     scored_ix = [t_df.index[0]]
     scored_v = [AS_MAP[FWD]]
@@ -79,7 +54,7 @@ def load_bagfile_get_laseron(score, smooth=False):
     else:
         return None, None
 
-def prepare_data(path, genotype):
+def prepare_data(arena, path, genotype):
     GENOTYPES = (genotype,)
 
     data = {}
@@ -95,7 +70,7 @@ def prepare_data(path, genotype):
                 target,trial,year,date = bag_re.search(fmfname).groups()
 
                 score = Scored(pair.fmf, pair.bag, mp4, csv)
-                t_df,lon = load_bagfile_get_laseron(score)
+                t_df,lon = load_bagfile_get_laseron(arena, score)
 
                 if t_df is None:
                     print "skip",score.mp4
@@ -110,14 +85,14 @@ def prepare_data(path, genotype):
 
         data[gt] = {'targets':targets}
 
-    cPickle.dump(data, open(os.path.join(path,'data_%s.pkl' % genotype),'wb'), -1)
+    cPickle.dump(data, open(os.path.join(path,'data_%s_%s.pkl' % (genotype,arena.unit)),'wb'), -1)
 
     return data
 
-def load_data(path, gt):
-    return cPickle.load(open(os.path.join(path,'data_%s.pkl' % gt),'rb'))
+def load_data(arena, path, gt):
+    return cPickle.load(open(os.path.join(path,'data_%s_%s.pkl' % (gt,arena.unit)),'rb'))
 
-def plot_data(path, data, genotype):
+def plot_data(arena, path, data, genotype):
 
     targets = data[genotype]['targets']
 
@@ -160,13 +135,14 @@ def plot_data(path, data, genotype):
 
         axv.plot(pm.index, pm.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
         axv.set_xlim([-100,900])
-        axv.set_ylim([-20,40])
+        axv.set_ylabel('velocity (%s/s)' % arena.unit)
 
         m = pd.DataFrame(pooled_theta).mean(axis=1)
         pm = m.loc[-100:900]
         axt.plot(pm.index, pm.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
         axt.set_xlim([-100,900])
-        axt.set_ylim([-0,0.3])
+        axt.set_ylabel('dtheta (rad/s)')
+        axt.set_ylim([0,0.6])
 
         figv.savefig(os.path.join(path,'velocity_%s_%s.png' % (genotype,trg)))
         figt.savefig(os.path.join(path,'dtheta_%s_%s.png' % (genotype,trg)))
@@ -184,12 +160,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
-    if args.only_plot:
-        data = load_data(path, args.genotype)
-    else:
-        data = prepare_data(path, args.genotype)
+    arena = madplot.Arena('mm')
 
-    plot_data(path, data, args.genotype)
+    if args.only_plot:
+        data = load_data(arena, path, args.genotype)
+    else:
+        data = prepare_data(arena, path, args.genotype)
+
+    plot_data(arena, path, data, args.genotype)
 
     if args.show:
         plt.show()

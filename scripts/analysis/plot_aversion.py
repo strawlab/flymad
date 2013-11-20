@@ -17,10 +17,9 @@ import rosbag
 
 import madplot
 
-def prepare_data(path):
+def prepare_data(arena, path):
 
     dat = json.load(open(path))
-    arena = madplot.Arena(dat)
 
     fly_data = dat['data']
     bpath = dat.get('_base',os.path.abspath(os.path.dirname(path)))
@@ -59,23 +58,23 @@ def prepare_data(path):
         pooled_off[exp["type"]].append(t_off)
         pooled_lon[exp["type"]].append(l_on)
 
-    cPickle.dump(pooled_on, open(os.path.join(bpath,'pooled_on.pkl'),'wb'), -1)
-    cPickle.dump(pooled_off, open(os.path.join(bpath,'pooled_off.pkl'),'wb'), -1)
-    cPickle.dump(pooled_lon, open(os.path.join(bpath,'pooled_lon.pkl'),'wb'), -1)
+    cPickle.dump(pooled_on, open(os.path.join(bpath,'pooled_on_%s.pkl' % arena.unit),'wb'), -1)
+    cPickle.dump(pooled_off, open(os.path.join(bpath,'pooled_off_%s.pkl' % arena.unit),'wb'), -1)
+    cPickle.dump(pooled_lon, open(os.path.join(bpath,'pooled_lon_%s.pkl' % arena.unit),'wb'), -1)
 
     return pooled_on, pooled_off, pooled_lon
 
-def load_data(path):
+def load_data(arena, path):
     dat = json.load(open(path))
     bpath = dat.get('_base',os.path.dirname(path))
 
     return (
-        cPickle.load(open(os.path.join(bpath,'pooled_on.pkl'),'rb')),
-        cPickle.load(open(os.path.join(bpath,'pooled_off.pkl'),'rb')),
-        cPickle.load(open(os.path.join(bpath,'pooled_lon.pkl'),'rb'))
+        cPickle.load(open(os.path.join(bpath,'pooled_on_%s.pkl' % arena.unit),'rb')),
+        cPickle.load(open(os.path.join(bpath,'pooled_off_%s.pkl' % arena.unit),'rb')),
+        cPickle.load(open(os.path.join(bpath,'pooled_lon_%s.pkl' % arena.unit),'rb'))
     )
 
-def plot_data(path, data):
+def plot_data(arena, path, data):
 
     pooled_on, pooled_off, pooled_lon = data
 
@@ -118,9 +117,7 @@ def plot_data(path, data):
     rects1 = ax.bar(ind, on_means, width, color='b', yerr=on_sems, ecolor='k')
     rects2 = ax.bar(ind+width, off_means, width, color='r', yerr=off_sems, ecolor='k')
 
-    ax.set_ylim([0, 20])
-
-    ax.set_ylabel('Speed (pixels/s) +/- SEM')
+    ax.set_ylabel('Speed (%s/s) +/- SEM' % arena.unit)
     ax.set_xticks(ind+width)
     ax.set_xticklabels( labels )
     ax.spines['bottom'].set_color('none') # don't draw bottom spine
@@ -140,12 +137,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
-    if args.only_plot:
-        data = load_data(path)
-    else:
-        data = prepare_data(path)
+    arena = madplot.Arena('mm')
 
-    plot_data(path, data)
+    if args.only_plot:
+        data = load_data(arena, path)
+    else:
+        data = prepare_data(arena, path)
+
+    plot_data(arena, path, data)
 
     if args.show:
         plt.show()

@@ -30,7 +30,7 @@ def prepare_data(path):
         dat = json.load(open(path))
         fname = os.path.splitext(os.path.basename(path))[0]
 
-    arena = madplot.Arena(dat)
+    arena = madplot.Arena(False, dat)
 
     jobs = {}
     pool = multiprocessing.Pool()
@@ -128,7 +128,7 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
     figl.savefig(os.path.join(plotdir,'%s_l.png' % filename))
 
 def plot_data(path, dat, debug_plot):
-    arena = madplot.Arena(dat)
+    arena = madplot.Arena(False, dat)
 
     if os.path.isdir(path):
         plotdir = path

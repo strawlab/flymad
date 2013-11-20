@@ -12,11 +12,8 @@ import madplot
 Err = collections.namedtuple('Err', 'err dt_thisfly dt_ttm')
 Target = collections.namedtuple('Target', 'obj_id from_idx to_idx v ttm_err wf_err')
 
-arena = madplot.Arena()
-#pool_df = madplot.load_bagfile_single_dataframe(sys.argv[1], arena, ffill=False)
-#pool_df.save('pool.df')
-
-pool_df = pd.load('pool.df')
+arena = madplot.Arena(False)
+pool_df = madplot.load_bagfile_single_dataframe(sys.argv[1], arena, ffill=False)
 
 ldf = pool_df[~pool_df['lobj_id'].isnull()]
 
@@ -24,9 +21,9 @@ fig = plt.figure("TTM Tracking", figsize=(8,8))
 ax = fig.add_subplot(1,1,1)
 
 ax.add_patch(arena.get_patch(color='k', alpha=0.1))
-madplot.plot_laser_trajectory(ax, ldf,
-            limits=arena.get_limits()
-)
+
+madplot.plot_laser_trajectory(ax, ldf, arena)
+
 ax.set_title("The effect of TTM tracking on laser position.\nValues required to hit the fly head.")
 ax.legend()
 fig.savefig('ttmeffect.png')

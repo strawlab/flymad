@@ -90,7 +90,7 @@ if __name__ == "__main__":
     zfmf = madplot.FMFTTLPlotter(ZOOM_FMF)
     zfmf.enable_color_correction(brightness=20, contrast=1.5)
 
-    arena = madplot.Arena()
+    arena = madplot.Arena(False)
 
     print "loading data"
     df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena, ffill=True)

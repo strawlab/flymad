@@ -65,7 +65,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
-    arena = madplot.Arena()
+    arena = madplot.Arena(False)
     df = madplot.load_bagfile_single_dataframe(path, arena, ffill=False)
 
     objids = df['tobj_id'].dropna().unique()

@@ -62,7 +62,7 @@ def doit_using_framenumber(match):
     rosbagf = match.bag
     maxt = match.maxt
 
-    arena = madplot.Arena()
+    arena = madplot.Arena(False)
     zoom = madplot.FMFImagePlotter(zoomf, 'z_frame')
     zoom.enable_color_correction(brightness=15, contrast=1.5)
     wide = madplot.ArenaPlotter(arena)
