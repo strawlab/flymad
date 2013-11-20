@@ -35,27 +35,108 @@ def pairwise(iterable):
     return itertools.izip(a, b)
 
 class Arena:
-    def __init__(self, jsonconf=dict()):
+
+    CONVERT_OPTIONS = {
+        False:None,
+        "m":1.0,
+        "cm":100.0,
+        "mm":1000.0,
+    }
+
+    def __init__(self, convert, jsonconf=dict()):
         x = jsonconf.get('cx',360)
         y = jsonconf.get('cy',255)
         r = jsonconf.get('cr',200)
+        xlim = jsonconf.get('xlim',(150,570))
+        ylim = jsonconf.get('ylim',(47,463))
         self._x, self._y, self._r = x,y,r
-        self._circ = sg.Point(x,y).buffer(r)
+        self._xlim = xlim
+        self._ylim = ylim
+        self._convert = convert
+        self._convert_mult = self.CONVERT_OPTIONS[convert]
+        self._rw = float(jsonconf.get('rw',0.1))  #radius in m
+        self._sx = float(jsonconf.get('sx',0.1/192)) #scale factor px->m
+        self._sy = float(jsonconf.get('sy',0.1/201)) #scale factor px->m
 
+        #cache the simgear object for quick tests if the fly is in the area
+        (sgcx,sgcy),sgr = self.circ
+        self._sg_circ = sg.Point(sgcx,sgcy).buffer(sgr)
+
+    @property
+    def unit(self):
+        if self._convert:
+            return self._convert
+        else:
+            return 'px'
+    @property
+    def circ(self):
+        if self._convert:
+            return (0,0), self._convert_mult*self._rw
+        return (self._x,self._y), self._r
     @property
     def cx(self):
-        return self._x
+        return self.scale_x(self._x)
     @property
     def cy(self):
-        return self._y
+        return self.scale_y(self._y)
     @property
     def r(self):
+        if self._convert:
+            return self._convert_mult*self._rw
         return self._r
+    @property
+    def xlim(self):
+        if self._convert:
+            #10% larger than the radius
+            xlim = np.array([-self._rw, self._rw])*self._convert_mult
+            return (xlim + (xlim*0.1)).tolist()
+        return self._xlim
+    @property
+    def ylim(self):
+        if self._convert:
+            #10% larger than the radius
+            ylim = np.array([-self._rw, self._rw])*self._convert_mult
+            return (ylim + (ylim*0.1)).tolist()
+        return self._ylim
+
+    def scale_x(self, x, origin=None):
+        if self._convert:
+            if origin is not None:
+                o = origin
+            else:
+                o = self._x
+            if isinstance(x,list):
+                x = np.array(x)
+            return (x-o)*self._sx*self._convert_mult
+        return x
+
+    def scale_y(self, y, origin=None):
+        if self._convert:
+            if origin is not None:
+                o = origin
+            else:
+                o = self._y
+            if isinstance(y,list):
+                y = np.array(y)
+            return (y-o)*self._sy*self._convert_mult
+        return y
+
+    def scale_vx(self, x):
+        #when scaling velocity, don't adjust for the origin
+        return self.scale_x(x, origin=0.0)
+
+    def scale_vy(self, y):
+        #when scaling velocity, don't adjust for the origin
+        return self.scale_y(y, origin=0.0)
 
     def get_intersect_polygon(self, geom):
+        if self._convert and geom:
+            points_x, points_y = geom
+            geom = (map(self.scale_x,points_x),map(self.scale_y,points_y))
+
         if geom:
             poly = sg.Polygon(list(zip(*geom)))
-            inter = self._circ.intersection(poly)
+            inter = self._sg_circ.intersection(poly)
             return inter
         else:
             return None
@@ -74,11 +155,12 @@ class Arena:
         return None
 
     def get_patch(self, **kwargs):
-        return matplotlib.patches.Circle((self._x,self._y), radius=self._r, **kwargs)
+        (cx,cy),r = self.circ
+        return matplotlib.patches.Circle((cx,cy), radius=r, **kwargs)
 
     def get_limits(self):
         #(xlim, ylim)
-        return (150,570), (47,463)
+        return self.xlim, self.ylim
 
 def strptime_bagfile(bag):
     assert os.path.isfile(bag)
@@ -97,13 +179,12 @@ def get_path(path, dat, bname):
 def plot_geom(ax, geom):
     ax.plot(geom[0],geom[1],'g-')
 
-def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect_patch=None, limits=None):
+def plot_laser_trajectory(ax, df, arena, plot_starts=False, plot_laser=False, intersect_patch=None):
     ax.set_aspect('equal')
 
-    if limits is not None:
-        xlim,ylim = limits
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
+    xlim,ylim = arena.get_limits()
+    ax.set_xlim(*xlim)
+    ax.set_ylim(*ylim)
 
     if intersect_patch is not None:
         ax.add_patch(intersect_patch)
@@ -113,13 +194,16 @@ def plot_laser_trajectory(ax, df, plot_starts=False, plot_laser=False, intersect
         fly_x = group['fly_x'].values
         fly_y = group['fly_y'].values
 
-        pp = ax.plot(fly_x,fly_y,'k.',label="predicted" if first else "__nolegend__")
+        pp = ax.plot(fly_x, fly_y,
+                     'k.',label="predicted" if first else "__nolegend__")
 
 #        ax.plot(fly_x[0],fly_y[0],'b.',label="predicted" if first else "__nolegend__")
 
         #plot the laser when under fine control
         laserdf = group[group['mode'] == 2]
-        lp = ax.plot(laserdf['laser_x'],laserdf['laser_y'],'r.',label="required" if first else "__nolegend__")
+        lp = ax.plot(laserdf['laser_x'].values,
+                     laserdf['laser_y'].values,
+                     'r.',label="required" if first else "__nolegend__")
 
         first = False
 
@@ -150,7 +234,7 @@ def plot_tracked_trajectory(ax, tdf, arena, ds=1, minlenpct=0.10, debug_plot=Tru
                 continue
 
             print "\ttraj: obj_id", name, "len", lenpct
-            ax.plot(group['x'].values[::ds],group['y'].values[::ds],**kwargs)
+            ax.plot(group['x'].values[::ds], group['y'].values[::ds], **kwargs)
 
             if debug_plot:
                 ins[name] = (group['x'].values.copy(),group['y'].values.copy())
@@ -163,7 +247,7 @@ def plot_tracked_trajectory(ax, tdf, arena, ds=1, minlenpct=0.10, debug_plot=Tru
 
         for oid in ins:
             x,y = ins[oid]
-            ax.plot(x,y,'r,',label="i%s (%.1f%%)" % (oid,pcts[oid]*100))
+            ax.plot(x, y, 'r,',label="i%s (%.1f%%)" % (oid,pcts[oid]*100))
 
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
@@ -233,11 +317,13 @@ def load_bagfile(bagpath, arena, filter_short=100):
     #KEEP TRACKED AND LASER OBJECT ID SEPARATE
 
     l_index = []
-    l_data = {k:[] for k in ("lobj_id","fly_x","fly_y","laser_x","laser_y","laser_power","mode")}
-    l_data_names = ("fly_x","fly_y","laser_x","laser_y","laser_power","mode")
+    l_data = {k:[] for k in ("lobj_id",
+                             "fly_x","fly_y","laser_x","laser_y",
+                             "fly_x_px","fly_y_px","laser_x_px","laser_y_px",
+                             "laser_power","mode")}
 
     t_index = []
-    t_data = {k:[] for k in ("tobj_id","x","y","vx","vy",'v','t_framenumber')}
+    t_data = {k:[] for k in ("tobj_id","x_px","y_px","vx_px","vy_px","v_px",'t_framenumber')}
 
     h_index = []
     h_data = {k:[] for k in ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type", "h_framenumber", "h_processing_time")}
@@ -252,21 +338,22 @@ def load_bagfile(bagpath, arena, filter_short=100):
                                                        "/flymad/raw_2d_positions"]):
         if topic == "/targeter/targeted":
             l_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
-            for k in l_data_names:
-                l_data[k].append( getattr(msg,k) )
             l_data['lobj_id'].append(msg.obj_id)
+            l_data['laser_power'].append(msg.laser_power)
+            l_data['mode'].append(msg.mode)
+            l_data['fly_x_px'].append(msg.fly_x)
+            l_data['fly_y_px'].append(msg.fly_y)
+            l_data['laser_x_px'].append(msg.laser_x)
+            l_data['laser_y_px'].append(msg.laser_y)
         elif topic == "/flymad/tracked":
             if msg.is_living:
-                vx = msg.state_vec[2]
-                vy = msg.state_vec[3]
                 t_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
                 t_data['tobj_id'].append(msg.obj_id)
                 t_data['t_framenumber'].append(msg.framenumber)
-                t_data['x'].append(msg.state_vec[0])
-                t_data['y'].append(msg.state_vec[1])
-                t_data['vx'].append(vx)
-                t_data['vy'].append(vy)
-                t_data['v'].append(math.sqrt( (vx**2) + (vy**2) ))
+                t_data['x_px'].append(msg.state_vec[0])
+                t_data['y_px'].append(msg.state_vec[1])
+                t_data['vx_px'].append(msg.state_vec[2])
+                t_data['vy_px'].append(msg.state_vec[3])
         elif topic == "/draw_geom/poly":
             if geom_msg is not None:
                 print "WARNING: DUPLICATE GEOM MSG", msg, "vs", geom_msg
@@ -288,6 +375,21 @@ def load_bagfile(bagpath, arena, filter_short=100):
         geom = (points_x, points_y)
     else:
         geom = tuple()
+
+    t_data['v_px'] = np.sqrt(np.power(t_data['vx_px'],2) + np.power(t_data['vy_px'],2))
+
+    #convert to real world units if the arena supports it
+    #KEEP THIS UPDATED TO INCLUDE ALL PIXEL FIELDS IN THE BAGFILES
+    t_data['x'] = arena.scale_x(t_data['x_px'])
+    t_data['y'] = arena.scale_y(t_data['y_px'])
+    t_data['vx'] = arena.scale_vx(t_data['vx_px'])
+    t_data['vy'] = arena.scale_vy(t_data['vy_px'])
+    t_data['v'] = np.sqrt(np.power(t_data['vx'],2) + np.power(t_data['vy'],2))
+
+    l_data["fly_x"] = arena.scale_x(l_data["fly_x_px"])
+    l_data["fly_y"] = arena.scale_y(l_data["fly_y_px"])
+    l_data["laser_x"] = arena.scale_x(l_data["laser_x_px"])
+    l_data["laser_y"] = arena.scale_y(l_data["laser_y_px"])
 
     poly = arena.get_intersect_polygon(geom)
 
