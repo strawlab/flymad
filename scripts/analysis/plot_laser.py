@@ -14,6 +14,13 @@ Target = collections.namedtuple('Target', 'obj_id from_idx to_idx v ttm_err wf_e
 
 path = sys.argv[1]
 
+ttm_unit = 'mm'
+ttm_conv = lambda x: np.array(x)*0.00416 #px -> mm
+
+wide_unit = 'mm'
+w_arena = madplot.Arena('mm')
+wide_conv = w_arena.scale #lambda x: x*0.21077 #px -> mm
+
 arena = madplot.Arena(False)
 pool_df = madplot.load_bagfile_single_dataframe(path, arena, ffill=False, filter_short_pct=10.0)
 
@@ -171,27 +178,36 @@ for k in target_ranges:
     axt_w = axt.twinx()
 
     for trg in target_ranges[k]:
-        ttm_err = trg.ttm_err
-        wf_err = trg.wf_err
+        #widefiled
+        err = trg.wf_err
+        axf_w.plot(err.dt_thisfly,
+                   wide_conv(err.err),
+                   'r', alpha=0.3)
+        axt_w.plot(err.dt_ttm,
+                   wide_conv(err.err),
+                   'r', alpha=0.3)
 
-        axf.plot(ttm_err.dt_thisfly, ttm_err.err, 'k', alpha=0.2)
-        axt.plot(ttm_err.dt_ttm, ttm_err.err, 'k', alpha=0.2)
-
-        axf_w.plot(wf_err.dt_thisfly, wf_err.err, 'r', alpha=0.3)
-        axt_w.plot(wf_err.dt_ttm, wf_err.err, 'r', alpha=0.3)
+        #ttm
+        err = trg.ttm_err
+        axf.plot(err.dt_thisfly,
+                 ttm_conv(err.err),
+                 'k', alpha=0.2)
+        axt.plot(err.dt_ttm,
+                 ttm_conv(err.err),
+                 'k', alpha=0.2)
 
         all_v.append(trg.v)
-        all_e.append(np.mean(ttm_err.err))
+        all_e.append(np.mean(ttm_conv(err.err)))
 
     for ax in (axf,axt):
         ax.set_xlim([0, 0.25])
         ax.set_xlabel('time (s)')
-        ax.set_ylabel('ttm error (px)')
-        ax.set_ylim([0, 400])
+        ax.set_ylabel('TTM error (%s)' % ttm_unit)
+        ax.set_ylim([0, 1.5])
 
     for ax in (axf_w,axt_w):
-        ax.set_ylabel('deviation from WF COM (px)')
-        ax.set_ylim([0, 15])
+        ax.set_ylabel('deviation from WF COM (%s)' % wide_unit)
+        ax.set_ylim([0, 4])
 
     for axttm,axwf in [(axt,axt_w),(axf,axf_w)]:
         axttm.set_zorder(axwf.get_zorder()+1) # put ax in front of ax2
@@ -207,12 +223,12 @@ for k in target_ranges:
 
 fig = plt.figure("Velocity")
 ax = fig.add_subplot(1,1,1)
-ax.scatter(all_v, all_e)
-ax.set_ylim([0, 400])
-ax.set_xlim([0, 10])
+ax.scatter(wide_conv(all_v),all_e)
+ax.set_ylim([0, 1.5])
+ax.set_xlim([0, 3])
 ax.set_title("Spacial accuracy of %s targeting" % target_name)
-ax.set_xlabel('fly velocity (px/s)')
-ax.set_ylabel('error (px)')
+ax.set_xlabel('fly velocity (%s/s)' % wide_unit)
+ax.set_ylabel('error (%s)' % ttm_unit)
 fig.savefig('flyv_errpx_%s.png' % target_name)
 
 plt.show()
