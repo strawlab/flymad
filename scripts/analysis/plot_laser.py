@@ -45,6 +45,9 @@ prev_id = prev.values[0]
 prev_ix = prev.index[0]
 
 target_ranges = {
+    (0,4):[],
+    (4,8):[],
+    (8,30):[],
     (0,30):[],
 }
 
