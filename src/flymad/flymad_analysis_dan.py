@@ -231,7 +231,14 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None):
         yield df, (csvfilefn,experimentID,date,time,genotype,laser,repID)
         
 
-def kalman_smooth_dataframe(df):
+def kalman_smooth_dataframe(df, arena=None):
+    if arena:
+        fsx = arena.scale_x
+        fsy = arena.scale_y
+    else:
+        fsx = lambda _x: _x
+        fsy = lambda _y: _y
+
     #we need dt in seconds to calculate velocity. numpy returns nanoseconds here
     #because this is an array of type datetime64[ns] and I guess it retains the
     #nano part when casting
@@ -240,8 +247,8 @@ def kalman_smooth_dataframe(df):
     #smooth the positions, and recalculate the velocitys based on this.
     kf = Kalman()
     smoothed = kf.smooth(df['x'].values, df['y'].values)
-    _x = smoothed[:,0]
-    _y = smoothed[:,1]
+    _x = fsx(smoothed[:,0])
+    _y = fsy(smoothed[:,1])
     _vx = np.gradient(_x) / dt
     _vy = np.gradient(_y) / dt
     _v = np.sqrt( (_vx**2) + (_vy**2) )
