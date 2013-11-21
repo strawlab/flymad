@@ -60,7 +60,9 @@ if __name__ == "__main__":
     parser.add_argument('--show-target', action='store_true', default=False, help='show targeted fly')
     parser.add_argument('--show-timestamp', action='store_true', default=False, help='show frame timestamp (likely framenumber)')
     parser.add_argument('--show-epoch', action='store_true', default=False, help='show epoch')
+    parser.add_argument('--show-arena', action='store_true', default=False, help='show arena')
     parser.add_argument('--fps', type=int, default=20, help='framenumber')
+    parser.add_argument('--hist', type=int, default=400, help='show this many points of trajectory history')
 
     args = parser.parse_args()
     path = args.path[0]
@@ -70,7 +72,9 @@ if __name__ == "__main__":
 
     objids = df['tobj_id'].dropna().unique()
 
-    wfmf = madplot.FMFMultiTrajectoryPlotter(args.wide_fmf, objids, maxlen=400)
+    wfmf = madplot.FMFMultiTrajectoryPlotter(args.wide_fmf, objids, maxlen=args.hist)
+    if args.show_arena:
+        wfmf.show_arena = arena
     wfmf.show_lxly = args.show_laser
     wfmf.show_fxfy = args.show_target
     wfmf.show_timestamp = args.show_timestamp
