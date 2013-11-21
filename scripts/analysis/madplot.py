@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches
 import matplotlib.colors
 import progressbar
+import adskalman.adskalman
 
 import motmot.FlyMovieFormat.FlyMovieFormat
 import benu.benu
@@ -33,6 +34,43 @@ def pairwise(iterable):
     a, b = itertools.tee(iterable)
     next(b, None)
     return itertools.izip(a, b)
+
+class Kalman:
+    ### KEEP THESE IN SYNC WITH FLYMAD TRACKER
+
+    FPS = 100
+    Qsigma=10.0 # process covariance
+    Rsigma=10.0 # observation covariance
+
+    dt = 1.0/FPS
+
+    # process model
+    A = np.array([[1, 0, dt, 0],
+                  [0, 1, 0, dt],
+                  [0, 0, 1,  0],
+                  [0, 0, 0,  1]],
+                 dtype=np.float64)
+    # observation model
+    C = np.array([[1, 0, 0, 0],
+                  [0, 1, 0, 0]],
+                 dtype=np.float64)
+    # process covariance
+    Q = Qsigma*np.eye(4)
+    # measurement covariance
+    R = Rsigma*np.eye(2)
+
+    def smooth(self, x, y):
+
+        y = np.c_[x,y]
+        initx = np.array([y[0,0],y[0,1],0,0])
+        initV = 0*np.eye(4)
+
+        xsmooth,Vsmooth = adskalman.adskalman.kalman_smoother(y,
+                                self.A,self.C,
+                                self.Q,self.R,
+                                initx,initV)
+
+        return xsmooth
 
 class Arena:
 
@@ -314,7 +352,7 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0):
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False):
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -389,15 +427,33 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0):
     else:
         geom = tuple()
 
-    t_data['v_px'] = np.sqrt(np.power(t_data['vx_px'],2) + np.power(t_data['vy_px'],2))
+    if smooth:
+        print "\tkalman smoothing"
+
+        dt = 1/100.0#np.gradient(df.index.values.astype('float64')/SECOND_TO_NANOSEC)
+
+        #smooth the positions, and recalculate the velocitys based on this.
+        kf = Kalman()
+        smoothed = kf.smooth(t_data['x_px'], t_data['y_px'])
+        x_px = smoothed[:,0]
+        y_px = smoothed[:,1]
+        vx_px = np.gradient(x_px) / dt
+        vy_px = np.gradient(y_px) / dt
+    else:
+        x_px = np.array(t_data['x_px'])
+        y_px = np.array(t_data['y_px'])
+        vx_px = np.array(t_data['vx_px'])
+        vy_px = np.array(t_data['vy_px'])
 
     #convert to real world units if the arena supports it
     #KEEP THIS UPDATED TO INCLUDE ALL PIXEL FIELDS IN THE BAGFILES
-    t_data['x'] = arena.scale_x(t_data['x_px'])
-    t_data['y'] = arena.scale_y(t_data['y_px'])
-    t_data['vx'] = arena.scale_vx(t_data['vx_px'])
-    t_data['vy'] = arena.scale_vy(t_data['vy_px'])
-    t_data['v'] = np.sqrt(np.power(t_data['vx'],2) + np.power(t_data['vy'],2))
+    t_data['v_px'] = np.sqrt((vx_px**2) + (vy_px**2))
+
+    t_data['x'] = arena.scale_x(x_px)
+    t_data['y'] = arena.scale_y(y_px)
+    t_data['vx'] = arena.scale_vx(vx_px)
+    t_data['vy'] = arena.scale_vy(vy_px)
+    t_data['v'] = np.sqrt((t_data['vx']**2) + (t_data['vy']**2))
 
     l_data["fly_x"] = arena.scale_x(l_data["fly_x_px"])
     l_data["fly_y"] = arena.scale_y(l_data["fly_y_px"])
@@ -1078,4 +1134,18 @@ class MovieMaker:
         shutil.rmtree(self.tmpdir)
 
 
+if __name__ == "__main__":
+    for unit in ('mm','cm','m'):
+        a = Arena(unit)
+
+        cx = a._x #cx
+        cy = a._y #cy
+        print "cx =", a.scale_x(cx), unit
+        print "cy =", a.scale_y(cy), unit
+
+        print "200 px from origin +ve x", a.scale_x(cx + a._r), unit
+        print "200 px from origin +ve y", a.scale_y(cy + a._r), unit
+
+        print "400 px/s in +ve x", a.scale_vx(400), unit+'/s'
+        print "400 px/s in +ve y", a.scale_vy(400), unit+'/s'
 
