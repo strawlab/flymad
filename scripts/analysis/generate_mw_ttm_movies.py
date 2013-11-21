@@ -57,7 +57,9 @@ class Assembler:
 
         return png
 
-def doit_using_framenumber(match):
+def doit_using_framenumber(user_data):
+    match, mdir, show_theta, show_velocity = user_data
+
     zoomf = match.fmf
     rosbagf = match.bag
     maxt = match.maxt
@@ -66,7 +68,13 @@ def doit_using_framenumber(match):
     zoom = madplot.FMFImagePlotter(zoomf, 'z_frame')
     zoom.enable_color_correction(brightness=15, contrast=1.5)
     wide = madplot.ArenaPlotter(arena)
-    wide.show_theta = True
+
+    wide.show_theta = show_theta
+    wide.show_velocity = show_velocity
+    wide.show_epoch = True
+    wide.show_framenumber = True
+    wide.show_lxly = True
+    wide.show_fxfy = True
 
     renderlist = []
 
@@ -134,7 +142,6 @@ def doit_using_framenumber(match):
     if not USE_MULTIPROCESSING:
         pbar.finish()
 
-    mdir = 'mp4s'
     if not os.path.exists(mdir):
         os.makedirs(mdir)
 
@@ -206,7 +213,10 @@ if __name__ == "__main__":
     parser.add_argument('--genotype', required=True, help='genotype (the prefix of the fmfs; cs, Moonw, etc)')
     parser.add_argument('--disable-multiprocessing', action='store_true', default=False)
     parser.add_argument('--dry-run', action='store_true', default=False)
+    parser.add_argument('--show-theta', action='store_true', default=False)
+    parser.add_argument('--show-velocity', action='store_true', default=False)
     parser.add_argument('--max-time', type=int, default=0, help='max time of video')
+    parser.add_argument('--outdir', default='mp4s', help='dir to save mp4s')
 
     args = parser.parse_args()
     path = args.path[0]
@@ -214,12 +224,13 @@ if __name__ == "__main__":
     if not os.path.isdir(path):
         parser.error('must be a directory')
 
-    matching = get_matching_fmf_and_bag(args.genotype, path, args.max_time)
+    matching = [(m,args.outdir,args.show_theta,args.show_velocity)\
+                for m in get_matching_fmf_and_bag(args.genotype, path, args.max_time)]
     print len(matching),"matching"
 
     if args.dry_run:
         for match in matching:
-            print match
+            print match[0]
         sys.exit(0)
 
     if (not args.disable_multiprocessing) and USE_MULTIPROCESSING:

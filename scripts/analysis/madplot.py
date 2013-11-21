@@ -778,6 +778,8 @@ class _FMFPlotter:
 class ArenaPlotter(_FMFPlotter):
 
     show_theta = False
+    show_velocity = False
+    show_framenumber = False
 
     def __init__(self, arena, bgcolor=(0.0,0.0,0.0,1), tzname='CET'):
         _FMFPlotter.__init__(self, None) #no fmf
@@ -792,10 +794,11 @@ class ArenaPlotter(_FMFPlotter):
 
             row = desc.get_row()
 
-            canv.scatter( [row['x']],
-                          [row['y']],
-                          color_rgba=(0,1,0,1),
-                          radius=2 )
+            if self.show_fxfy:
+                canv.scatter( [row['x']],
+                              [row['y']],
+                              color_rgba=(0,1,0,1),
+                              radius=2 )
 
             if self.show_theta and row['theta']:
                 try:
@@ -812,31 +815,35 @@ class ArenaPlotter(_FMFPlotter):
                             color_rgba=(0,1,0,1),
                             close_path=False)
 
-            if row['laser_power']:
+            if self.show_lxly and row['laser_power']:
                 canv.scatter( [row['laser_x']],
                               [row['laser_y']],
                               color_rgba=(1,0,0,1),
                               radius=1 )
 
-            canv.text(str(datetime.datetime.fromtimestamp(desc.epoch, self.tz)),
-                      15,25,
-                      color_rgba=(1.,1.,1.,1.),
-                      font_face="Ubuntu", bold=False, font_size=14)
+            if self.show_epoch:
+                canv.text(str(datetime.datetime.fromtimestamp(desc.epoch, self.tz)),
+                          15,25,
+                          color_rgba=(1.,1.,1.,1.),
+                          font_face="Ubuntu", bold=False, font_size=14)
 
-            canv.text(str(int(row['t_framenumber'])),
-                      15,50,
-                      color_rgba=(1.,1.,1.,1.),
-                      font_face="Ubuntu", bold=False, font_size=14)
+            if self.show_framenumber:
+                canv.text(str(int(row['t_framenumber'])),
+                          15,50,
+                          color_rgba=(1.,1.,1.,1.),
+                          font_face="Ubuntu", bold=False, font_size=14)
 
-            canv.text("%.1fs" % (desc.epoch - self.t0),
-                      15,75,
-                      color_rgba=(1.,1.,1.,1.),
-                      font_face="Ubuntu", bold=False, font_size=14)
+            if self.show_epoch:
+                canv.text("%.1fs" % (desc.epoch - self.t0),
+                          15,75,
+                          color_rgba=(1.,1.,1.,1.),
+                          font_face="Ubuntu", bold=False, font_size=14)
 
-            canv.text("%.1f px/s" % row['v'],
-                      15,panel["height"]-15,
-                      color_rgba=(1.,1.,1.,1.),
-                      font_face="Ubuntu", bold=False, font_size=14)
+            if self.show_velocity:
+                canv.text("%.1f px/s" % row['v'],
+                          15,panel["height"]-15,
+                          color_rgba=(1.,1.,1.,1.),
+                          font_face="Ubuntu", bold=False, font_size=14)
 
 
 class FMFImagePlotter(_FMFPlotter):
