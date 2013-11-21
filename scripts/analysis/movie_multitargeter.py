@@ -48,14 +48,19 @@ class Assembler:
         return png
 
 if __name__ == "__main__":
+    import argparse
 
-    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser/reiser_movie_120131030_173444.fmf'
-    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser/reiser_movie_220131030_173442.fmf'
-    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/reiser/2013-10-30-17-34-49.bag'
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', nargs=1, help='path to bag file')
+    parser.add_argument('--wide-fmf', help='wide fmf file to render the trajectory over', required=True)
+    parser.add_argument('--zoom-fmf', help='wide fmf file to render the trajectory over', required=True)
+    parser.add_argument('--outdir', help='destination directory for mp4')
 
-#    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/2013-11-05-12-20-23.bag'
-#    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/w_reiser_movie_better20131105_122018.fmf'
-#    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/reiser2/z_reiser_movie_better20131105_122015.fmf'
+    args = parser.parse_args()
+
+    BAG_FILE = args.path[0]
+    ZOOM_FMF = args.zoom_fmf
+    WIDE_FMF = args.wide_fmf
 
     arena = madplot.Arena(False)
     df = madplot.load_bagfile_single_dataframe(BAG_FILE, arena, ffill=False)
@@ -158,7 +163,7 @@ if __name__ == "__main__":
 
     pbar.finish()
 
-    moviefname = moviemaker.render(os.path.dirname(BAG_FILE))
+    moviefname = moviemaker.render(args.outdir if args.outdir else os.path.dirname(BAG_FILE))
     print "wrote", moviefname
 
     moviemaker.cleanup()
