@@ -3,10 +3,164 @@ import glob
 import os.path
 import numpy as np
 import pandas as pd
+import shapely.geometry as sg
+import matplotlib.patches
 
 SECOND_TO_NANOSEC = 1e9
 
 from trackingparams import Kalman
+
+class Arena:
+
+    CONVERT_OPTIONS = {
+        False:None,
+        "m":1.0,
+        "cm":100.0,
+        "mm":1000.0,
+    }
+
+    def __init__(self, convert, jsonconf=dict()):
+        #from clicking on the outermost points to define the circlt
+        l = {'y': 253.9102822580644, 'x': 256.27620967741939}
+        r = {'y': 241.01108870967732, 'x': 624.82459677419365}
+        t = {'y': 30.017137096774036, 'x': 438.70766129032268}
+        b = {'y': 457.5332661290322, 'x': 429.49395161290329}
+
+        w = r['x'] - l['x']
+        h = b['y'] - t['y']
+        self._x = l['x'] + (w/2.0)# + 12
+        self._y = t['y'] + (h/2.0)
+        self._r = min(w,h)/2.0
+
+        #NO DAN. NEVER REVERSE THE AXIS BY SETTING xlim[-1] < xlim[0]
+        #self._xlim = [self._y+self._r+10,self._y-self._r-10]
+
+        self._xlim = [self._y-self._r-10,self._y+self._r+10]
+        self._ylim = [self._x-self._r-10,self._x+self._r+10]
+
+        self._convert = convert
+        self._convert_mult = self.CONVERT_OPTIONS[convert]
+
+        self._rw = float(jsonconf.get('rw',0.045))   #radius in m
+        self._sx = float(jsonconf.get('sx',0.045/160)) #scale factor px->m
+        self._sy = float(jsonconf.get('sy',0.045/185)) #scale factor px->m
+
+        #cache the simgear object for quick tests if the fly is in the area
+        (sgcx,sgcy),sgr = self.circ
+        self._sg_circ = sg.Point(sgcx,sgcy).buffer(sgr)
+
+    @property
+    def unit(self):
+        if self._convert:
+            return self._convert
+        else:
+            return 'px'
+    @property
+    def circ(self):
+        if self._convert:
+            return (0,0), self._convert_mult*self._rw
+        return (self._x,self._y), self._r
+    @property
+    def cx(self):
+        return self.scale_x(self._x)
+    @property
+    def cy(self):
+        return self.scale_y(self._y)
+    @property
+    def r(self):
+        if self._convert:
+            return self._convert_mult*self._rw
+        return self._r
+    @property
+    def xlim(self):
+        if self._convert:
+            #10% larger than the radius
+            xlim = np.array([-self._rw, self._rw])*self._convert_mult
+            return (xlim + (xlim*0.1)).tolist()
+        return self._xlim
+    @property
+    def ylim(self):
+        if self._convert:
+            #10% larger than the radius
+            ylim = np.array([-self._rw, self._rw])*self._convert_mult
+            return (ylim + (ylim*0.1)).tolist()
+        return self._ylim
+
+    def scale_x(self, x, origin=None):
+        if self._convert:
+            if origin is not None:
+                o = origin
+            else:
+                o = self._x
+            if isinstance(x,list):
+                x = np.array(x)
+            return (x-o)*self._sx*self._convert_mult
+        return x
+
+    def scale_y(self, y, origin=None):
+        if self._convert:
+            if origin is not None:
+                o = origin
+            else:
+                o = self._y
+            if isinstance(y,list):
+                y = np.array(y)
+            return (y-o)*self._sy*self._convert_mult
+        return y
+
+    def scale_vx(self, x):
+        #when scaling velocity, don't adjust for the origin
+        return self.scale_x(x, origin=0.0)
+
+    def scale_vy(self, y):
+        #when scaling velocity, don't adjust for the origin
+        return self.scale_y(y, origin=0.0)
+
+    def scale(self, v):
+        if self._convert:
+            if self._sx == self._sy:
+                s = self._sx
+            else:
+                print "warning: x and y scale not identical"
+                s = (self._sx + self._sy) / 2.0
+            if isinstance(v,list):
+                v = np.array(v)
+            return v*s*self._convert_mult
+        else:
+            return v
+
+    def get_intersect_polygon(self, geom):
+        if self._convert and geom:
+            points_x, points_y = geom
+            geom = (map(self.scale_x,points_x),map(self.scale_y,points_y))
+
+        if geom:
+            poly = sg.Polygon(list(zip(*geom)))
+            inter = self._sg_circ.intersection(poly)
+            return inter
+        else:
+            return None
+
+    def get_intersect_points(self, geom):
+        inter = self.get_intersect_polygon(geom)
+        if inter:
+            return list(inter.exterior.coords)
+        else:
+            return []
+
+    def get_intersect_patch(self, geom, **kwargs):
+        pts = self.get_intersect_points(geom)
+        if pts:
+            return matplotlib.patches.Polygon(pts, **kwargs)
+        return None
+
+    def get_patch(self, **kwargs):
+        (cx,cy),r = self.circ
+        return matplotlib.patches.Circle((cx,cy), radius=r, **kwargs)
+
+    def get_limits(self):
+        #(xlim, ylim)
+        return self.xlim, self.ylim
 
 def courtship_combine_csvs_to_dataframe(path, globpattern=None):
     filelist = []
