@@ -51,9 +51,14 @@ def build_framedesc_list(pool_df, wt, zt):
 
         for idx,hmatchingrow in (pool_df[pool_df['h_framenumber'] == z_frameno]).iterrows():
 
-            if hmatchingrow.isnull().values.any():
-                #missing data
-                continue
+            isnull = hmatchingrow.isnull()
+            if isnull.any():
+                if isnull['theta'] and (isnull.values.sum() == 1):
+                    #only theta is missing, that is harmless
+                    pass
+                else:
+                    #missing data
+                    continue
 
             try:
                 t_frameno = int(hmatchingrow['t_framenumber'])
@@ -82,9 +87,19 @@ def build_framedesc_list(pool_df, wt, zt):
     return frames
 
 if __name__ == "__main__":
-    ZOOM_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/aversion/z_new_movie_aversion_h20131030_180450.fmf'
-    WIDE_FMF = '/mnt/strawscience/data/FlyMAD/new_movies/aversion/w_new_movie_aversion_h20131030_180453.fmf'
-    BAG_FILE = '/mnt/strawscience/data/FlyMAD/new_movies/aversion/2013-10-30-18-04-55.bag'
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', nargs=1, help='path to bag file')
+    parser.add_argument('--wide-fmf', help='wide fmf file to render the trajectory over', required=True)
+    parser.add_argument('--zoom-fmf', help='wide fmf file to render the trajectory over', required=True)
+    parser.add_argument('--outdir', help='destination directory for mp4')
+
+    args = parser.parse_args()
+
+    BAG_FILE = args.path[0]
+    ZOOM_FMF = args.zoom_fmf
+    WIDE_FMF = args.wide_fmf
 
     wfmf = madplot.FMFTrajectoryPlotter(WIDE_FMF)
     zfmf = madplot.FMFTTLPlotter(ZOOM_FMF)
@@ -162,7 +177,7 @@ if __name__ == "__main__":
 
     pbar.finish()
 
-    moviefname = moviemaker.render(os.path.dirname(BAG_FILE))
+    moviefname = moviemaker.render(args.outdir if args.outdir else os.path.dirname(BAG_FILE))
     print "wrote", moviefname
 
     moviemaker.cleanup()
