@@ -28,7 +28,7 @@ class Arena:
 
         w = r['x'] - l['x']
         h = b['y'] - t['y']
-        self._x = l['x'] + (w/2.0)# + 12
+        self._x = l['x'] + (w/2.0) + 12
         self._y = t['y'] + (h/2.0)
         self._r = min(w,h)/2.0
 
