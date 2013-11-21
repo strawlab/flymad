@@ -55,7 +55,7 @@ def prepare_data(arena, path):
         elif lobj_id != prev_id:
             df = pool_df[prev_ix:ix]
 
-            #mean velocity of fly over its whole turn
+            #mean speed of fly over its whole turn
             v = df['v'].mean()
 
             #details of the TrackedObj message
@@ -133,7 +133,7 @@ def prepare_data(arena, path):
             #    print "UNKNOWN ERROR"
             #    trg = None
 
-            #classify the target into which velocity range
+            #classify the target into which speed range
             if trg is not None:
                 for k in target_ranges:
                     vmin,vmax = k
@@ -233,21 +233,21 @@ def plot_data(arena, path, data):
             axttm.set_zorder(axwf.get_zorder()+1) # put ax in front of ax2
             axttm.patch.set_visible(False)
 
-        axf.set_title("Spacial accuracy of %s targeting (fly velocity %s/s)\n"\
+        axf.set_title("Spacial accuracy of %s targeting (fly speed %s/s)\n"\
                       "(time since targeting this fly)" % (target_name,fvels))
-        axt.set_title("Spacial accuracy of %s targeting (fly velocity %s/s)\n"\
+        axt.set_title("Spacial accuracy of %s targeting (fly speed %s/s)\n"\
                       "(time since switching to TTM targeting)" % (target_name,fvels))
 
         figf.savefig(('tFly%s%s.png' % (fvels,target_name)).replace(' ',''))
         figt.savefig(('tTTM%s%s.png' % (fvels,target_name)).replace(' ',''))
 
-    fig = plt.figure("Velocity")
+    fig = plt.figure("Speed %s" % target_name)
     ax = fig.add_subplot(1,1,1)
     ax.scatter(wide_conv(all_v),all_e)
     ax.set_ylim([0, 1.5])
     ax.set_xlim([0, 2.5])
     ax.set_title("Spacial accuracy of %s targeting" % target_name)
-    ax.set_xlabel('fly velocity (%s/s)' % wide_unit)
+    ax.set_xlabel('fly speed (%s/s)' % wide_unit)
     ax.set_ylabel('error (%s)' % ttm_unit)
     fig.savefig('flyv_errpx_%s.png' % target_name)
 
