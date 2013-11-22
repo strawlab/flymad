@@ -166,7 +166,7 @@ if __name__ == "__main__":
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--genotype', default='Moonw')
-    parser.add_argument('--smooth', action='store_true', default=False)
+    parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
 
     args = parser.parse_args()
     path = args.path[0]
