@@ -21,7 +21,9 @@ import flymad.flymad_plot as flymad_plot
 assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.__version__ == "0.11.0"
 
-def prepare_data(path, exp_genotype, ctrl_genotype):
+arena = flymad_analysis.Arena('mm')
+
+def prepare_data(path, smoothstr, smooth, exp_genotype, ctrl_genotype):
 
     df2 = DataFrame()
     if not os.path.exists(path + "/Speed_calculations/"):
@@ -46,7 +48,7 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
         df = flymad_analysis.fixup_index_and_resample(df, '10L')
 
         #smooth the positions, and recalculate the velocitys based on this.
-        dt = flymad_analysis.kalman_smooth_dataframe(df)
+        dt = flymad_analysis.kalman_smooth_dataframe(df, arena, smooth)
 
         df['laser_state'] = df['laser_state'].fillna(value=0)
 
@@ -99,29 +101,29 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
     ctrln = ctrldf.groupby(['align'], as_index=False).count().astype(float)
 
     ####AAAAAAAARRRRRRRRRRRGGGGGGGGGGGGGGHHHHHHHHHH so much copy paste here
-    df2.save(path + "/df2.df")
-    expmean.save(path + "/expmean.df")
-    ctrlmean.save(path + "/ctrlmean.df")
-    expstd.save(path + "/expstd.df")
-    ctrlstd.save(path + "/ctrlstd.df")
-    expn.save(path + "/expn.df")
-    ctrln.save(path + "/ctrln.df")
+    df2.save(path + "/df2" + smoothstr + ".df")
+    expmean.save(path + "/expmean" + smoothstr + ".df")
+    ctrlmean.save(path + "/ctrlmean" + smoothstr + ".df")
+    expstd.save(path + "/expstd" + smoothstr + ".df")
+    ctrlstd.save(path + "/ctrlstd" + smoothstr + ".df")
+    expn.save(path + "/expn" + smoothstr + ".df")
+    ctrln.save(path + "/ctrln" + smoothstr + ".df")
 
     return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln
 
-def load_data( path ):
+def load_data(path, smoothstr):
     return (
-            pd.load(path + "/expmean.df"),
-            pd.load(path + "/ctrlmean.df"),
-            pd.load(path + "/expstd.df"),
-            pd.load(path + "/ctrlstd.df"),
-            pd.load(path + "/expn.df"),
-            pd.load(path + "/ctrln.df"),
+            pd.load(path + "/expmean" + smoothstr + ".df"),
+            pd.load(path + "/ctrlmean" + smoothstr + ".df"),
+            pd.load(path + "/expstd" + smoothstr + ".df"),
+            pd.load(path + "/ctrlstd" + smoothstr + ".df"),
+            pd.load(path + "/expn" + smoothstr + ".df"),
+            pd.load(path + "/ctrln" + smoothstr + ".df"),
     )
 
-def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
+def plot_data( path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
 
-    fig2 = plt.figure("Speed Multiplot")
+    fig2 = plt.figure("Speed Multiplot %s" % smoothstr)
     ax = fig2.add_subplot(1,1,1)
 
     flymad_plot.plot_timeseries_with_activation(ax,
@@ -140,12 +142,13 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
                     downsample=25
     )
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Speed (pixels/s) +/- STD')
-    ax.set_ylim([0, 160])
+    ax.set_ylabel('Speed (%s/s) +/- STD' % arena.unit)
     ax.set_xlim([0, 70])
 
-    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.png"), bbox_inches='tight')
-    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.svg"), bbox_inches='tight')
+    ax.set_title("Speed %s" % smoothstr)
+
+    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot_%s.png" % smoothstr), bbox_inches='tight')
+    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot_%s.svg" % smoothstr), bbox_inches='tight')
 
 
 if __name__ == "__main__":
@@ -156,16 +159,21 @@ if __name__ == "__main__":
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--smooth', action='store_true', default=False)
 
     args = parser.parse_args()
     path = args.path[0]
 
-    if args.only_plot:
-        data = load_data(path)
-    else:
-        data = prepare_data(path, EXP_GENOTYPE, CTRL_GENOTYPE)
+    smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
 
-    plot_data(path, *data)
+    print "speed", smoothstr
+
+    if args.only_plot:
+        data = load_data(path,smoothstr)
+    else:
+        data = prepare_data(path, smoothstr, args.smooth, EXP_GENOTYPE, CTRL_GENOTYPE)
+
+    plot_data(path, smoothstr, *data)
 
     if args.show:
         plt.show()

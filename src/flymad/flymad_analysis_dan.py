@@ -231,24 +231,29 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None):
         yield df, (csvfilefn,experimentID,date,time,genotype,laser,repID)
         
 
-def kalman_smooth_dataframe(df, arena=None):
+def kalman_smooth_dataframe(df, arena=None, smooth=True):
     if arena:
         fsx = arena.scale_x
         fsy = arena.scale_y
     else:
-        fsx = lambda _x: _x
-        fsy = lambda _y: _y
+        fsx = fsy = lambda _v: _v
 
     #we need dt in seconds to calculate velocity. numpy returns nanoseconds here
     #because this is an array of type datetime64[ns] and I guess it retains the
     #nano part when casting
     dt = np.gradient(df.index.values.astype('float64')/SECOND_TO_NANOSEC)
 
-    #smooth the positions, and recalculate the velocitys based on this.
-    kf = Kalman()
-    smoothed = kf.smooth(df['x'].values, df['y'].values)
-    _x = fsx(smoothed[:,0])
-    _y = fsy(smoothed[:,1])
+    if smooth:
+        print "smoothing"
+        #smooth the positions, and recalculate the velocitys based on this.
+        kf = Kalman()
+        smoothed = kf.smooth(df['x'].values, df['y'].values)
+        _x = fsx(smoothed[:,0])
+        _y = fsy(smoothed[:,1])
+    else:
+        _x = fsx(df['x'].values)
+        _y = fsy(df['y'].values)
+
     _vx = np.gradient(_x) / dt
     _vy = np.gradient(_y) / dt
     _v = np.sqrt( (_vx**2) + (_vy**2) )
