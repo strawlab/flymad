@@ -16,12 +16,12 @@ import flymad.trackingparams
 
 Scored = collections.namedtuple('Scored', 'fmf bag mp4 csv')
 
-def load_bagfile_get_laseron(arena, score):
+def load_bagfile_get_laseron(arena, score, smooth):
     FWD = 's'
     BWD = 'a'
     AS_MAP = {FWD:1,BWD:-1}
 
-    l_df, t_df, h_df, geom = madplot.load_bagfile(score.bag, arena)
+    l_df, t_df, h_df, geom = madplot.load_bagfile(score.bag, arena, smooth=smooth)
 
     scored_ix = [t_df.index[0]]
     scored_v = [AS_MAP[FWD]]
@@ -54,7 +54,7 @@ def load_bagfile_get_laseron(arena, score):
     else:
         return None, None
 
-def prepare_data(arena, path, genotype):
+def prepare_data(arena, path, smoothstr, smooth, genotype):
     GENOTYPES = (genotype,)
 
     data = {}
@@ -70,7 +70,7 @@ def prepare_data(arena, path, genotype):
                 target,trial,year,date = bag_re.search(fmfname).groups()
 
                 score = Scored(pair.fmf, pair.bag, mp4, csv)
-                t_df,lon = load_bagfile_get_laseron(arena, score)
+                t_df,lon = load_bagfile_get_laseron(arena, score, smooth)
 
                 if t_df is None:
                     print "skip",score.mp4
@@ -85,14 +85,14 @@ def prepare_data(arena, path, genotype):
 
         data[gt] = {'targets':targets}
 
-    cPickle.dump(data, open(os.path.join(path,'data_%s_%s.pkl' % (genotype,arena.unit)),'wb'), -1)
+    cPickle.dump(data, open(os.path.join(path,'data_%s_%s_%s.pkl' % (genotype,arena.unit,smoothstr)),'wb'), -1)
 
     return data
 
-def load_data(arena, path, gt):
-    return cPickle.load(open(os.path.join(path,'data_%s_%s.pkl' % (gt,arena.unit)),'rb'))
+def load_data(arena, path, smoothstr, gt):
+    return cPickle.load(open(os.path.join(path,'data_%s_%s_%s.pkl' % (gt,arena.unit,smoothstr)),'rb'))
 
-def plot_data(arena, path, data, genotype):
+def plot_data(arena, path, smoothstr, data, genotype):
 
     targets = data[genotype]['targets']
 
@@ -104,9 +104,9 @@ def plot_data(arena, path, data, genotype):
         pooled_theta = {}
 
         vals = []
-        figv = plt.figure('velocity %s %s' % (genotype, trg))
+        figv = plt.figure('velocity %s %s %s' % (genotype, trg, smoothstr))
         axv = figv.add_subplot(1,1,1)
-        figt = plt.figure('dtheta %s %s' % (genotype, trg))
+        figt = plt.figure('dtheta %s %s %s' % (genotype, trg, smoothstr))
         axt = figt.add_subplot(1,1,1)
         for i,(score,t_df,lon) in enumerate(targets[trg]):
 
@@ -140,6 +140,7 @@ def plot_data(arena, path, data, genotype):
         axv.plot(pm.index, pm.values,'r',label=os.path.basename(score.mp4),lw=2, alpha=0.8)
         axv.set_xlim([-100,900])
         axv.set_ylabel('velocity (%s/s)' % arena.unit)
+        axv.set_ylim([-10, 30])
 
         m = pd.DataFrame(pooled_theta).mean(axis=1)
         pm = m.loc[-100:900]
@@ -148,8 +149,13 @@ def plot_data(arena, path, data, genotype):
         axt.set_ylabel('dtheta (rad/s)')
         axt.set_ylim([0,0.6])
 
-        figv.savefig(os.path.join(path,'velocity_%s_%s.png' % (genotype,trg)))
-        figt.savefig(os.path.join(path,'dtheta_%s_%s.png' % (genotype,trg)))
+        axv.set_title('velocity %s %s %s' % (genotype, trg, smoothstr))
+        axt.set_title('dtheta %s %s %s' % (genotype, trg, smoothstr))
+
+        figv.savefig(os.path.join(path,'velocity_%s_%s_%s.png' % (genotype,trg,smoothstr)))
+        figpath = os.path.join(path,'dtheta_%s_%s_%s.png' % (genotype,trg,smoothstr))
+        figt.savefig(figpath)
+        print "wrote", figpath
 
 
 if __name__ == "__main__":
@@ -160,18 +166,21 @@ if __name__ == "__main__":
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--genotype', default='Moonw')
+    parser.add_argument('--smooth', action='store_true', default=False)
 
     args = parser.parse_args()
     path = args.path[0]
 
+    smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
+
     arena = madplot.Arena('mm')
 
     if args.only_plot:
-        data = load_data(arena, path, args.genotype)
+        data = load_data(arena, path, smoothstr, args.genotype)
     else:
-        data = prepare_data(arena, path, args.genotype)
+        data = prepare_data(arena, path, smoothstr, args.smooth, args.genotype)
 
-    plot_data(arena, path, data, args.genotype)
+    plot_data(arena, path, smoothstr, data, args.genotype)
 
     if args.show:
         plt.show()

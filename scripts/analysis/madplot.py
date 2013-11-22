@@ -29,6 +29,8 @@ import rosbag
 
 assert benu.__version__ >= "0.1.0"
 
+SECOND_TO_NANOSEC = 1e9
+
 def pairwise(iterable):
     "s -> (s0,s1), (s1,s2), (s2, s3), ..."
     a, b = itertools.tee(iterable)
@@ -427,21 +429,29 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     else:
         geom = tuple()
 
+    #FIXME: There is a potential loss of precision when going via datetime.fromtimestamp()
+    #as it is not nanosecond resolution. The correct way to do this would be to
+    #build an array of nanoseconds, and then call np.astype('datetime64[ns]')
+
+    t = [(ix - t_index[0]).total_seconds() for ix in t_index]
+    dt = np.gradient(t)
+
     if smooth:
         print "\tkalman smoothing"
-
-        dt = 1/100.0#np.gradient(df.index.values.astype('float64')/SECOND_TO_NANOSEC)
-
         #smooth the positions, and recalculate the velocitys based on this.
         kf = Kalman()
         smoothed = kf.smooth(t_data['x_px'], t_data['y_px'])
         x_px = smoothed[:,0]
         y_px = smoothed[:,1]
-        vx_px = np.gradient(x_px) / dt
-        vy_px = np.gradient(y_px) / dt
     else:
         x_px = np.array(t_data['x_px'])
         y_px = np.array(t_data['y_px'])
+
+    if smooth:
+        print "\trecalculating v"
+        vx_px = np.gradient(x_px) / dt
+        vy_px = np.gradient(y_px) / dt
+    else:
         vx_px = np.array(t_data['vx_px'])
         vy_px = np.array(t_data['vy_px'])
 

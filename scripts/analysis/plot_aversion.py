@@ -17,7 +17,7 @@ import rosbag
 
 import madplot
 
-def prepare_data(arena, path):
+def prepare_data(arena, path, smoothstr, smooth):
 
     dat = json.load(open(path))
 
@@ -32,8 +32,8 @@ def prepare_data(arena, path):
 
         l_df,t_df,h_df,geom = madplot.load_bagfile(
                                     madplot.get_path(path,dat,exp["bag"]),
-                                    arena
-        )
+                                    arena,
+                                    smooth=smooth)
 
         #find when the laser was on
         l_on = l_df[l_df['laser_power'] > 0]
@@ -58,23 +58,23 @@ def prepare_data(arena, path):
         pooled_off[exp["type"]].append(t_off)
         pooled_lon[exp["type"]].append(l_on)
 
-    cPickle.dump(pooled_on, open(os.path.join(bpath,'pooled_on_%s.pkl' % arena.unit),'wb'), -1)
-    cPickle.dump(pooled_off, open(os.path.join(bpath,'pooled_off_%s.pkl' % arena.unit),'wb'), -1)
-    cPickle.dump(pooled_lon, open(os.path.join(bpath,'pooled_lon_%s.pkl' % arena.unit),'wb'), -1)
+    cPickle.dump(pooled_on, open(os.path.join(bpath,'pooled_on_%s_%s.pkl' % (arena.unit,smoothstr)),'wb'), -1)
+    cPickle.dump(pooled_off, open(os.path.join(bpath,'pooled_off_%s_%s.pkl' % (arena.unit,smoothstr)),'wb'), -1)
+    cPickle.dump(pooled_lon, open(os.path.join(bpath,'pooled_lon_%s_%s.pkl' % (arena.unit,smoothstr)),'wb'), -1)
 
     return pooled_on, pooled_off, pooled_lon
 
-def load_data(arena, path):
+def load_data(arena, path, smoothstr):
     dat = json.load(open(path))
     bpath = dat.get('_base',os.path.dirname(path))
 
     return (
-        cPickle.load(open(os.path.join(bpath,'pooled_on_%s.pkl' % arena.unit),'rb')),
-        cPickle.load(open(os.path.join(bpath,'pooled_off_%s.pkl' % arena.unit),'rb')),
-        cPickle.load(open(os.path.join(bpath,'pooled_lon_%s.pkl' % arena.unit),'rb'))
+        cPickle.load(open(os.path.join(bpath,'pooled_on_%s_%s.pkl' % (arena.unit,smoothstr)),'rb')),
+        cPickle.load(open(os.path.join(bpath,'pooled_off_%s_%s.pkl' % (arena.unit,smoothstr)),'rb')),
+        cPickle.load(open(os.path.join(bpath,'pooled_lon_%s_%s.pkl' % (arena.unit,smoothstr)),'rb'))
     )
 
-def plot_data(arena, path, data):
+def plot_data(arena, path, smoothstr, data):
 
     pooled_on, pooled_off, pooled_lon = data
 
@@ -111,7 +111,7 @@ def plot_data(arena, path, data):
     ind = np.arange(N)  # the x locations for the groups
     width = 0.35        # the width of the bars
 
-    fig = plt.figure("Aversion")
+    fig = plt.figure("Aversion %s" % smoothstr)
     ax = fig.add_subplot(1,1,1)
 
     rects1 = ax.bar(ind, on_means, width, color='b', yerr=on_sems, ecolor='k')
@@ -124,8 +124,11 @@ def plot_data(arena, path, data):
 
     ax.legend( (rects1[0], rects2[0]), ('Laser On', 'Laser Off'), loc='upper right' )
 
-    fig.savefig('aversion.svg', bbox_inches='tight')
-    fig.savefig('aversion.png', bbox_inches='tight')
+    ax.set_title("Aversion %s" % smoothstr)
+
+    fig.savefig('aversion_%s.svg' % smoothstr, bbox_inches='tight')
+    fig.savefig('aversion_%s.png' % smoothstr, bbox_inches='tight')
+    print "wrote",'aversion_%s.png' % smoothstr
 
 if __name__ == "__main__":
 
@@ -133,18 +136,21 @@ if __name__ == "__main__":
     parser.add_argument('path', nargs=1, help='path to json files')
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--smooth', action='store_true', default=False)
 
     args = parser.parse_args()
     path = args.path[0]
 
+    smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
+
     arena = madplot.Arena('mm')
 
     if args.only_plot:
-        data = load_data(arena, path)
+        data = load_data(arena, path, smoothstr)
     else:
-        data = prepare_data(arena, path)
+        data = prepare_data(arena, path, smoothstr, args.smooth)
 
-    plot_data(arena, path, data)
+    plot_data(arena, path, smoothstr, data)
 
     if args.show:
         plt.show()
