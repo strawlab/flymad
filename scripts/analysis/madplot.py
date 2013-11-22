@@ -405,8 +405,6 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                 t_data['t_framenumber'].append(msg.framenumber)
                 t_data['x_px'].append(msg.state_vec[0])
                 t_data['y_px'].append(msg.state_vec[1])
-                t_data['vx_px'].append(msg.state_vec[2])
-                t_data['vy_px'].append(msg.state_vec[3])
         elif topic == "/draw_geom/poly":
             if geom_msg is not None:
                 print "WARNING: DUPLICATE GEOM MSG", msg, "vs", geom_msg
@@ -447,16 +445,13 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
         x_px = np.array(t_data['x_px'])
         y_px = np.array(t_data['y_px'])
 
-    if smooth:
-        print "\trecalculating v"
-        vx_px = np.gradient(x_px) / dt
-        vy_px = np.gradient(y_px) / dt
-    else:
-        vx_px = np.array(t_data['vx_px'])
-        vy_px = np.array(t_data['vy_px'])
+    vx_px = np.gradient(x_px) / dt
+    vy_px = np.gradient(y_px) / dt
 
     #convert to real world units if the arena supports it
     #KEEP THIS UPDATED TO INCLUDE ALL PIXEL FIELDS IN THE BAGFILES
+    t_data['vx_px'] = vx_px
+    t_data['vy_px'] = vy_px
     t_data['v_px'] = np.sqrt((vx_px**2) + (vy_px**2))
 
     t_data['x'] = arena.scale_x(x_px)
