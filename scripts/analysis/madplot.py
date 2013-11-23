@@ -529,10 +529,10 @@ def calculate_total_pct_in_area(tdf, maxtime):
     pcts = []
 
     for experiment,df in tdf.groupby('experiment'):
-        print "\ttpct: EXPERIMENT #",experiment
-
         t00 = df.index[0]
         tend = min(t00 + datetime.timedelta(seconds=maxtime), df.index[-1])
+
+        print "\ttpct: EXPERIMENT #",experiment, "duration", tend-t00
 
         npts = df['in_area'].sum()
         #percentage of time in area
@@ -541,6 +541,20 @@ def calculate_total_pct_in_area(tdf, maxtime):
         pcts.append(total_pct)
 
     return pcts
+
+def calculate_pct_in_area_per_objid(tdf, minlenpct=0.10):
+    exps = {}
+    for experiment,df in tdf.groupby('experiment'):
+        flies = {}
+        for oid,fly in df.groupby('tobj_id'):
+            lenpct = len(fly) / float(len(df))
+            if lenpct >= minlenpct:
+                npts = fly['in_area'].sum()
+                #percentage of time in area
+                total_pct = 100.0 * (npts / float(len(fly)))
+                flies[oid] = total_pct
+        exps[experiment] = flies
+    return exps
 
 def calculate_time_in_area(tdf, maxtime, toffsets):
     exp_pcts = []

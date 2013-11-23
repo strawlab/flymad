@@ -266,6 +266,72 @@ def plot_data(path, dat, debug_plot):
                         ticklabels, exps_colors,
                         'velocity_in', plotdir)
 
+def plot_data_trajectories(path, dat):
+    arena = madplot.Arena(False, dat)
+
+    if os.path.isdir(path):
+        plotdir = path
+        conf = dat
+    else:
+        if path.endswith('.json'):
+            conf = json.load(open(path))
+        else:
+            conf = dat
+        plotdir = os.path.dirname(path)
+
+    plot_exps = conf.get('_plot', ['coupled'])
+
+    exps = [e for e in plot_exps if e in dat]
+    exps_colors = [plt.cm.gnuplot(i) for i in np.linspace(0, 1.0, len(exps))]
+
+    if '_ntrials' in conf:
+        ntrials = conf['_ntrials']
+    else:
+        #check all trials have the same number
+        trial_lens = set(map(len, (dat[e] for e in exps)))
+        if len(trial_lens) != 1:
+            raise Exception("experiments contain different numbers of trials")
+
+        ntrials = trial_lens.pop()
+
+    plotdir = os.path.join(plotdir, 'trajectories')
+    try:
+        os.makedirs(plotdir)
+    except OSError:
+        pass
+
+    for exp in exps:
+        ordered_trials = dat[exp][0:ntrials]
+        for i,trial in enumerate(ordered_trials):
+            label = trial['label']
+            ldf, tdf, hdf, geom = trial['data']
+
+            dbg_plot_title = " %s %s" % (exp,label)
+
+            good_oids = madplot.calculate_pct_in_area_per_objid(tdf)
+            for _exp in good_oids:
+                for _oid in good_oids[_exp]:
+                    _fdf = tdf[(tdf['experiment'] == _exp) & (tdf['tobj_id'] == _oid)].resample('100L')
+                    _fig = plt.figure(figsize=(2,2), frameon=False)
+                    _ax = _fig.add_subplot(1,1,1)
+
+                    _ax.set_aspect('equal')
+                    _ax.xaxis.set_visible(False)
+                    _ax.yaxis.set_visible(False)
+                    patch = arena.get_intersect_patch(geom, fill=True, color='#1A9641', closed=True, alpha=0.4, zorder=9)
+                    if patch is not None:
+                        _ax.add_patch(patch)
+                    _ax.add_patch(arena.get_patch(fill=False, color='k'))
+
+                    xlim,ylim = arena.get_limits()
+                    _ax.set_xlim(*xlim)
+                    _ax.set_ylim(*ylim)
+                    _ax.plot(_fdf['x'],_fdf['y'],color='#292724')
+
+                    _fig.savefig(os.path.join(plotdir,
+                                 "%s_t%s_%.0f_%s.svg" % (exp,i,good_oids[_exp][_oid],_oid)))
+                    plt.close(_fig)
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -285,6 +351,7 @@ if __name__ == "__main__":
         data = prepare_data(path)
 
     plot_data(path, data, args.debug_plot)
+    #plot_data_trajectories(path, data)
 
     if args.show:
         plt.show()
