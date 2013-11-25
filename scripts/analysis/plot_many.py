@@ -127,6 +127,17 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
     figb.savefig(os.path.join(plotdir,'%s.png' % filename))
     figl.savefig(os.path.join(plotdir,'%s_l.png' % filename))
 
+def _get_plot_gs(ordered_trials):
+    if len(ordered_trials) <= 8:
+        gs = gridspec.GridSpec(2, 4)
+    elif len(ordered_trials) <= 12:
+        gs = gridspec.GridSpec(3, 4)
+    elif len(ordered_trials) <= 16:
+        gs = gridspec.GridSpec(4, 4)
+    else:
+        raise Exception("yeah, this figure will be ugly")
+    return gs
+
 def plot_data(path, dat, debug_plot):
     arena = madplot.Arena(False, dat)
 
@@ -167,16 +178,11 @@ def plot_data(path, dat, debug_plot):
     for exp in exps:
         ordered_trials = dat[exp][0:ntrials]
 
-        if len(ordered_trials) <= 8:
-            gs = gridspec.GridSpec(2, 4)
-        elif len(ordered_trials) <= 12:
-            gs = gridspec.GridSpec(3, 4)
-        elif len(ordered_trials) <= 16:
-            gs = gridspec.GridSpec(4, 4)
-        else:
-            raise Exception("yeah, this figure will be ugly")
-
+        gs = _get_plot_gs(ordered_trials)
         fig = plt.figure("%s Trajectories" % exp.title(), figsize=(16,8))
+
+        gsh = _get_plot_gs(ordered_trials)
+        figh = plt.figure("%s Trajectories (Hist)" % exp.title(), figsize=(16,8))
 
         for i,trial in enumerate(ordered_trials):
             label = trial['label']
@@ -195,9 +201,18 @@ def plot_data(path, dat, debug_plot):
 
             ax.add_patch(arena.get_patch(fill=False, color='k', zorder=10))
 
-            ax.set_title(label)
-            ax.xaxis.set_visible(False)
-            ax.yaxis.set_visible(False)
+            ok = tdf.dropna(axis=0,how='any',subset=['x','y'])
+            axh = figh.add_subplot(gs[i])
+            axh.set_aspect('equal')
+            xlim,ylim = arena.get_limits()
+            axh.set_xlim(*xlim)
+            axh.set_ylim(*ylim)
+            axh.hist2d(ok['x'],ok['y'],bins=30,range=(xlim,ylim), normed=True, norm=matplotlib.colors.LogNorm())
+
+            for _ax in (ax,axh):
+                _ax.set_title(label)
+                _ax.xaxis.set_visible(False)
+                _ax.yaxis.set_visible(False)
 
             pct_in_area_per_time_lbls[exp].append( label )
 
