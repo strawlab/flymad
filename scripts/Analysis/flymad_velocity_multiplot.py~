@@ -198,8 +198,8 @@ def run_stats_bin_to_bin (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln 
     return p_values
 
 def fit_to_curve ( p_values ):
-    x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
-    logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 50]))
+    x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 40])
+    logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 40]))
     y = np.array(logs)
     order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
     poly_params = np.polyfit(x,y,order)

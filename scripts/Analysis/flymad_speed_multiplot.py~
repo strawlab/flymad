@@ -145,24 +145,6 @@ def run_stats (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2):
             p_values = pd.concat([p_values, dftemp])
     return p_values
 
-def fit_to_curve ( p_values ):
-    x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
-    logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 50]))
-    y = np.array(logs)
-    order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
-    poly_params = np.polyfit(x,y,order)
-    polynom = np.poly1d(poly_params)
-    xPoly = np.linspace(0, max(x), 100)
-    yPoly = polynom(xPoly)
-    fig1 = plt.figure()
-    ax = fig1.add_subplot(1,1,1)
-    ax.plot(x, y, 'o', xPoly, yPoly, '-g')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('-log(p)')
-    plt.show()
-    print polynom #lazy dan can't use python to solve polynomial eqns. boo.
-    return (x, y, xPoly, yPoly, polynom)
-
 def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
 
     fig2 = plt.figure("Speed Multiplot")
@@ -211,7 +193,6 @@ if __name__ == "__main__":
 
     run_stats(path, *data)
     p_values.to_csv(path + '/p_values.csv')
-    fit_to_curve( p_values )
     plot_data(path, *data)
 
     if args.show:
