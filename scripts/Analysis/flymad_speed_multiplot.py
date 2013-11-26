@@ -16,10 +16,11 @@ import matplotlib.transforms as mtransforms
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
+from scipy.stats import kruskal
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
-assert pd.__version__ == "0.11.0"
+assert pd.version.version in ("0.11.0" ,  "0.12.0")
 
 def prepare_data(path, exp_genotype, ctrl_genotype):
 
@@ -107,17 +108,42 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
     expn.save(path + "/expn.df")
     ctrln.save(path + "/ctrln.df")
 
-    return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln
+    return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2
 
 def load_data( path ):
     return (
-            pd.load(path + "/expmean.df"),
-            pd.load(path + "/ctrlmean.df"),
-            pd.load(path + "/expstd.df"),
-            pd.load(path + "/ctrlstd.df"),
-            pd.load(path + "/expn.df"),
-            pd.load(path + "/ctrln.df"),
+            pd.read_pickle(path + "/df2.df"),
+            pd.read_pickle(path + "/expmean.df"),
+            pd.read_pickle(path + "/ctrlmean.df"),
+            pd.read_pickle(path + "/expstd.df"),
+            pd.read_pickle(path + "/ctrlstd.df"),
+            pd.read_pickle(path + "/expn.df"),
+            pd.read_pickle(path + "/ctrln.df"),
     )
+
+def get_stats(group):
+    return {'mean': group.mean(),
+            'var' : group.var(),
+            'n' : group.count()
+           }
+
+def run_stats (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
+    print type(df2), df2.shape 
+    number_of_bins = [ 6990 ] #69.9 second trials.
+    p_values = DataFrame()  
+    df_ctrl = df2[df2['Genotype'] == 'wshib']
+    df_exp = df2[df2['Genotype'] == 'ok371shib']
+    for binsize in number_of_bins:
+        bins = np.linspace(0,8.91, binsize)
+        binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
+        binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
+        for x in binned_ctrl.levels:                
+            test1 = df_ctrl['v'][binned_ctrl == x]
+            test2 = df_exp['v'][binned_exp == x]
+            hval, pval = kruskal(test1, test2)
+            dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
+            p_values = pd.concat([p_values, dftemp])
+    return p_values
 
 def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
 
@@ -165,6 +191,8 @@ if __name__ == "__main__":
     else:
         data = prepare_data(path, EXP_GENOTYPE, CTRL_GENOTYPE)
 
+    run_stats(path, *data)
+    p_values.to_csv(path + '/p_values.csv')
     plot_data(path, *data)
 
     if args.show:

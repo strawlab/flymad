@@ -14,13 +14,14 @@ import matplotlib.transforms as mtransforms
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
+from scipy.stats import kruskal
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
-assert pd.__version__ == "0.11.0"
+assert pd.version.version in ("0.11.0" ,  "0.12.0")
 
 def prepare_data(path, exp_genotype, ctrl_genotype):
-
+    
     df2 = DataFrame()
     if not os.path.exists(path + "/Velocity_calculations/"):
         os.makedirs(path + "/Velocity_calculations/")
@@ -139,18 +140,80 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
     expn.save(path + "/expn.df")
     ctrln.save(path + "/ctrln.df")
 
-    return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln
+    return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2
 
 def load_data( path ):
     return (
-            pd.load(path + "/expmean.df"),
-            pd.load(path + "/ctrlmean.df"),
-            pd.load(path + "/expstd.df"),
-            pd.load(path + "/ctrlstd.df"),
-            pd.load(path + "/expn.df"),
-            pd.load(path + "/ctrln.df"),
+            pd.read_pickle(path + "/df2.df"),
+            pd.read_pickle(path + "/expmean.df"),
+            pd.read_pickle(path + "/ctrlmean.df"),
+            pd.read_pickle(path + "/expstd.df"),
+            pd.read_pickle(path + "/ctrlstd.df"),
+            pd.read_pickle(path + "/expn.df"),
+            pd.read_pickle(path + "/ctrln.df"),
     )
 
+def get_stats(group):   #was using this for debugging. could be useful in future so keep.
+    return {'mean': group.mean(),
+            'var' : group.var(),
+            'n' : group.count()
+           }
+
+def run_stats (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
+    print type(df2), df2.shape #SHOULD BE LONGER THAN 891. WORKS IN IPYTHON, NOT IN PYTHON. BUG?????
+    number_of_bins = [ 891,445,223,111,56,28, 9 ] #8.9 second trials, different bin sizes.
+    p_values = DataFrame()  
+    df_ctrl = df2[df2['Genotype'] == CTRL_GENOTYPE]
+    df_exp = df2[df2['Genotype'] == EXP_GENOTYPE]
+    for binsize in number_of_bins:
+        bins = np.linspace(0,8.91, binsize) ###lazy dan bug fix. should relate to min/max of df2['align']
+        binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
+        binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
+        for x in binned_ctrl.levels:                
+            test1 = df_ctrl['Vfwd'][binned_ctrl == x]
+            test2 = df_exp['Vfwd'][binned_exp == x]
+            hval, pval = kruskal(test1, test2)   
+            dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
+            p_values = pd.concat([p_values, dftemp])
+    return p_values
+
+
+#run_stats_bin_to_bin was my failed attempt at finding first diff from baseline. boo dan boo.
+def run_stats_bin_to_bin (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
+    print type(df2), df2.shape  
+    number_of_bins = [ 891,445,223,111,56,28, 9 ] 
+    p_values = DataFrame()  
+    df_ctrl = df2[df2['Genotype'] == CTRL_GENOTYPE]
+    df_exp = df2[df2['Genotype'] == EXP_GENOTYPE]
+    for binsize in number_of_bins:
+        bins = np.linspace(0,8.91, binsize) 
+        binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
+        binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
+        for x in binned_ctrl.levels:                
+            test1 = df_ctrl['Vfwd'][binned_ctrl == x]
+            test2 = df_exp['Vfwd'][binned_exp == x]
+            hval, pval = kruskal(test1, test2)
+            dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
+            p_values = pd.concat([p_values, dftemp])
+    return p_values
+
+def fit_to_curve ( p_values ):
+    x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 40])
+    logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 40]))
+    y = np.array(logs)
+    order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
+    poly_params = np.polyfit(x,y,order)
+    polynom = np.poly1d(poly_params)
+    xPoly = np.linspace(0, max(x), 100)
+    yPoly = polynom(xPoly)
+    fig1 = plt.figure()
+    ax = fig1.add_subplot(1,1,1)
+    ax.plot(x, y, 'o', xPoly, yPoly, '-g')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('-log(p)')
+    plt.show()
+    print polynom #lazy dan can't use python to solve polynomial eqns. boo.
+    return (x, y, xPoly, yPoly, polynom)
 
 def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
 
@@ -269,7 +332,7 @@ def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
 if __name__ == "__main__":
     CTRL_GENOTYPE = 'ctrl' #black
     EXP_GENOTYPE = 'MW' #blue
-
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--only-plot', action='store_true', default=False)
@@ -283,6 +346,9 @@ if __name__ == "__main__":
     else:
         data = prepare_data(path, EXP_GENOTYPE, CTRL_GENOTYPE)
 
+    run_stats(path, *data)
+    p_values.to_csv(path + '/p_values.csv')
+    fit_to_curve( p_values )
     plot_data(path, *data)
 
     if args.show:
