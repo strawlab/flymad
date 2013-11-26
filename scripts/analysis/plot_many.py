@@ -10,6 +10,7 @@ import glob
 import numpy as np
 import pandas as pd
 import matplotlib.colors
+import matplotlib.ticker
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
@@ -232,7 +233,14 @@ def plot_data(path, dat, debug_plot):
             xlim,ylim = arena.get_limits()
             axh.set_xlim(*xlim)
             axh.set_ylim(*ylim)
-            axh.hist2d(ok['x'],ok['y'],bins=30,range=(xlim,ylim), normed=True, norm=matplotlib.colors.LogNorm())
+
+            #manually scale the lognorm
+            lognorm = matplotlib.colors.LogNorm(vmin=1e-7, vmax=1e-3)
+            #(counts, xedges, yedges, Image)
+            _,_,_,_im = axh.hist2d(ok['x'],ok['y'],bins=30,range=(xlim,ylim), normed=True, norm=lognorm)
+
+            l_f = matplotlib.ticker.LogFormatter(10, labelOnlyBase=False)
+            figh.colorbar(_im,ax=axh,format=l_f)
 
             for _ax in (ax,axh):
                 _ax.set_title(label)
