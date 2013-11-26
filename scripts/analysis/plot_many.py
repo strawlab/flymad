@@ -15,6 +15,17 @@ import matplotlib.gridspec as gridspec
 
 import madplot
 
+#FIXME: Smoothing and dt calculation calculation is not valid here, as multiple
+#object ids are interleaved in the x_px and y_px arrays.... this will take a while
+#to fix
+#
+#for learning it is fine to keep it all in pixels anyway
+arena = madplot.Arena(False)
+smooth_trajectories = False
+recalc_v = False
+unit_ext = "%s%s%s" % (arena.unit,{True:'s',False:''}[smooth_trajectories],
+                                   {True:'v',False:''}[recalc_v])
+
 def prepare_data(path):
     if os.path.isdir(path):
         path = path + "/"
@@ -29,8 +40,6 @@ def prepare_data(path):
     else:
         dat = json.load(open(path))
         fname = os.path.splitext(os.path.basename(path))[0]
-
-    arena = madplot.Arena(False, dat)
 
     jobs = {}
     pool = multiprocessing.Pool()
@@ -50,7 +59,9 @@ def prepare_data(path):
                 bpath = madplot.get_path(path, dat, bname)
                 jobs[bname] = pool.apply_async(
                                     madplot.load_bagfile,
-                                    (bpath, arena))
+                                    (bpath, arena),
+                                    {'smooth':smooth_trajectories,
+                                     'recalc_v':recalc_v})
 
     pool.close()
     pool.join()
@@ -71,7 +82,7 @@ def prepare_data(path):
                                         data,
                                         dat.get('_geom_must_intersect', True))
 
-    with open(madplot.get_path(path, dat, fname+".pkl"), 'wb') as f:
+    with open(madplot.get_path(path, dat, "%s_%s.pkl" % (fname,unit_ext)), 'wb') as f:
         cPickle.dump(dat, f, -1)
 
     return dat
@@ -79,7 +90,7 @@ def prepare_data(path):
 def load_data(path):
     dat = json.load(open(path))
     fname = os.path.splitext(os.path.basename(path))[0]
-    with open(madplot.get_path(path, dat, fname+".pkl"), 'rb') as f:
+    with open(madplot.get_path(path, dat, "%s_%s.pkl" % (fname,unit_ext)), 'rb') as f:
         return cPickle.load(f)
 
 def _label_rect_with_n(ax, rects, nens):
@@ -96,6 +107,21 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
     axb = figb.add_subplot(1,1,1)
     figl = plt.figure("%s L" % title)
     axl = figl.add_subplot(1,1,1)
+
+    #save a json file
+    data = {"treatment":[],'trial':[],'flyid':[],'value':[],'experiment':[]}
+    for treatment in exps:
+        for trialn,vals in enumerate(per_exp_data[treatment]):
+            for flyid,val in enumerate(vals):
+                data['treatment'].append(treatment)
+                data['trial'].append(trialn)
+                data['flyid'].append(flyid)
+                data['value'].append(val)
+                data['experiment'].append(-1)
+    dfname = os.path.join(plotdir,'%s.df' % filename)
+    df = pd.DataFrame(data)
+    df.save(dfname)
+    print "\twrote", dfname
 
     for i,exp in enumerate(exps):
         means = []
@@ -139,7 +165,6 @@ def _get_plot_gs(ordered_trials):
     return gs
 
 def plot_data(path, dat, debug_plot):
-    arena = madplot.Arena(False, dat)
 
     if os.path.isdir(path):
         plotdir = path
@@ -282,7 +307,6 @@ def plot_data(path, dat, debug_plot):
                         'velocity_in', plotdir)
 
 def plot_data_trajectories(path, dat):
-    arena = madplot.Arena(False, dat)
 
     if os.path.isdir(path):
         plotdir = path

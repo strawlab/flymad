@@ -354,7 +354,7 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False):
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, recalc_v=True):
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -405,6 +405,8 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                 t_data['t_framenumber'].append(msg.framenumber)
                 t_data['x_px'].append(msg.state_vec[0])
                 t_data['y_px'].append(msg.state_vec[1])
+                t_data['vx_px'].append(msg.state_vec[2])
+                t_data['vy_px'].append(msg.state_vec[3])
         elif topic == "/draw_geom/poly":
             if geom_msg is not None:
                 print "WARNING: DUPLICATE GEOM MSG", msg, "vs", geom_msg
@@ -430,7 +432,6 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     #FIXME: There is a potential loss of precision when going via datetime.fromtimestamp()
     #as it is not nanosecond resolution. The correct way to do this would be to
     #build an array of nanoseconds, and then call np.astype('datetime64[ns]')
-
     t = [(ix - t_index[0]).total_seconds() for ix in t_index]
     dt = np.gradient(t)
 
@@ -445,8 +446,13 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
         x_px = np.array(t_data['x_px'])
         y_px = np.array(t_data['y_px'])
 
-    vx_px = np.gradient(x_px) / dt
-    vy_px = np.gradient(y_px) / dt
+    if recalc_v:
+        print "\trecalculating velocity"
+        vx_px = np.gradient(x_px) / dt
+        vy_px = np.gradient(y_px) / dt
+    else:
+        vx_px = np.array(t_data['vx_px'])
+        vy_px = np.array(t_data['vy_px'])
 
     #convert to real world units if the arena supports it
     #KEEP THIS UPDATED TO INCLUDE ALL PIXEL FIELDS IN THE BAGFILES
