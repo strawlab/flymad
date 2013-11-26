@@ -556,6 +556,14 @@ def calculate_pct_in_area_per_objid(tdf, minlenpct=0.10):
         exps[experiment] = flies
     return exps
 
+def calculate_pct_in_area_per_objid_only_vals(tdf, minlenpct=0.10):
+    vals = []
+    good_oids = calculate_pct_in_area_per_objid(tdf, minlenpct)
+    for _exp in good_oids:
+        for _oid in good_oids[_exp]:
+            vals.append(good_oids[_exp][_oid])
+    return vals
+
 def calculate_time_in_area(tdf, maxtime, toffsets):
     exp_pcts = []
 

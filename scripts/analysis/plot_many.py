@@ -221,7 +221,7 @@ def plot_data(path, dat, debug_plot):
                                                        pct_in_area_per_time_bins))
 
             pct_in_area_total[exp].append(
-                        madplot.calculate_total_pct_in_area(tdf, 300))
+                        madplot.calculate_pct_in_area_per_objid_only_vals(tdf))
 
             tts, vel_out, vel_in = madplot.calculate_latency_and_velocity_to_stay(
                                                 tdf, holdtime=20,
