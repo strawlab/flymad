@@ -78,7 +78,17 @@ def prepare_data(path):
             data = []
             for bname in bags:
                 print "merge", bname, "to trial", trialn
-                data.append( jobs[bname].get() )
+                bdat = jobs[bname].get()
+                data.append( bdat )
+
+#                dt = bdat[1]['t_dt'].values
+#                print "\tdt",dt.mean(),"+/-",dt.std()
+#                ax = plt.figure(bname).add_subplot(1,1,1)
+#                ax.plot(dt)
+#                ax = plt.figure(bname+"hist").add_subplot(1,1,1)
+#                ax.hist(dt,bins=20)
+#                plt.show(block=False)
+
             trials["data"] = madplot.merge_bagfiles(
                                         data,
                                         dat.get('_geom_must_intersect', True))
