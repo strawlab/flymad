@@ -113,7 +113,7 @@ def _label_rect_with_n(ax, rects, nens):
                     1.05*height,
                     str(n), ha='center', va='bottom')
 
-def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, ntrials, xticklabels, exps_colors, filename, plotdir):
+def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, ntrials, xticklabels, exps_colors, filename, plotdir, use_sem=True):
     figb = plt.figure(title)
     axb = figb.add_subplot(1,1,1)
     figl = plt.figure("%s L" % title)
@@ -142,7 +142,12 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
         for j,v in enumerate(per_exp_data[exp]):
             pooled_nens.append(len(v))
             means.append( np.mean(v) )
-            stds.append( np.std(v) )
+
+            std = np.std(v)
+            if use_sem:
+                stds.append(std/np.sqrt(len(v)))
+            else:
+                stds.append(std)
 
         rects = axb.bar(ind+(i*width), means, width, label=exp, color=exps_colors[i], yerr=stds)
         _label_rect_with_n(axb, rects, pooled_nens)
@@ -150,8 +155,9 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
         axl.errorbar(ind, means, label=exp, color=exps_colors[i], yerr=stds)
 
     for ax in [axb, axl]:
+        _ylabel = "%s +/- %s" % (ylabel, "SEM" if use_sem else "STD")
         ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        ax.set_ylabel(_ylabel)
         ax.legend()
 
     axl.set_xlim([0, ntrials-1])
