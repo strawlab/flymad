@@ -767,16 +767,7 @@ class _FMFPlotter:
         self.alpha = contrast
         self.beta = brightness
 
-    def get_frame(self, frame):
-        assert isinstance(frame, FMFFrame)
-
-        if self.fmf is None:
-            return None
-
-        f,ts = self.fmf.get_frame(frame.offset)
-
-        assert ts == frame.timestamp
-
+    def _color_correct(self, f):
         if self.force_color:
             return cv2.cvtColor(f,cv2.COLOR_GRAY2RGB)
         elif (self.alpha is not None) and (self.beta is not None):
@@ -784,6 +775,21 @@ class _FMFPlotter:
             return cv2.add(mul_f,np.array([self.beta],dtype=float))
         else:
             return f
+
+    def get_frame(self, frame):
+        assert isinstance(frame, FMFFrame)
+
+        if self.fmf is None:
+            return None
+
+        f,ts = self.fmf.get_frame(frame.offset)
+        assert ts == frame.timestamp
+
+        return self._color_correct(f)
+
+    def get_frame_number(self, offset):
+        f,ts = self.fmf.get_frame(offset)
+        return self._color_correct(f)
 
     def get_benu_panel(self, device_x0, device_x1, device_y0, device_y1):
         return dict(
