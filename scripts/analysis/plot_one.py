@@ -26,12 +26,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to bag file')
     parser.add_argument('--unit', default=False)
+    parser.add_argument('--no-smooth', dest='smooth', action='store_false', default=True)
 
     args = parser.parse_args()
     path = args.path[0]
 
     arena = madplot.Arena(args.unit)
-    ldf,tdf,hdf,geom = madplot.load_bagfile(path, arena)
+    ldf,tdf,hdf,geom = madplot.load_bagfile(path, arena, smooth=args.smooth)
 
     axt = plt.figure("Trajectory").add_subplot(1,1,1)
     plot_trajectory(axt,arena,ldf,tdf,hdf,geom)
@@ -42,5 +43,18 @@ if __name__ == "__main__":
     for ax in (axt,axl):
         ax.set_xlabel('x (%s)' % arena.unit)
         ax.set_ylabel('y (%s)' % arena.unit)
+
+    axdt = plt.figure("Tracking").add_subplot(1,1,1)
+    axvel = plt.figure("Velocity").add_subplot(1,1,1)
+    for obj_id,df in tdf.groupby('tobj_id'):
+        axdt.plot(df['t_dt'].values, ',')
+        t = df['t_ts'].values
+        axvel.plot(t - t[0], df['v'].values, ',', label=str(obj_id))
+
+    axdt.set_xlabel('observation (n)')
+    axdt.set_ylabel('observation dt (s)')
+    axvel.legend()
+    axvel.set_xlabel('t (s)')
+    axvel.set_ylabel('velocity (%s/s)' % arena.unit)
 
     plt.show()
