@@ -432,7 +432,7 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     #FIXME: There is a potential loss of precision when going via datetime.fromtimestamp()
     #as it is not nanosecond resolution. The correct way to do this would be to
     #build an array of nanoseconds, and then call np.astype('datetime64[ns]')
-    t = [(ix - t_index[0]).total_seconds() for ix in t_index]
+    t = np.array([(ix - t_index[0]).total_seconds() for ix in t_index])
     dt = np.gradient(t)
 
     if smooth:
