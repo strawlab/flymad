@@ -857,16 +857,16 @@ class ArenaPlotter(_FMFPlotter):
             row = desc.get_row()
 
             if self.show_fxfy:
-                canv.scatter( [row['x']],
-                              [row['y']],
+                canv.scatter( [row['x_px']],
+                              [row['y_px']],
                               color_rgba=(0,1,0,1),
                               radius=2 )
 
             if self.show_theta and row['theta']:
                 try:
                     theta = row['theta'].values[0]
-                    fx = float(row['x'])
-                    fy = float(row['y'])
+                    fx = float(row['x_px'])
+                    fy = float(row['y_px'])
                 except:
                     theta = fx = fy = np.nan
 
