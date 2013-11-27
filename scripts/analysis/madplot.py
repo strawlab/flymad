@@ -354,7 +354,7 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, recalc_v=True):
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False):
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -376,7 +376,7 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                              "laser_power","mode")}
 
     t_index = []
-    t_data = {k:[] for k in ("tobj_id","x_px","y_px","vx_px","vy_px","v_px",'t_framenumber')}
+    t_data = {k:[] for k in ("tobj_id","x_px","y_px","vx_px","vy_px","v_px",'t_framenumber','t_ts')}
 
     h_index = []
     h_data = {k:[] for k in ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type", "h_framenumber", "h_processing_time")}
@@ -400,11 +400,18 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
             l_data['laser_y_px'].append(msg.laser_y)
         elif topic == "/flymad/tracked":
             if msg.is_living:
-                t_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
+                ts = msg.header.stamp.to_sec()
+                t_index.append( datetime.datetime.fromtimestamp(ts) )
+                #pandas > 0.11.0 and numpy 1.6.x do not play well together wrt datetime colums
+                #but it does seem to work for datetime indexe??.
+                #Until we upgrade to numpy 1.7.1 it is easier to keep around a
+                #simple timestamp object to use for calculating the velocity later.
+                t_data['t_ts'].append(ts)
                 t_data['tobj_id'].append(msg.obj_id)
                 t_data['t_framenumber'].append(msg.framenumber)
                 t_data['x_px'].append(msg.state_vec[0])
                 t_data['y_px'].append(msg.state_vec[1])
+                #these will be replaced later with smoothed versions
                 t_data['vx_px'].append(msg.state_vec[2])
                 t_data['vy_px'].append(msg.state_vec[3])
         elif topic == "/draw_geom/poly":
@@ -432,40 +439,18 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     #FIXME: There is a potential loss of precision when going via datetime.fromtimestamp()
     #as it is not nanosecond resolution. The correct way to do this would be to
     #build an array of nanoseconds, and then call np.astype('datetime64[ns]')
-    t = [(ix - t_index[0]).total_seconds() for ix in t_index]
-    dt = np.gradient(t)
 
-    if smooth:
-        print "\tkalman smoothing"
-        #smooth the positions, and recalculate the velocitys based on this.
-        kf = Kalman()
-        smoothed = kf.smooth(t_data['x_px'], t_data['y_px'])
-        x_px = smoothed[:,0]
-        y_px = smoothed[:,1]
-    else:
-        x_px = np.array(t_data['x_px'])
-        y_px = np.array(t_data['y_px'])
-
-    if recalc_v:
-        print "\trecalculating velocity"
-        vx_px = np.gradient(x_px) / dt
-        vy_px = np.gradient(y_px) / dt
-    else:
-        vx_px = np.array(t_data['vx_px'])
-        vy_px = np.array(t_data['vy_px'])
+    #add some placeholders for values that will be replaced later
+    #with correctly sized smoothed equivilents
+    t_data['v_px'] = np.nan
+    t_data['x'] = np.nan
+    t_data['y'] = np.nan
+    t_data['vx'] = np.nan
+    t_data['vy'] = np.nan
+    t_data['v'] = np.nan
+    t_data['t_dt'] = np.nan
 
     #convert to real world units if the arena supports it
-    #KEEP THIS UPDATED TO INCLUDE ALL PIXEL FIELDS IN THE BAGFILES
-    t_data['vx_px'] = vx_px
-    t_data['vy_px'] = vy_px
-    t_data['v_px'] = np.sqrt((vx_px**2) + (vy_px**2))
-
-    t_data['x'] = arena.scale_x(x_px)
-    t_data['y'] = arena.scale_y(y_px)
-    t_data['vx'] = arena.scale_vx(vx_px)
-    t_data['vy'] = arena.scale_vy(vy_px)
-    t_data['v'] = np.sqrt((t_data['vx']**2) + (t_data['vy']**2))
-
     l_data["fly_x"] = arena.scale_x(l_data["fly_x_px"])
     l_data["fly_y"] = arena.scale_y(l_data["fly_y_px"])
     l_data["laser_x"] = arena.scale_x(l_data["laser_x_px"])
@@ -483,17 +468,11 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     else:
         t_df['theta'] = np.nan
 
-    #add a new colum if they were in the area
-    t_df = pd.concat([t_df,
-                      t_df.apply(in_area, axis=1, args=(poly,))],
-                      axis=1)
-
+    #optionally find short trials here, print the length of kept trials
     if (filter_short_pct > 0) or (filter_short > 0):
         if filter_short_pct > 0:
             filter_short = (float(filter_short_pct)/100.0) * len(t_df)
 
-
-    #optionally find short trials here, print the length of kept trials
     short_tracks = []
     for name, group in t_df.groupby('tobj_id'):
         if len(group) < filter_short:
@@ -507,6 +486,50 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     if short_tracks:
         l_df = l_df[~l_df['lobj_id'].isin(short_tracks)]
         t_df = t_df[~t_df['tobj_id'].isin(short_tracks)]
+
+    #now resmooth the tracking data. these are all long enough
+    grouper = t_df.groupby('tobj_id')
+    for tobj_id, group in grouper:
+        dt = np.gradient(group['t_ts'].values)
+
+        if smooth:
+            print "\tkalman smoothing traj %s (%s pts long)" % (tobj_id, len(group))
+            #smooth the positions, and recalculate the velocitys based on this.
+            kf = Kalman()
+            smoothed = kf.smooth(group['x_px'].values, group['y_px'].values)
+            x_px = smoothed[:,0]
+            y_px = smoothed[:,1]
+        else:
+            x_px = arena.scale_x(group['x_px'].values)
+            y_px = arena.scale_y(group['y_px'].values)
+
+        vx_px = np.gradient(x_px) / dt
+        vy_px = np.gradient(y_px) / dt
+
+        #replace all values with their smoothed equivilents.
+        ixs_of_group = grouper.groups[tobj_id]
+
+        t_df['x_px'][ixs_of_group] = x_px
+        t_df['y_px'][ixs_of_group] = y_px
+        t_df['vx_px'][ixs_of_group] = vx_px
+        t_df['vy_px'][ixs_of_group] = vy_px
+        t_df['v_px'][ixs_of_group] = np.sqrt((vx_px**2) + (vy_px**2))
+
+        #and their scaled equivilents
+        vx = arena.scale_vx(vx_px)
+        vy = arena.scale_vx(vy_px)
+        t_df['x'][ixs_of_group] = arena.scale_x(x_px)
+        t_df['y'][ixs_of_group] = arena.scale_y(y_px)
+        t_df['vx'][ixs_of_group] = vx
+        t_df['vy'][ixs_of_group] = vy
+        t_df['v'][ixs_of_group] = np.sqrt((vx**2) + (vy**2))
+
+        t_df['t_dt'][ixs_of_group] = dt
+
+    #add a new colum if they were in the area
+    t_df = pd.concat([t_df,
+                      t_df.apply(in_area, axis=1, args=(poly,))],
+                      axis=1)
 
     t_df['experiment'] = 0
 
