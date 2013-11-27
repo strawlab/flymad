@@ -21,11 +21,9 @@ import madplot
 #to fix
 #
 #for learning it is fine to keep it all in pixels anyway
-arena = madplot.Arena(False)
-smooth_trajectories = False
-recalc_v = False
-unit_ext = "%s%s%s" % (arena.unit,{True:'s',False:''}[smooth_trajectories],
-                                   {True:'v',False:''}[recalc_v])
+arena = madplot.Arena('mm')
+smooth_trajectories = True
+unit_ext = "%s%s" % (arena.unit,{True:'s',False:''}[smooth_trajectories])
 
 def prepare_data(path):
     if os.path.isdir(path):
@@ -61,8 +59,7 @@ def prepare_data(path):
                 jobs[bname] = pool.apply_async(
                                     madplot.load_bagfile,
                                     (bpath, arena),
-                                    {'smooth':smooth_trajectories,
-                                     'recalc_v':recalc_v})
+                                    {'smooth':smooth_trajectories})
 
     pool.close()
     pool.join()
