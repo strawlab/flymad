@@ -132,25 +132,25 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
     ctrln = ctrldf.groupby(['align'], as_index=False)[['Vfwd', 'Afwd', 'dorientation', 'laser_state']].count().astype(float)
 
     ####AAAAAAAARRRRRRRRRRRGGGGGGGGGGGGGGHHHHHHHHHH so much copy paste here
-    df2.save(path + "/df2.df")
-    expmean.save(path + "/expmean.df")
-    ctrlmean.save(path + "/ctrlmean.df")
-    expstd.save(path + "/expstd.df")
-    ctrlstd.save(path + "/ctrlstd.df")
-    expn.save(path + "/expn.df")
-    ctrln.save(path + "/ctrln.df")
+    df2.save(path + "/df2.df.dan")
+    expmean.save(path + "/expmean.df.dan")
+    ctrlmean.save(path + "/ctrlmean.df.dan")
+    expstd.save(path + "/expstd.df.dan")
+    ctrlstd.save(path + "/ctrlstd.df.dan")
+    expn.save(path + "/expn.df.dan")
+    ctrln.save(path + "/ctrln.df.dan")
 
     return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2
 
 def load_data( path ):
     return (
-            pd.read_pickle(path + "/df2.df"),
-            pd.read_pickle(path + "/expmean.df"),
-            pd.read_pickle(path + "/ctrlmean.df"),
-            pd.read_pickle(path + "/expstd.df"),
-            pd.read_pickle(path + "/ctrlstd.df"),
-            pd.read_pickle(path + "/expn.df"),
-            pd.read_pickle(path + "/ctrln.df"),
+            pd.load(path + "/expmean.df.dan"),
+            pd.load(path + "/ctrlmean.df.dan"),
+            pd.load(path + "/expstd.df.dan"),
+            pd.load(path + "/ctrlstd.df.dan"),
+            pd.load(path + "/expn.df.dan"),
+            pd.load(path + "/ctrln.df.dan"),
+            pd.load(path + "/df2.df.dan"),
     )
 
 def get_stats(group):   #was using this for debugging. could be useful in future so keep.
@@ -159,12 +159,13 @@ def get_stats(group):   #was using this for debugging. could be useful in future
             'n' : group.count()
            }
 
-def run_stats (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
+def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
+    print df2['Genotype']
     print type(df2), df2.shape #SHOULD BE LONGER THAN 891. WORKS IN IPYTHON, NOT IN PYTHON. BUG?????
     number_of_bins = [ 891,445,223,111,56,28, 9 ] #8.9 second trials, different bin sizes.
     p_values = DataFrame()  
-    df_ctrl = df2[df2['Genotype'] == CTRL_GENOTYPE]
-    df_exp = df2[df2['Genotype'] == EXP_GENOTYPE]
+    df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
+    df_exp = df2[df2['Genotype'] == exp_genotype]
     for binsize in number_of_bins:
         bins = np.linspace(0,8.91, binsize) ###lazy dan bug fix. should relate to min/max of df2['align']
         binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
@@ -179,12 +180,12 @@ def run_stats (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2):
 
 
 #run_stats_bin_to_bin was my failed attempt at finding first diff from baseline. boo dan boo.
-def run_stats_bin_to_bin (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
+def run_stats_bin_to_bin (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
     print type(df2), df2.shape  
     number_of_bins = [ 891,445,223,111,56,28, 9 ] 
     p_values = DataFrame()  
-    df_ctrl = df2[df2['Genotype'] == CTRL_GENOTYPE]
-    df_exp = df2[df2['Genotype'] == EXP_GENOTYPE]
+    df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
+    df_exp = df2[df2['Genotype'] == exp_genotype]
     for binsize in number_of_bins:
         bins = np.linspace(0,8.91, binsize) 
         binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
@@ -211,6 +212,8 @@ def fit_to_curve ( p_values ):
     ax.plot(x, y, 'o', xPoly, yPoly, '-g')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('-log(p)')
+    ax.set_ylim([0, 25])
+    ax.set_xlim([0, 9])
     plt.show()
     print polynom #lazy dan can't use python to solve polynomial eqns. boo.
     return (x, y, xPoly, yPoly, polynom)
@@ -346,10 +349,10 @@ if __name__ == "__main__":
     else:
         data = prepare_data(path, EXP_GENOTYPE, CTRL_GENOTYPE)
 
-    run_stats(path, *data)
+    p_values = run_stats(path, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
     p_values.to_csv(path + '/p_values.csv')
     fit_to_curve( p_values )
-    plot_data(path, *data)
+    #plot_data(path, *data)
 
     if args.show:
         plt.show()
