@@ -160,8 +160,7 @@ def get_stats(group):   #was using this for debugging. could be useful in future
            }
 
 def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
-    print df2['Genotype']
-    print type(df2), df2.shape #SHOULD BE LONGER THAN 891. WORKS IN IPYTHON, NOT IN PYTHON. BUG?????
+    print df2.shape
     number_of_bins = [ 891,445,223,111,56,28, 9 ] #8.9 second trials, different bin sizes.
     p_values = DataFrame()  
     df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
@@ -181,7 +180,6 @@ def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctr
 
 #run_stats_bin_to_bin was my failed attempt at finding first diff from baseline. boo dan boo.
 def run_stats_bin_to_bin (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
-    print type(df2), df2.shape  
     number_of_bins = [ 891,445,223,111,56,28, 9 ] 
     p_values = DataFrame()  
     df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
