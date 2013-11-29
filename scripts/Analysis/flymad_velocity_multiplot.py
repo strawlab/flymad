@@ -225,20 +225,21 @@ def fit_to_curve ( p_values ):
     x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
     logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 50]))
     y = np.array(logs)
-    order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
-    poly_params = np.polyfit(x,y,order)
-    polynom = np.poly1d(poly_params)
-    xPoly = np.linspace(0, max(x), 100)
-    yPoly = polynom(xPoly)
+    # order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
+    # poly_params = np.polyfit(x,y,order)
+    # polynom = np.poly1d(poly_params)
+    # xPoly = np.linspace(0, max(x), 100)
+    # yPoly = polynom(xPoly)
     fig1 = plt.figure()
     ax = fig1.add_subplot(1,1,1)
-    ax.plot(x, y, 'o', xPoly, yPoly, '-g')
+    ax.plot(x, y, 'bo-')
+
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('-log(p)')
     ax.set_ylim([0, 25])
     ax.set_xlim([0, 9])
     plt.show()
-    print polynom #lazy dan can't use python to solve polynomial eqns. boo.
+    #print polynom #lazy dan can't use python to solve polynomial eqns. boo.
     return (x, y, xPoly, yPoly, polynom)
 
 def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
