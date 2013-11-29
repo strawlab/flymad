@@ -166,8 +166,18 @@ def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_co
         binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
         binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
         for x in binned_ctrl.levels:
-            test1 = df_ctrl['Vfwd'][binned_ctrl == x]
-            test2 = df_exp['Vfwd'][binned_exp == x]
+            test1_all_flies_df = df_ctrl[binned_ctrl == x]
+            test1 = []
+            for obj_id, fly_group in test1_all_flies_df.groupby('obj_id'):
+                test1.append( np.mean(fly_group['Vfwd'].values) )
+            test1 = np.array(test1)
+
+            test2_all_flies_df = df_exp[binned_exp == x]
+            test2 = []
+            for obj_id, fly_group in test2_all_flies_df.groupby('obj_id'):
+                test2.append( np.mean(fly_group['Vfwd'].values) )
+            test2 = np.array(test2)
+
             hval, pval = kruskal(test1, test2)
             dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
             p_values = pd.concat([p_values, dftemp])
