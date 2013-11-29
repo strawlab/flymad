@@ -159,7 +159,20 @@ def get_stats(group):   #was using this for debugging. could be useful in future
             'n' : group.count()
            }
 
+def add_obj_id(df):
+    results = np.zeros( (len(df),), dtype=np.int )
+    obj_id = 0
+    for i,(ix,row) in enumerate(df.iterrows()):
+        if row['align']==0.0:
+            obj_id += 1
+        results[i] = obj_id
+    df['obj_id']=results
+    return df
+
 def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_colname='Vfwd'):
+    df_ctrl = add_obj_id(df_ctrl)
+    df_exp = add_obj_id(df_exp)
+
     p_values = DataFrame()
     for binsize in number_of_bins:
         bins = np.linspace(0,8.91, binsize) ###lazy dan bug fix. should relate to min/max of df2['align']
