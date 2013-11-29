@@ -198,7 +198,7 @@ def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_co
 
 def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2):
     number_of_bins = [891,445,223,111,56,28, 9 ] #8.9 second trials, different bin sizes.
-    number_of_bins = [891]
+    number_of_bins = [223]
     df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
     df_exp = df2[df2['Genotype'] == exp_genotype]
     return calc_kruskal(df_ctrl, df_exp, number_of_bins)
@@ -233,6 +233,11 @@ def fit_to_curve ( p_values ):
     fig1 = plt.figure()
     ax = fig1.add_subplot(1,1,1)
     ax.plot(x, y, 'bo-')
+
+    ax.axvspan(2.0,4.0,
+               facecolor='Yellow', alpha=0.15,
+               edgecolor='none',
+               zorder=-20)
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('-log(p)')
