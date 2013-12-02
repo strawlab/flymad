@@ -173,9 +173,11 @@ def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_co
     df_ctrl = add_obj_id(df_ctrl)
     df_exp = add_obj_id(df_exp)
 
+    dalign = df_ctrl['align'].max() - df_ctrl['align'].min()
+
     p_values = DataFrame()
     for binsize in number_of_bins:
-        bins = np.linspace(0,8.91, binsize) ###lazy dan bug fix. should relate to min/max of df2['align']
+        bins = np.linspace(0,dalign,binsize)
         binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
         binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
         for x in binned_ctrl.levels:
