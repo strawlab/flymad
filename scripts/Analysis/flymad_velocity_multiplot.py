@@ -153,7 +153,7 @@ def load_data( path ):
             pd.load(path + "/df2.df.dan"),
     )
 
-def get_stats(group):   #was using this for debugging. could be useful in future so keep.
+def get_stats(group):
     return {'mean': group.mean(),
             'var' : group.var(),
             'n' : group.count()
@@ -225,9 +225,6 @@ def fit_to_curve ( p_values ):
     ax.set_ylabel('-log(p)')
     ax.set_ylim([0, 25])
     ax.set_xlim([0, 9])
-    plt.show()
-    #print polynom #lazy dan can't use python to solve polynomial eqns. boo.
-    return (x, y, xPoly, yPoly, polynom)
 
 def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
 
