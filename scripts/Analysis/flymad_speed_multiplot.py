@@ -100,25 +100,25 @@ def prepare_data(path, exp_genotype, ctrl_genotype):
     ctrln = ctrldf.groupby(['align'], as_index=False).count().astype(float)
 
     ####AAAAAAAARRRRRRRRRRRGGGGGGGGGGGGGGHHHHHHHHHH so much copy paste here
-    df2.save(path + "/df2.df")
-    expmean.save(path + "/expmean.df")
-    ctrlmean.save(path + "/ctrlmean.df")
-    expstd.save(path + "/expstd.df")
-    ctrlstd.save(path + "/ctrlstd.df")
-    expn.save(path + "/expn.df")
-    ctrln.save(path + "/ctrln.df")
+    df2.save(path + "/df2.df.dan")
+    expmean.save(path + "/expmean.df.dan")
+    ctrlmean.save(path + "/ctrlmean.df.dan")
+    expstd.save(path + "/expstd.df.dan")
+    ctrlstd.save(path + "/ctrlstd.df.dan")
+    expn.save(path + "/expn.df.dan")
+    ctrln.save(path + "/ctrln.df.dan")
 
     return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2
 
 def load_data( path ):
     return (
-            pd.read_pickle(path + "/df2.df"),
-            pd.read_pickle(path + "/expmean.df"),
-            pd.read_pickle(path + "/ctrlmean.df"),
-            pd.read_pickle(path + "/expstd.df"),
-            pd.read_pickle(path + "/ctrlstd.df"),
-            pd.read_pickle(path + "/expn.df"),
-            pd.read_pickle(path + "/ctrln.df"),
+            pd.load(path + "/expmean.df.dan"),
+            pd.load(path + "/ctrlmean.df.dan"),
+            pd.load(path + "/expstd.df.dan"),
+            pd.load(path + "/ctrlstd.df.dan"),
+            pd.load(path + "/expn.df.dan"),
+            pd.load(path + "/ctrln.df.dan"),
+            pd.load(path + "/df2.df.dan"),
     )
 
 def get_stats(group):
@@ -127,41 +127,74 @@ def get_stats(group):
             'n' : group.count()
            }
 
-def run_stats (path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
-    print type(df2), df2.shape 
-    number_of_bins = [ 6990 ] #69.9 second trials.
-    p_values = DataFrame()  
-    df_ctrl = df2[df2['Genotype'] == 'wshib']
-    df_exp = df2[df2['Genotype'] == 'ok371shib']
+def add_obj_id(df):
+    results = np.zeros( (len(df),), dtype=np.int )
+    obj_id = 0
+    for i,(ix,row) in enumerate(df.iterrows()):
+        if row['align']==0.0:
+            obj_id += 1
+        results[i] = obj_id
+    df['obj_id']=results
+    return df
+
+def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_colname='v'):
+    df_ctrl = add_obj_id(df_ctrl)
+    df_exp = add_obj_id(df_exp)
+
+    p_values = DataFrame()
     for binsize in number_of_bins:
-        bins = np.linspace(0,8.91, binsize)
+
+        ###lazy dan bug fix. should relate to min/max of df2['align']
+
+        bins = np.linspace(0,69.9, binsize)
         binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
         binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
-        for x in binned_ctrl.levels:                
-            test1 = df_ctrl['v'][binned_ctrl == x]
-            test2 = df_exp['v'][binned_exp == x]
+        for x in binned_ctrl.levels:
+            test1_all_flies_df = df_ctrl[binned_ctrl == x]
+            test1 = []
+            for obj_id, fly_group in test1_all_flies_df.groupby('obj_id'):
+                test1.append( np.mean(fly_group['v'].values) )
+            test1 = np.array(test1)
+
+            test2_all_flies_df = df_exp[binned_exp == x]
+            test2 = []
+            for obj_id, fly_group in test2_all_flies_df.groupby('obj_id'):
+                test2.append( np.mean(fly_group['v'].values) )
+            test2 = np.array(test2)
+
             hval, pval = kruskal(test1, test2)
             dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
             p_values = pd.concat([p_values, dftemp])
     return p_values
 
+def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2):
+    number_of_bins = [ 6990//4 ]
+    df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
+    df_exp = df2[df2['Genotype'] == exp_genotype]
+    return calc_kruskal(df_ctrl, df_exp, number_of_bins)
+
 def fit_to_curve ( p_values ):
     x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
     logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 50]))
     y = np.array(logs)
-    order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
-    poly_params = np.polyfit(x,y,order)
-    polynom = np.poly1d(poly_params)
-    xPoly = np.linspace(0, max(x), 100)
-    yPoly = polynom(xPoly)
+    # order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
+    # poly_params = np.polyfit(x,y,order)
+    # polynom = np.poly1d(poly_params)
+    # xPoly = np.linspace(0, max(x), 100)
+    # yPoly = polynom(xPoly)
     fig1 = plt.figure()
     ax = fig1.add_subplot(1,1,1)
-    ax.plot(x, y, 'o', xPoly, yPoly, '-g')
+    ax.plot(x, y, 'bo-')
+
+    ax.axvspan(10,20,
+               facecolor='Yellow', alpha=0.15,
+               edgecolor='none',
+               zorder=-20)
+
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('-log(p)')
-    plt.show()
-    print polynom #lazy dan can't use python to solve polynomial eqns. boo.
-    return (x, y, xPoly, yPoly, polynom)
+    ax.set_ylim([0, 25])
+    ax.set_xlim([5, 40])
 
 def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
 
@@ -209,12 +242,11 @@ if __name__ == "__main__":
     else:
         data = prepare_data(path, EXP_GENOTYPE, CTRL_GENOTYPE)
 
-    run_stats(path, *data)
+    p_values = run_stats(path, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
     p_values.to_csv(path + '/p_values.csv')
     fit_to_curve( p_values )
-    plot_data(path, *data)
+    #plot_data(path, *data)
 
     if args.show:
         plt.show()
-
 
