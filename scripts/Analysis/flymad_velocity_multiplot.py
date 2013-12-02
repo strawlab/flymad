@@ -203,24 +203,6 @@ def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctr
     df_exp = df2[df2['Genotype'] == exp_genotype]
     return calc_kruskal(df_ctrl, df_exp, number_of_bins)
 
-#run_stats_bin_to_bin was my failed attempt at finding first diff from baseline. boo dan boo.
-def run_stats_bin_to_bin (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2): 
-    number_of_bins = [ 891,445,223,111,56,28, 9 ] 
-    p_values = DataFrame()  
-    df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
-    df_exp = df2[df2['Genotype'] == exp_genotype]
-    for binsize in number_of_bins:
-        bins = np.linspace(0,8.91, binsize) 
-        binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
-        binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
-        for x in binned_ctrl.levels:                
-            test1 = df_ctrl['Vfwd'][binned_ctrl == x]
-            test2 = df_exp['Vfwd'][binned_exp == x]
-            hval, pval = kruskal(test1, test2)
-            dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
-            p_values = pd.concat([p_values, dftemp])
-    return p_values
-
 def fit_to_curve ( p_values ):
     x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
     logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 50]))
