@@ -196,7 +196,7 @@ def fit_to_curve ( p_values ):
     ax.set_ylim([0, 25])
     ax.set_xlim([5, 40])
 
-def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
+def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2):
 
     fig2 = plt.figure("Speed Multiplot")
     ax = fig2.add_subplot(1,1,1)
@@ -245,7 +245,7 @@ if __name__ == "__main__":
     p_values = run_stats(path, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
     p_values.to_csv(path + '/p_values.csv')
     fit_to_curve( p_values )
-    #plot_data(path, *data)
+    plot_data(path, *data)
 
     if args.show:
         plt.show()

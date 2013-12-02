@@ -196,7 +196,7 @@ def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_co
             p_values = pd.concat([p_values, dftemp])
     return p_values
 
-def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2):
+def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2):
     number_of_bins = [891,445,223,111,56,28, 9 ] #8.9 second trials, different bin sizes.
     number_of_bins = [223]
     df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
@@ -226,7 +226,7 @@ def fit_to_curve ( p_values ):
     ax.set_ylim([0, 25])
     ax.set_xlim([0, 9])
 
-def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
+def plot_data( path, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2):
 
     """
     fig = plt.figure()
@@ -360,7 +360,7 @@ if __name__ == "__main__":
     p_values = run_stats(path, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
     p_values.to_csv(path + '/p_values.csv')
     fit_to_curve( p_values )
-    #plot_data(path, *data)
+    plot_data(path, *data)
 
     if args.show:
         plt.show()
