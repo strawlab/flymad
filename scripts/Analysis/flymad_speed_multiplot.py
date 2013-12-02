@@ -16,10 +16,11 @@ import matplotlib.transforms as mtransforms
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
+from scipy.stats import kruskal
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
-assert pd.__version__ == "0.11.0"
+assert pd.version.version in ("0.11.0" ,  "0.12.0")
 
 arena = flymad_analysis.Arena('mm')
 
@@ -109,7 +110,7 @@ def prepare_data(path, smoothstr, smooth, exp_genotype, ctrl_genotype):
     expn.save(path + "/expn" + smoothstr + ".df")
     ctrln.save(path + "/ctrln" + smoothstr + ".df")
 
-    return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln
+    return expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2
 
 def load_data(path, smoothstr):
     return (
@@ -119,9 +120,84 @@ def load_data(path, smoothstr):
             pd.load(path + "/ctrlstd" + smoothstr + ".df"),
             pd.load(path + "/expn" + smoothstr + ".df"),
             pd.load(path + "/ctrln" + smoothstr + ".df"),
+            pd.load(path + "/df2" + smoothstr + ".df"),
     )
 
-def plot_data( path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln ):
+def get_stats(group):
+    return {'mean': group.mean(),
+            'var' : group.var(),
+            'n' : group.count()
+           }
+
+def add_obj_id(df):
+    results = np.zeros( (len(df),), dtype=np.int )
+    obj_id = 0
+    for i,(ix,row) in enumerate(df.iterrows()):
+        if row['align']==0.0:
+            obj_id += 1
+        results[i] = obj_id
+    df['obj_id']=results
+    return df
+
+def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_colname='v'):
+    df_ctrl = add_obj_id(df_ctrl)
+    df_exp = add_obj_id(df_exp)
+
+    dalign = df_ctrl['align'].max() - df_ctrl['align'].min()
+
+    p_values = DataFrame()
+    for binsize in number_of_bins:
+        bins = np.linspace(0,dalign,binsize)
+        binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
+        binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
+        for x in binned_ctrl.levels:
+            test1_all_flies_df = df_ctrl[binned_ctrl == x]
+            test1 = []
+            for obj_id, fly_group in test1_all_flies_df.groupby('obj_id'):
+                test1.append( np.mean(fly_group['v'].values) )
+            test1 = np.array(test1)
+
+            test2_all_flies_df = df_exp[binned_exp == x]
+            test2 = []
+            for obj_id, fly_group in test2_all_flies_df.groupby('obj_id'):
+                test2.append( np.mean(fly_group['v'].values) )
+            test2 = np.array(test2)
+
+            hval, pval = kruskal(test1, test2)
+            dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
+            p_values = pd.concat([p_values, dftemp])
+    return p_values
+
+def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2):
+    number_of_bins = [ 6990//4 ]
+    df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
+    df_exp = df2[df2['Genotype'] == exp_genotype]
+    return calc_kruskal(df_ctrl, df_exp, number_of_bins)
+
+def fit_to_curve (path, smoothstr, p_values):
+    x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
+    logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 50]))
+    y = np.array(logs)
+    # order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
+    # poly_params = np.polyfit(x,y,order)
+    # polynom = np.poly1d(poly_params)
+    # xPoly = np.linspace(0, max(x), 100)
+    # yPoly = polynom(xPoly)
+    fig1 = plt.figure()
+    ax = fig1.add_subplot(1,1,1)
+    ax.plot(x, y, 'bo-')
+
+    ax.axvspan(10,20,
+               facecolor='Yellow', alpha=0.15,
+               edgecolor='none',
+               zorder=-20)
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('-log(p)')
+    ax.set_ylim([0, 25])
+    ax.set_xlim([5, 40])
+
+def plot_data(path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2):
 
     fig2 = plt.figure("Speed Multiplot %s" % smoothstr)
     ax = fig2.add_subplot(1,1,1)
@@ -173,9 +249,10 @@ if __name__ == "__main__":
     else:
         data = prepare_data(path, smoothstr, args.smooth, EXP_GENOTYPE, CTRL_GENOTYPE)
 
+    p_values = run_stats(path, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
+    fit_to_curve(path, smoothstr, p_values)
     plot_data(path, smoothstr, *data)
 
     if args.show:
         plt.show()
-
 

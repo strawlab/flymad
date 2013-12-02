@@ -24,7 +24,7 @@ import flymad.flymad_plot as flymad_plot
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
-assert pd.__version__ == "0.11.0"
+assert pd.version.version in ("0.11.0", "0.12.0")
 
 def prepare_data(path, exp_genotype, exp2_genotype, ctrl_genotype):
     path_out = path + "/outputs/"
@@ -137,6 +137,9 @@ def prepare_data(path, exp_genotype, exp2_genotype, ctrl_genotype):
     ctrln = ctrldf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'as']].count().astype(float)
     
     ####AAAAAAAARRRRRRRRRRRGGGGGGGGGGGGGGHHHHHHHHHH so much copy paste here
+    
+    pooldf.save(path+'/pooldf.df')
+
     expdf.save(path+'/exp.df')
     exp2df.save(path+'/exp2.df')
     ctrldf.save(path+'/ctrl.df')
@@ -153,11 +156,12 @@ def prepare_data(path, exp_genotype, exp2_genotype, ctrl_genotype):
     exp2n.save(path+'/exp2n.df')
     ctrln.save(path+'/ctrln.df')
 
-    return (expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln)
+    return (expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln, pooldf)
 
 def load_data(path):
 
     return (
+        pd.read_pickle(path+'/pooldf.df'),
         pd.load(path+'/exp.df'),
         pd.load(path+'/exp2.df'),
         pd.load(path+'/ctrl.df'),
@@ -172,8 +176,58 @@ def load_data(path):
         pd.load(path+'/ctrln.df')
     )
 
+def run_stats (path, expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln, pooldf): 
+    print type(pooldf), pooldf.shape 
+    p_values = DataFrame()  
+    df_ctrl = pooldf[pooldf['Genotype'] == CTRL_GENOTYPE]
+    df_exp1 = pooldf[pooldf['Genotype'] == EXP_GENOTYPE]
+    df_exp2 = pooldf[pooldf['Genotype'] == EXP_GENOTYPE2]
+    df_exp2['Genotype'] = 'VT40347GP'
+    df_ctrl = df_ctrl[df_ctrl['t'] <= 485]
+    df_exp1 = df_exp1[df_exp1['t'] <= 485]
+    df_exp2 = df_exp2[df_exp2['t'] <= 485]
+    df_ctrl = df_ctrl[df_ctrl['t'] >=-120]
+    df_exp1 = df_exp1[df_exp1['t'] >=-120]
+    df_exp2 = df_exp2[df_exp2['t'] >=-120]
+    bins = np.linspace(-120,485,122)  # 5 second bins -120 to 485
+    binned_ctrl = pd.cut(df_ctrl['t'], bins, labels= bins[:-1])
+    binned_exp1 = pd.cut(df_exp1['t'], bins, labels= bins[:-1])
+    binned_exp2 = pd.cut(df_exp2['t'], bins, labels= bins[:-1])
+    for x in binned_ctrl.levels:               
+        testctrl = df_ctrl['zx'][binned_ctrl == x]
+        test1 = df_exp1['zx'][binned_exp1 == x]
+        test2 = df_exp2['zx'][binned_exp2 == x]
+        hval1, pval1 = ttest_ind(test1, testctrl)
+        hval2, pval2 = ttest_ind(test2, testctrl) #too many identical values (zeros) in controls, so cannot do Kruskal.
+        dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P1': pval1, 'P2':pval2}, index=[x])
+        p_values = pd.concat([p_values, dftemp])
+    p_values1 = p_values[['Total_bins', 'Bin_number', 'P1']]
+    p_values1.columns = ['Total_bins', 'Bin_number', 'P']
+    p_values2 = p_values[['Total_bins', 'Bin_number', 'P2']]
+    p_values2.columns = ['Total_bins', 'Bin_number', 'P']
+    return p_values1, p_values2
 
-def plot_data(path, expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln):
+def fit_to_curve ( p_values ):
+    x = np.array(p_values['Bin_number'])
+    logs = -1*(np.log(p_values['P']))
+    y = np.array(logs)
+    order = 6 #DEFINE ORDER OF POLYNOMIAL HERE.
+    poly_params = np.polyfit(x,y,order)
+    polynom = np.poly1d(poly_params)
+    xPoly = np.linspace(min(x), max(x), 100)
+    yPoly = polynom(xPoly)
+    fig1 = plt.figure()
+    ax = fig1.add_subplot(1,1,1)
+    ax.plot(x, y, 'o', xPoly, yPoly, '-g')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('-log(p)')
+    #plt.axhline(y=1.30103, color='k-')
+    plt.show()
+    print polynom #lazy dan can't use python to solve polynomial eqns. boo.
+    return (x, y, xPoly, yPoly, polynom)
+
+
+def plot_data(path, expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln, pooldf):
     path_out = path + "/outputs/"
 
     fig = plt.figure("Courtship Wingext 10min")
@@ -259,7 +313,10 @@ if __name__ == "__main__":
         data = load_data(path)
     else:
         data = prepare_data(path, EXP_GENOTYPE, EXP_GENOTYPE2, CTRL_GENOTYPE)
-
+    
+    run_stats(path, *data)
+    fit_to_curve( p_values1 )
+    fit_to_curve( p_values2 )
     plot_data(path, *data)
 
     if args.show:
