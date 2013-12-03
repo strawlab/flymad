@@ -18,6 +18,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
+from scipy.stats import ttest_ind
+
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
@@ -161,7 +163,6 @@ def prepare_data(path, exp_genotype, exp2_genotype, ctrl_genotype):
 def load_data(path):
 
     return (
-        pd.read_pickle(path+'/pooldf.df'),
         pd.load(path+'/exp.df'),
         pd.load(path+'/exp2.df'),
         pd.load(path+'/ctrl.df'),
@@ -173,7 +174,8 @@ def load_data(path):
         pd.load(path+'/ctrlstd.df'),
         pd.load(path+'/expn.df'),
         pd.load(path+'/exp2n.df'),
-        pd.load(path+'/ctrln.df')
+        pd.load(path+'/ctrln.df'),
+        pd.load(path+'/pooldf.df'),
     )
 
 def run_stats (path, expdf, exp2df, ctrldf, expmean, exp2mean, ctrlmean, expstd, exp2std, ctrlstd, expn, exp2n, ctrln, pooldf): 
@@ -222,7 +224,6 @@ def fit_to_curve ( p_values ):
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('-log(p)')
     #plt.axhline(y=1.30103, color='k-')
-    plt.show()
     print polynom #lazy dan can't use python to solve polynomial eqns. boo.
     return (x, y, xPoly, yPoly, polynom)
 
@@ -314,7 +315,7 @@ if __name__ == "__main__":
     else:
         data = prepare_data(path, EXP_GENOTYPE, EXP_GENOTYPE2, CTRL_GENOTYPE)
     
-    run_stats(path, *data)
+    p_values1, p_values2 = run_stats(path, *data)
     fit_to_curve( p_values1 )
     fit_to_curve( p_values2 )
     plot_data(path, *data)
