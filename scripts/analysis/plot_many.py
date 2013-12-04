@@ -211,6 +211,7 @@ def plot_data(path, dat, debug_plot):
     latency_to_first_contact = {k:[] for k in exps}
     velocity_outside_area = {k:[] for k in exps}
     velocity_inside_area = {k:[] for k in exps}
+    path_length = {k:[] for k in exps}
 
     pct_in_area_per_time_bins = range(0,300,30)
 
@@ -269,7 +270,7 @@ def plot_data(path, dat, debug_plot):
             pct_in_area_total[exp].append(
                         madplot.calculate_pct_in_area_per_objid_only_vals(tdf))
 
-            tts, vel_out, vel_in = madplot.calculate_latency_and_velocity_to_stay(
+            tts, vel_out, vel_in, path_l = madplot.calculate_latency_and_velocity_to_stay(
                                                 tdf, holdtime=20,
                                                 tout_reset_time=2, arena=arena, geom=geom,
                                                 debug_plot=debug_plot, title=dbg_plot_title)
@@ -277,6 +278,7 @@ def plot_data(path, dat, debug_plot):
             latency_to_first_contact[exp].append(tts)
             velocity_outside_area[exp].append(vel_out)
             velocity_inside_area[exp].append(vel_in)
+            path_length[exp].append(path_l)
 
         fig.savefig(os.path.join(plotdir,'%s_trajectories.png' % exp))
 
@@ -326,6 +328,13 @@ def plot_data(path, dat, debug_plot):
                         ind, width, ntrials,
                         ticklabels, exps_colors,
                         'velocity_in', plotdir)
+
+    #path length
+    _plot_bar_and_line(path_length, exps,
+                       'Path Length', 'Trial', 'Path Length',
+                        ind, width, ntrials,
+                        ticklabels, exps_colors,
+                        'path_length', plotdir)
 
 def plot_data_trajectories(path, dat):
 

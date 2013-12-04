@@ -643,6 +643,7 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
     tts = []
     vel_out = []
     vel_in = []
+    path_l = []
 
     for experiment,df in tdf.groupby('experiment'):
         print "\tltcy: EXPERIMENT #",experiment
@@ -703,6 +704,8 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
                 vel_out.append( dfo['v'].mean() )
                 vel_in.append( dfi['v'].mean() )
 
+                path_l.append(np.trapz(dfo['v'].values, dx=1/100.0))
+
                 if debug_plot:
 
                     xlim,ylim = arena.get_limits()
@@ -727,9 +730,10 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
                 #the fly didn't make it, so consider the whole trajectory
                 #for its outside velocity
                 vel_out.append( group['v'].mean() )
+                path_l.append(np.trapz(group['v'].values, dx=1/100.0))
                 print "\tltcy: obj_id %s finished outside" % name
 
-    return tts, vel_out, vel_in
+    return tts, vel_out, vel_in, path_l
 
 def get_progress_bar(name, maxval):
     widgets = ["%s: " % name, progressbar.Percentage(),
