@@ -119,13 +119,14 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
     #save a json file
     data = {"treatment":[],'trial':[],'flyid':[],'value':[],'experiment':[]}
     for treatment in exps:
-        for trialn,vals in enumerate(per_exp_data[treatment]):
-            for flyid,val in enumerate(vals):
+        for trialn,(vals,exp_ids) in enumerate(per_exp_data[treatment]):
+            assert len(vals) == len(exp_ids)
+            for flyid,(val,exp_id) in enumerate(zip(vals,exp_ids)):
                 data['treatment'].append(treatment)
                 data['trial'].append(trialn)
                 data['flyid'].append(flyid)
                 data['value'].append(val)
-                data['experiment'].append(-1)
+                data['experiment'].append(exp_id)
     dfname = os.path.join(plotdir,'%s.df' % filename)
     df = pd.DataFrame(data)
     df.save(dfname)
@@ -136,7 +137,7 @@ def _plot_bar_and_line(per_exp_data, exps, title, xlabel, ylabel, ind, width, nt
         stds = []
         pooled_nens = []
 
-        for j,v in enumerate(per_exp_data[exp]):
+        for j,(v,ids) in enumerate(per_exp_data[exp]):
             pooled_nens.append(len(v))
             means.append( np.mean(v) )
 

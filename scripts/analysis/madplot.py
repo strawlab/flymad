@@ -587,11 +587,13 @@ def calculate_pct_in_area_per_objid(tdf, minlenpct=0.10):
 
 def calculate_pct_in_area_per_objid_only_vals(tdf, minlenpct=0.10):
     vals = []
+    exp_ids = []
     good_oids = calculate_pct_in_area_per_objid(tdf, minlenpct)
     for _exp in good_oids:
         for _oid in good_oids[_exp]:
             vals.append(good_oids[_exp][_oid])
-    return vals
+            exp_ids.append(_exp)
+    return vals,exp_ids
 
 def calculate_time_in_area(tdf, maxtime, toffsets):
     exp_pcts = []
@@ -644,6 +646,8 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
     vel_out = []
     vel_in = []
     path_l = []
+    exp_ids = []
+    vel_in_exp_ids = []
 
     for experiment,df in tdf.groupby('experiment'):
         print "\tltcy: EXPERIMENT #",experiment
@@ -702,7 +706,9 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
                 dfi = group[t_first_in_area_ix:t_last_in_area]
 
                 vel_out.append( dfo['v'].mean() )
+
                 vel_in.append( dfi['v'].mean() )
+                vel_in_exp_ids.append(experiment)
 
                 path_l.append(np.trapz(dfo['v'].values, dx=1/100.0))
 
@@ -730,10 +736,13 @@ def calculate_latency_and_velocity_to_stay(tdf, holdtime=20, minlenpct=0.10, tou
                 #the fly didn't make it, so consider the whole trajectory
                 #for its outside velocity
                 vel_out.append( group['v'].mean() )
+                #and its whole path length
                 path_l.append(np.trapz(group['v'].values, dx=1/100.0))
                 print "\tltcy: obj_id %s finished outside" % name
 
-    return tts, vel_out, vel_in, path_l
+            exp_ids.append(experiment)
+
+    return (tts,exp_ids), (vel_out,exp_ids), (vel_in,vel_in_exp_ids), (path_l,exp_ids)
 
 def get_progress_bar(name, maxval):
     widgets = ["%s: " % name, progressbar.Percentage(),
