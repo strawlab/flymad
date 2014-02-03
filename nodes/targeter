@@ -148,6 +148,6 @@ class Targeter:
         rospy.spin()
 
 if __name__=='__main__':
-    cal_fname = sys.argv[1]
+    cal_fname = rospy.myargv()[1]
     t=Targeter(cal_fname)
     t.run()

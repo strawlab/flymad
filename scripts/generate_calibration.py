@@ -73,7 +73,7 @@ class Calibration:
 
 def main():
     fc = Calibration()
-    fname = sys.argv[1]
+    fname = rospy.myargv()[1]
     daca, dacb = np.mgrid[-0x3FFF:0x3FFF:50j, -0x3FFF:0x3FFF:50j]
     daca = daca.ravel().astype(np.int16)
     dacb = dacb.ravel().astype(np.int16)

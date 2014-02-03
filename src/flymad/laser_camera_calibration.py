@@ -119,7 +119,7 @@ class Calibration:
 def main():
     import sys
     import matplotlib.pyplot as plt
-    fname = sys.argv[1]
+    fname = rospy.myargv()[1]
     cal = load_calibration(fname)
 
     if 0:

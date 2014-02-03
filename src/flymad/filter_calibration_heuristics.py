@@ -7,7 +7,7 @@ from flymad.laser_camera_calibration import read_raw_calibration_data, \
      save_raw_calibration_data
 
 def main():
-    fname_in = sys.argv[1]
+    fname_in = rospy.myargv()[1]
     fname_out = os.path.splitext(fname_in)[0] + '.filtered.yaml'
     dac_in, pixels_in = read_raw_calibration_data(fname_in)
 

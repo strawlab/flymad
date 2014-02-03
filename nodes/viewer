@@ -180,11 +180,11 @@ class ViewerApp(Gtk.Window):
             self.pcw.on_dac_pixels( px, py )
 
 if __name__ == "__main__":
-    # THIS IS A HACK! Need to fix argument parsing so that ROS has
-    # first pass at the parameters (e.g. __name:=node_name).
-    if len(sys.argv)>=2:
-        cal_fname = sys.argv[1]
+    argv = rospy.myargv()
+    if len(argv)==2:
+        cal_fname = argv[1]
     else:
+        assert len(argv)==1
         cal_fname = None
     app = ViewerApp(cal_fname)
     sys.exit(Gtk.main())
