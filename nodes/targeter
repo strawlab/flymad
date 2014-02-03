@@ -17,7 +17,7 @@ from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32
 
 LATENCY = 0.05
-K_PROPORTIONAL = 1e3
+K_PROPORTIONAL = 1e3/30.0
 
 class Targeter:
     def __init__(self,cal_fname):
