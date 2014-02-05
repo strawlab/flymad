@@ -1,11 +1,33 @@
-#!/usr/bin/env python
 import numpy as np
 from scipy.interpolate import griddata, CloughTocher2DInterpolator, LinearNDInterpolator
 import json
 import yaml
+import os.path
 
-import roslib; roslib.load_manifest('flymad')
+import roslib
+import roslib.rosenv
+import roslib.packages
+roslib.load_manifest('flymad')
 import rospy
+
+def get_calibration_file_path(default=None, create=False, suffix='OUT.filtered'):
+    if default and os.path.isfile(default):
+        return default
+
+    fn = "calibration%s.yaml" % suffix
+
+    default = os.path.join(
+                    roslib.rosenv.get_ros_home(),fn)
+    #try ~/.ros/calibrationOUT.filtered.yaml first (for DAN backwards compat)
+    if create or os.path.isfile(default):
+        return default
+
+    #always have a default for things like the viewer to work
+    example = os.path.join(
+                    roslib.packages.get_pkg_dir('flymad'),
+                    'data','calibration','example',fn)
+
+    return example
 
 def to_plain(arr):
     """Convert numpy arrays to pure-Python types. Useful for saving to JSON"""

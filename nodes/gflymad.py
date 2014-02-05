@@ -2,9 +2,11 @@
 
 import roslib
 roslib.load_manifest('flymad')
+import flymad.laser_camera_calibration
 
 import os.path
 import subprocess
+import datetime
 
 import rospy
 import roslib.packages
@@ -39,6 +41,21 @@ class UI:
 
         self._fcb = self._ui.get_object("filechooserbutton1")
         self._fcb.set_filename(DEFAULT_PATH)
+        self._fcb.props.tooltip_text = DEFAULT_PATH
+
+        self._newcalib = ''
+
+        self._lbl_calib = self._ui.get_object("lbl_calib")
+        self._lbl_calib_f = self._ui.get_object("lbl_calib_f")
+
+        #get the calibration file
+        c = flymad.laser_camera_calibration.get_calibration_file_path(
+                    default=rospy.get_param('flymad/calibration', None))
+        self._cfcb = self._ui.get_object("filechooserbutton2")
+        self._cfcb.set_filename(c)
+        self._cfcb.props.tooltip_text = c
+        self._cfcb.connect('file-set', self._on_calib_file_set)
+        self._short_set_lbl(self._lbl_calib_f, c)
 
         #Workaround, keep references of all rosgobject elements
         self._refs = []
@@ -58,6 +75,43 @@ class UI:
         #Start ros joy_node, so that in manual control mode the joystick can be used
         self._joynode_proc = subprocess.Popen(['rosrun', 'joy', 'joy_node'])
         self._rosbag_proc = None
+
+    def _short_set_lbl(self, lbl, txt):
+        h = os.path.expanduser('~')
+        txt = txt.replace(h,'~')
+        lbl.set_markup('<i>%s</i>' % txt)
+
+    def _on_calib_file_set(self, *args):
+        self._short_set_lbl(
+                    self._lbl_calib_f,
+                    self._cfcb.get_filename())
+
+    def _get_filtered_calibration_file(self):
+        return {'args':self._cfcb.get_filename()}
+
+    def _get_unfiltered_calibration_file(self):
+        if self._newcalib and os.path.isfile(self._newcalib):
+            {'args':self._newcalib}
+        else:
+            self._short_set_lbl(
+                        self._lbl_calib,
+                        "create a new calibration file")
+            raise Exception("create a new calibration file")
+
+    def _get_new_calibration_file(self):
+        newfn =  flymad.laser_camera_calibration.get_calibration_file_path(
+                    create=True,
+                    suffix=datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        #create the file
+        with open(newfn, 'w') as f:
+            pass
+
+        self._newcalib = newfn
+        self._short_set_lbl(
+                    self._lbl_calib,
+                    newfn)
+
+        return {'args':newfn}
 
     def _build_ui(self):
 
@@ -110,7 +164,7 @@ class UI:
                 nodemanager=self._manager,
                 package=package,
                 node_type="generate_calibration.py",
-                args=calibrationFile + ".yaml")
+                launch_callback=self._get_new_calibration_file)
                 )
 
         self._refs.append( GtkButtonKillNode(
@@ -126,7 +180,7 @@ class UI:
                 nodemanager=self._manager,
                 package=package,
                 node_type="filter_calibration_heuristics.py",
-                args=calibrationFile + ".yaml" )
+                launch_callback=self._get_unfiltered_calibration_file)
                 )
 
 
@@ -137,7 +191,7 @@ class UI:
                 nodemanager=self._manager,
                 package=package,
                 node_type="plot_calibration.py",
-                args=calibrationFile + ".filtered.yaml" )
+                launch_callback=self._get_filtered_calibration_file)
                 )
 
 
@@ -164,7 +218,7 @@ class UI:
                 nodemanager=self._manager,
                 package=package,
                 node_type="viewer",
-                args=calibrationFile + ".filtered.yaml")
+                launch_callback=self._get_filtered_calibration_file)
                 )
 
         self._refs.append( GtkButtonKillNode(
