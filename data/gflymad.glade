@@ -563,7 +563,7 @@
                     <property name="column_spacing">4</property>
                     <child>
                       <object class="GtkButton" id="bkillExperiment">
-                        <property name="label" translatable="yes">button</property>
+                        <property name="label" translatable="yes">Stop</property>
                         <property name="visible">True</property>
                         <property name="can_focus">True</property>
                         <property name="receives_default">True</property>
