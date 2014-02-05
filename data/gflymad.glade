@@ -192,7 +192,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">0</property>
-                        <property name="top_attach">3</property>
+                        <property name="top_attach">4</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -206,7 +206,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">2</property>
-                        <property name="top_attach">3</property>
+                        <property name="top_attach">4</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -220,7 +220,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">0</property>
-                        <property name="top_attach">2</property>
+                        <property name="top_attach">3</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -234,7 +234,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">2</property>
-                        <property name="top_attach">2</property>
+                        <property name="top_attach">3</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -248,7 +248,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">0</property>
-                        <property name="top_attach">4</property>
+                        <property name="top_attach">5</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -262,7 +262,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">2</property>
-                        <property name="top_attach">4</property>
+                        <property name="top_attach">5</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -279,7 +279,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">3</property>
-                        <property name="top_attach">4</property>
+                        <property name="top_attach">5</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -293,7 +293,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">0</property>
-                        <property name="top_attach">7</property>
+                        <property name="top_attach">8</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -310,7 +310,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">2</property>
-                        <property name="top_attach">7</property>
+                        <property name="top_attach">8</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -327,7 +327,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">3</property>
-                        <property name="top_attach">7</property>
+                        <property name="top_attach">8</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -342,44 +342,13 @@
                       </object>
                       <packing>
                         <property name="left_attach">2</property>
-                        <property name="top_attach">6</property>
+                        <property name="top_attach">7</property>
                         <property name="width">2</property>
                         <property name="height">1</property>
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkEntry" id="eFlyTrax">
-                        <property name="visible">True</property>
-                        <property name="sensitive">False</property>
-                        <property name="can_focus">False</property>
-                        <property name="editable">False</property>
-                        <property name="invisible_char">•</property>
-                        <property name="shadow_type">etched-in</property>
-                      </object>
-                      <packing>
-                        <property name="left_attach">1</property>
-                        <property name="top_attach">0</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
                       <object class="GtkEntry" id="eTracker">
-                        <property name="visible">True</property>
-                        <property name="sensitive">False</property>
-                        <property name="can_focus">False</property>
-                        <property name="editable">False</property>
-                        <property name="invisible_char">•</property>
-                      </object>
-                      <packing>
-                        <property name="left_attach">1</property>
-                        <property name="top_attach">2</property>
-                        <property name="width">1</property>
-                        <property name="height">1</property>
-                      </packing>
-                    </child>
-                    <child>
-                      <object class="GtkEntry" id="eMicro">
                         <property name="visible">True</property>
                         <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
@@ -394,7 +363,7 @@
                       </packing>
                     </child>
                     <child>
-                      <object class="GtkEntry" id="eTargeter">
+                      <object class="GtkEntry" id="eMicro">
                         <property name="visible">True</property>
                         <property name="sensitive">False</property>
                         <property name="can_focus">False</property>
@@ -409,6 +378,21 @@
                       </packing>
                     </child>
                     <child>
+                      <object class="GtkEntry" id="eTargeter">
+                        <property name="visible">True</property>
+                        <property name="sensitive">False</property>
+                        <property name="can_focus">False</property>
+                        <property name="editable">False</property>
+                        <property name="invisible_char">•</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">1</property>
+                        <property name="top_attach">5</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
+                      </packing>
+                    </child>
+                    <child>
                       <object class="GtkEntry" id="eRosBagStart">
                         <property name="visible">True</property>
                         <property name="sensitive">False</property>
@@ -418,7 +402,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">1</property>
-                        <property name="top_attach">7</property>
+                        <property name="top_attach">8</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -458,7 +442,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">0</property>
-                        <property name="top_attach">5</property>
+                        <property name="top_attach">6</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -472,7 +456,7 @@
                       </object>
                       <packing>
                         <property name="left_attach">2</property>
-                        <property name="top_attach">5</property>
+                        <property name="top_attach">6</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -486,7 +470,21 @@
                       </object>
                       <packing>
                         <property name="left_attach">3</property>
-                        <property name="top_attach">5</property>
+                        <property name="top_attach">6</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkLabel" id="label6">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="xalign">0</property>
+                        <property name="label" translatable="yes">FView w/ TTM</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">0</property>
+                        <property name="top_attach">2</property>
                         <property name="width">1</property>
                         <property name="height">1</property>
                       </packing>
@@ -514,6 +512,29 @@
                     </child>
                     <child>
                       <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="bTTM">
+                        <property name="label" translatable="yes">Start</property>
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">True</property>
+                      </object>
+                      <packing>
+                        <property name="left_attach">2</property>
+                        <property name="top_attach">2</property>
+                        <property name="width">1</property>
+                        <property name="height">1</property>
+                      </packing>
                     </child>
                   </object>
                 </child>
