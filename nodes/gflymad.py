@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
 import roslib
+import roslib.packages
 roslib.load_manifest('flymad')
 import flymad.laser_camera_calibration
 
 import os.path
 import subprocess
 import datetime
+import glob
 
 import rospy
 import roslib.packages
@@ -89,6 +91,10 @@ class UI:
     def _get_filtered_calibration_file(self):
         return {'args':self._cfcb.get_filename()}
 
+    def _get_targeter_and_calib(self):
+        return {'node_type':self._targeters.get_active_id(),
+                'args':self._cfcb.get_filename()}
+
     def _get_unfiltered_calibration_file(self):
         if self._newcalib and os.path.isfile(self._newcalib):
             {'args':self._newcalib}
@@ -157,6 +163,39 @@ class UI:
         w.widget.props.hexpand = True
         usb_grid.add(w.widget)
 
+        tg = self._ui.get_object("grid6")
+        w = GtkSpinButtonParam(
+                nodepath="/ttm/px",
+                min=-1.0,
+                max=1.0,
+                step=0.01)
+        self._refs.append(w)
+        tg.attach(w.widget,
+                  2,1,2,1)
+        w = GtkSpinButtonParam(
+                nodepath="/ttm/py",
+                min=-1.0,
+                max=1.0,
+                step=0.01)
+        self._refs.append(w)
+        tg.attach(w.widget,
+                  2,2,2,1)
+        w = GtkSpinButtonParam(
+                nodepath="/ttm/ttm_gyro_axes_flip",
+                min=0,
+                max=1,
+                step=1)
+        self._refs.append(w)
+        tg.attach(w.widget,
+                  2,3,2,1)
+
+        self._targeters = self._ui.get_object("comboboxtext1")
+        ndir = os.path.join(roslib.packages.get_pkg_dir('flymad'), 'nodes')
+        for n in glob.glob('%s/*targeter*' % ndir):
+            nn = os.path.basename(n)
+            self._targeters.append(nn,nn)
+        self._targeters.set_active_id('targeter')
+
         self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bStartCalibration"),
                 entry_widget=self._ui.get_object("eStartCalibration"),
@@ -195,14 +234,12 @@ class UI:
                 )
 
 
-        self._refs.append( MyGtkButtonStartNode(
+        self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bTargeter"),
-                entry_widget=self._ui.get_object("eTargeter"),
                 nodepath="flymad_targeter",
                 nodemanager=self._manager,
                 package=package,
-                node_type="targeter",
-                args=calibrationFile + ".filtered.yaml")
+                launch_callback=self._get_targeter_and_calib)
                 )
 
         self._refs.append( GtkButtonKillNode(
