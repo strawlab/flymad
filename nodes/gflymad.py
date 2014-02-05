@@ -95,13 +95,13 @@ class UI:
                 node_type=nName )
                 )
 
-        port = rospy.get_param( USB_PARAM, default = USB_DEFAULT )
-        w = self._ui.get_object("eUSBPort")
-        w.set_text(port)
-
-        w = self._ui.get_object("bUSBPort")
-        w.connect("clicked", self._on_send_usb_port)
-        self._on_send_usb_port(w)
+        w = GtkEntryChangeParam(
+                nodepath=USB_PARAM,
+                create=USB_DEFAULT)
+        self._refs.append(w)
+        usb_grid = self._ui.get_object("grid3")
+        w.widget.props.hexpand = True
+        usb_grid.add(w.widget)
 
         self._refs.append( MyGtkButtonStartNode(
                 widget=self._ui.get_object("bStartCalibration"),
@@ -206,12 +206,6 @@ class UI:
 
     def _on_start_ttm(self, widget):
         subprocess.Popen(['python', '/usr/bin/fview', '--plugins=fview_head_track'])
-
-    def _on_send_usb_port(self, widget):
-        w = self._ui.get_object("eUSBPort")
-        port = w.get_text()
-        print 'setting port to',port
-        rospy.set_param( USB_PARAM, port )
 
     def _on_rosbag_start(self, widget):
         path = os.path.join( self._fcb.get_filename(), 'rosbagOut' )
