@@ -134,25 +134,30 @@ class UI:
         w = self._ui.get_object("bTTM")
         w.connect("clicked", self._on_start_ttm)
 
-        self._refs.append( MyGtkButtonStartNode(
+        self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bTracker"),
-                entry_widget=self._ui.get_object("eTracker"),
                 nodepath="flymad_tracker",
                 nodemanager=self._manager,
                 package=package,
                 node_type="tracker" )
                 )
+        self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopTracker"),
+                nodepath= "/flymad_tracker",
+                nodemanager=self._manager )
+                )
 
-
-        nName = "flymad_micro"
-        self._refs.append( MyGtkButtonStartNode(
+        self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bMicro"),
-                entry_widget=self._ui.get_object("eMicro"),
-                # nodepath=nodepath,
-                nodepath=nName,
+                nodepath="flymad_micro",
                 nodemanager=self._manager,
                 package=package,
-                node_type=nName )
+                node_type="flymad_micro")
+                )
+        self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopMicro"),
+                nodepath= "flymad_micro",
+                nodemanager=self._manager )
                 )
 
         w = GtkEntryChangeParam(
@@ -220,6 +225,24 @@ class UI:
                 package=package,
                 node_type="filter_calibration_heuristics.py",
                 launch_callback=self._get_unfiltered_calibration_file)
+                )
+
+        self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopTTM"),
+                nodepath= "/fview_ttm",
+                nodemanager=self._manager )
+                )
+
+        self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopFlytrax"),
+                nodepath= "/fview_flytrax",
+                nodemanager=self._manager )
+                )
+
+        self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopTrackem"),
+                nodepath= "/fview_trackem",
+                nodemanager=self._manager )
                 )
 
 
@@ -290,13 +313,13 @@ class UI:
                 )
 
     def _on_start_flytrax(self, widget):
-        subprocess.Popen(['python', '/usr/bin/fview', '--plugins=flytrax'])
+        subprocess.Popen(['python', '/usr/bin/fview', '__name:=fview_flytrax', '--plugins=flytrax'])
 
     def _on_start_trackem(self, widget):
-        subprocess.Popen(['python', '/usr/bin/fview', '--plugins=trackem'])
+        subprocess.Popen(['python', '/usr/bin/fview', '__name:=fview_trackem', '--plugins=trackem'])
 
     def _on_start_ttm(self, widget):
-        subprocess.Popen(['python', '/usr/bin/fview', '--plugins=fview_head_track'])
+        subprocess.Popen(['python', '/usr/bin/fview', '__name:=fview_ttm', '--plugins=fview_head_track'])
 
     def _on_rosbag_start(self, widget):
         path = os.path.join( self._fcb.get_filename(), 'rosbagOut' )
