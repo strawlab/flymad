@@ -300,10 +300,13 @@ class UI:
 
     def _on_rosbag_start(self, widget):
         path = os.path.join( self._fcb.get_filename(), 'rosbagOut' )
-        self._rosbag_proc = subprocess.Popen(['rosbag', 'record', '-a', '-o', path])
+        name = self._manager.random_node_name(10, 'rosbag')
+        self._ui.get_object('eRosBagStart').set_text('/'+name)
+        self._rosbag_proc = subprocess.Popen(['rosbag', 'record', '__name:=%s' % name, '-a', '-o', path])
 
     def _on_rosbag_stop(self, widget):
         if self._rosbag_proc is not None:
+            self._ui.get_object('eRosBagStart').set_text('')
             self._rosbag_proc.send_signal(subprocess.signal.SIGINT)
 
 class Killer:
