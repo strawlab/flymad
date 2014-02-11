@@ -4,8 +4,10 @@
 
   <param name="/ttm/headtrack_downsample" type="int" value="2" />
   <param name="/ttm/headtrack_mincontourarea" type="int" value="1000" />
-  <param name="/ttm/headtrack_checkflipped" type="int" value="0" />
-  <param name="/ttm/headtrack_usegpu" type="int" value="0" />
+  <param name="/ttm/headtrack_checkflipped" type="int" value="1" />
+  <param name="/ttm/headtrack_usegpu" type="int" value="1" />
+  <param name="/ttm/headtrack_downsample" type="int" value="2" />
+  <param name="/ttm/headtrack_templateimg" type="string" value="$(find flymad)/data/templates/ds2_flybody.png" />
 
   <node name="flymad_micro" pkg="flymad" type="flymad_micro" />
   <node name="flymad_tracker" pkg="flymad" type="tracker" args="$(find flymad)/data/calibration/flymad2_newsetup.yaml" />
