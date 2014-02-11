@@ -350,7 +350,7 @@ class UI:
         subprocess.Popen(['python', '/usr/bin/fview', '__name:=fview_flytrax', '--plugins=flytrax'])
 
     def _on_start_trackem(self, widget):
-        subprocess.Popen(['python', '/usr/bin/fview', '__name:=fview_trackem', '--plugins=trackem'])
+        subprocess.Popen(['python', '/usr/bin/fview', '__name:=fview_trackem', '--plugins=trackem,fview_draw_geom'])
 
     def _on_start_ttm(self, widget):
         subprocess.Popen(['python', '/usr/bin/fview', '__name:=fview_ttm', '--plugins=fview_head_track'])
