@@ -211,6 +211,22 @@ class UI:
         tg.attach(w.widget,
                   2,5,2,1)
 
+        w = GtkSpinButtonParam(
+                nodepath="/ttm/headtrack_checkflipped",
+                min=0,
+                max=1,
+                step=1)
+        self._refs.append(w)
+        tg.attach(w.widget,
+                  2,6,2,1)
+        w = GtkSpinButtonParam(
+                nodepath="/ttm/headtrack_usegpu",
+                min=0,
+                max=1,
+                step=1)
+        self._refs.append(w)
+        tg.attach(w.widget,
+                  2,7,2,1)
 
         self._targeters = self._ui.get_object("comboboxtext1")
         ndir = os.path.join(roslib.packages.get_pkg_dir('flymad'), 'nodes')
