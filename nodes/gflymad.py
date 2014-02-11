@@ -149,14 +149,14 @@ class UI:
 
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bMicro"),
-                nodepath="flymad_micro",
+                nodepath="/flymad_micro",
                 nodemanager=self._manager,
                 package=package,
                 node_type="flymad_micro")
                 )
         self._refs.append( GtkButtonKillNode(
                 widget=self._ui.get_object("bStopMicro"),
-                nodepath= "flymad_micro",
+                nodepath= "/flymad_micro",
                 nodemanager=self._manager )
                 )
 
