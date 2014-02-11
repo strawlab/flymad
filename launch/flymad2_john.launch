@@ -1,9 +1,18 @@
 <launch>
 
+  <param name="/flymad/calibration" type="string" value="$(find flymad)/data/calibration/flymad2_newsetup.yaml" />
+
+  <param name="/ttm/headtrack_downsample" type="int" value="2" />
+  <param name="/ttm/headtrack_mincontourarea" type="int" value="1000" />
+  <param name="/ttm/headtrack_checkflipped" type="int" value="0" />
+  <param name="/ttm/headtrack_usegpu" type="int" value="0" />
+
   <node name="flymad_micro" pkg="flymad" type="flymad_micro" />
-  <node name="tracker" pkg="flymad" type="tracker" args="$(find flymad)/data/calibration/flymad2.yaml" />
-  <node name="viewer" pkg="flymad" type="viewer" args="$(find flymad)/data/calibration/flymad2.yaml" />
-  <node name="$(anon fview)" pkg="flymad" type="launch_fview_wide.sh" respawn="true"/>
-  <node name="$(anon fview)" pkg="flymad" type="launch_fview_zoom.sh" respawn="true"/>
+  <node name="flymad_tracker" pkg="flymad" type="tracker" args="$(find flymad)/data/calibration/flymad2_newsetup.yaml" />
+  <node name="flymad_viewer" pkg="flymad" type="viewer" args="$(find flymad)/data/calibration/flymad2_newsetup.yaml" />
+  <node name="gflymad" pkg="flymad" type="gflymad.py" />
+
+  <node name="fview_trackem" pkg="flymad" type="launch_fview_wide.sh" respawn="true"/>
+  <node name="fview_ttm" pkg="flymad" type="launch_fview_zoom.sh" respawn="true"/>
 
 </launch>
