@@ -63,9 +63,9 @@ class FlyMADMicro(object):
 
         self._debug = int(rospy.get_param('~debug', 0))
         #an adc_scale of 0 disables adc sampling
-        self._adc_scale = float(rospy.get_param('~adc_scale', 1.0))
+        self._adc_scale = float(rospy.get_param('~adc_scale', 0.0))
         #an adc_scale of 0 disables adc sampling
-        self._laser_modulatable = bool(int(rospy.get_param('~laser_modulatable', 1)))
+        self._laser_modulatable = bool(int(rospy.get_param('~laser_modulatable', 0)))
 
         if self._debug:
             print 'debug mode on (%d)' % self._debug
