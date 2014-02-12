@@ -15,5 +15,6 @@ private:
 public:
     DAC714(int a0Pin, int a1Pin);
     void setValue_AB(uint16_t value_A, uint16_t value_B);
+    void setValue_ABC(uint16_t value_A, uint16_t value_B, uint16_t value_C);
 };
 #endif

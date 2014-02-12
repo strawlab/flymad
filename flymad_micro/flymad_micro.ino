@@ -12,6 +12,7 @@ DAC714 analogOut = DAC714(AOUT_A0,AOUT_A1);
 // global vars for the state of the DACs
 uint16_t posA=0;
 uint16_t posB=0;
+uint16_t posC=0;
 uint16_t adcVal=0;
 
 #define STATE_INITIALIZED 			(0x1)
@@ -66,7 +67,7 @@ void setup() {
     digitalWrite(LASER, LOW);
   }
 
-  analogOut.setValue_AB(posA,posB);
+  analogOut.setValue_ABC(posA,posB,0);
 
   analogReference(INTERNAL); //1.1V
 
@@ -124,7 +125,10 @@ void loop() {
 	}
 
 	if (newvals) {
-		analogOut.setValue_AB(posA,posB);
+		if ( IS_LASER_MODULATABLE(state) )
+			analogOut.setValue_ABC(posA,posB,posC);
+		else
+			analogOut.setValue_ABC(posA,posB,0);
 	}
 
   }
@@ -146,9 +150,15 @@ void loop() {
 			if (cmdA & SETUP_LASER_MODULATABLE)
 				state |= STATE_LASER_MODULATABLE;
 
-			posA = posB = adcVal = 0;
+			posA = posB = posC = adcVal = 0;
+			analogOut.setValue_ABC(posA,posB,posC);
 
 		} else {
+
+			// 8192 corresponds to 5V on the dac714, but we expose an 
+			// 8-bit api. Multiply to correct the range
+			posC = (uint16_t)cmdC << 5;
+
 			if (cmd & VELOCITY_BIT) {
 				state |= STATE_VELOCITY_MODE;
 				set_stuff( cmdA, &rateA, &signA );
@@ -162,7 +172,10 @@ void loop() {
 				state &= (~STATE_VELOCITY_MODE);
 				posA = (uint16_t)cmdA;
 				posB = (uint16_t)cmdB;
-				analogOut.setValue_AB(posA,posB);
+				if ( IS_LASER_MODULATABLE(state) )
+					analogOut.setValue_ABC(posA,posB,posC);
+				else
+					analogOut.setValue_ABC(posA,posB,0);
 			}
 		}
 
@@ -171,6 +184,7 @@ void loop() {
 		} else {
 			digitalWrite(LASER, cmdC > 0);
 		}
+
     }
   }
 
