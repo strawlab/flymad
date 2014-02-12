@@ -3,12 +3,32 @@ import serial
 import numpy as np
 import threading
 import time
+import collections
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
 from std_msgs.msg import UInt8, UInt16, String, Float32
 from flymad.msg import MicroVelocity, MicroPosition
 from flymad.util import myint16, dac_value_wrap
+
+MicroState = collections.namedtuple('MicroState', 'initialized adc_enabled velocity_mode laser_modulatable')
+STATE_INITIALIZED       = 0x1
+STATE_ADC_ENABLED       = 0x2
+STATE_VELOCITY_MODE     = 0x4
+STATE_LASER_MODULATABLE = 0x8
+
+VELOCITY_BIT    = 0X02
+SETUP_BIT       = 0X01
+
+SETUP_ENABLE_ADC        = 0x01
+SETUP_LASER_MODULATABLE = 0x02
+
+def parse_state(byte):
+    return MicroState(
+            initialized=bool(byte&STATE_INITIALIZED),
+            adc_enabled=bool(byte&STATE_ADC_ENABLED),
+            velocity_mode=bool(byte&STATE_VELOCITY_MODE),
+            laser_modulatable=bool(byte&STATE_LASER_MODULATABLE))
 
 class FlyMADMicro(object):
     def __init__(self):
@@ -31,8 +51,7 @@ class FlyMADMicro(object):
         try:
             self.ser = serial.Serial(port=port,
                                      timeout=0.1,
-                                     baudrate=115200,
-                                     )
+                                     baudrate=115200)
             self.ser.open()
             rospy.loginfo('opened serial port: %s'%port)
         except serial.serialutil.SerialException, err:
@@ -42,27 +61,29 @@ class FlyMADMicro(object):
         self._buf = ''
         self.velocity_mode = False
 
-        self._debug = rospy.get_param('~debug', 0)
+        self._debug = int(rospy.get_param('~debug', 0))
         #an adc_scale of 0 disables adc sampling
         self._adc_scale = float(rospy.get_param('~adc_scale', 1.0))
+        #an adc_scale of 0 disables adc sampling
+        self._laser_modulatable = bool(int(rospy.get_param('~laser_modulatable', 1)))
 
         if self._debug:
             print 'debug mode on (%d)' % self._debug
             print '\t0 = disabled'
             print '\t1 = print sent commands'
-            print '\t2 = print recieved commands'
+            print '\t2 = print raw recieved commands'
         else:
             rospy.loginfo('debug mode disabled (set param debug > 0) to enable')
 
         self.lock = threading.Lock()
         with self.lock:
-            self._last_posA = 0
-            self._last_posB = 0
-            self._last_velA = 0
-            self._last_velB = 0
+            self._last_pos = {k:0 for k in 'ABC'}
+            self._last_vel = {k:0 for k in 'ABC'}
             self._last_vel_time = rospy.get_time()
         rospy.Timer( rospy.Duration(1.0/100.0),
                      self.on_timer )
+
+        self._initialized = False
 
     def _send_timezone(self):
         pub_timezone = rospy.Publisher('/timezone',
@@ -74,15 +95,37 @@ class FlyMADMicro(object):
 
     def position_callback(self,msg):
         if self._debug:
-            print 'msg: position:',msg.posA, msg.posB
+            print 'msg: position:',msg.posA, msg.posB, msg.laser
 
-        self._update(laser=msg.laser, posA=msg.posA, posB=msg.posB)
+        if self._initialized:
+            self._update(laser=msg.laser, posA=msg.posA, posB=msg.posB)
 
     def velocity_callback(self,msg):
         if self._debug:
-            print 'msg: velocity:',msg.velA, msg.velB
+            print 'msg: velocity:',msg.velA, msg.velB, msg.laser
 
-        self._update(laser=msg.laser, velA=msg.velA, velB=msg.velB)
+        if self._initialized:
+            self._update(laser=msg.laser, velA=msg.velA, velB=msg.velB)
+
+    def _write(self, cmd, argA, argB, argC):
+        serstr = '%d %d %d %d\n'%(cmd, argA, argB, argC)
+        if self._debug:
+            print 'tx : 0x%X %d %d %d' % (cmd, argA, argB, argC)
+        if self.ser is not None:
+            self.ser.write(serstr)
+
+    def _configure(self, enable_adc, laser_modulatable):
+        cmd = SETUP_BIT
+        argA = argB = argC = 0
+        if enable_adc:
+            argA |= SETUP_ENABLE_ADC
+        if laser_modulatable:
+            argA |= SETUP_LASER_MODULATABLE
+
+        if self._debug:
+            print 'configure: 0x%X' % argA
+
+        self._write(cmd, argA, argB, argC)
 
     def _update(self, 
                 laser=None,
@@ -92,12 +135,10 @@ class FlyMADMicro(object):
         cmd = 0x00
         argA = 0
         argB = 0
+        argC = 0
 
-        if self._adc_scale > 0:
-            cmd |= 0x08
-
-        if laser:
-            cmd |= 0x02
+        if laser is not None:
+            argC = laser
 
         if velA is not None or velB is not None:
             assert posA is None
@@ -110,8 +151,8 @@ class FlyMADMicro(object):
             argB = velB
 
             with self.lock:
-                self._last_velA = velA
-                self._last_velB = velB
+                self._last_vel['A'] = velA
+                self._last_vel['B'] = velB
                 self._last_vel_time = rospy.get_time()
 
         if posA is not None or posB is not None:
@@ -129,20 +170,16 @@ class FlyMADMicro(object):
             argB = posB
 
             with self.lock:
-                self._last_posA = posA
-                self._last_posB = posB
-                self._last_velA = 0
-                self._last_velB = 0
+                self._last_pos['A'] = posA
+                self._last_pos['B'] = posB
+                self._last_vel['A'] = 0
+                self._last_vel['B'] = 0
                 self._last_vel_time = rospy.get_time()
 
         if self.velocity_mode:
-            cmd |= 0x04
+            cmd |= VELOCITY_BIT
 
-        serstr = '%d %d %d\n'%(cmd, argA, argB)
-        if self._debug:
-            print 'tx : 0x%X %d %d' % (cmd, argA, argB)
-        if self.ser is not None:
-            self.ser.write(serstr)
+        self._write(cmd, argA, argB, argC)
 
     def on_timer(self, event):
         with self.lock:
@@ -150,13 +187,13 @@ class FlyMADMicro(object):
             now = rospy.get_time()
             dt = now-self._last_vel_time
 
-            a = self._last_posA + self._last_velA*dt
-            b = self._last_posB + self._last_velB*dt
+            a = self._last_pos['A'] + self._last_vel['A']*dt
+            b = self._last_pos['B'] + self._last_vel['B']*dt
 
             a = dac_value_wrap(a)
             b = dac_value_wrap(b)
-            self._last_posA = a
-            self._last_posB = b
+            self._last_pos['A'] = a
+            self._last_pos['B'] = b
             self._last_vel_time = now
 
         msg = MicroPosition()
@@ -169,8 +206,12 @@ class FlyMADMicro(object):
             if self.ser is not None:
                 buf = self.ser.read()
                 if len(buf):
-                    self._handle_read(buf)
-            # We'd call rospy.spinOnce() here if it existed.
+                    self._initialized |= self._handle_read(buf)
+                if not self._initialized:
+                    self._configure(
+                            enable_adc=self._adc_scale > 0,
+                            laser_modulatable=self._laser_modulatable)
+                    self._initialized |= self._handle_read(buf)
 
     def _handle_read(self,inbuf):
         self._buf += inbuf
@@ -178,29 +219,36 @@ class FlyMADMicro(object):
         self._buf = lines.pop() # returns '' when last chars were \r\n
         line = None
         for line in lines:
-            if self._debug:
+            if self._debug > 1:
                 print 'rx :',repr(line)
 
         # take last line (most current) and update it
         if line is not None:
             try:
-                mode, dacA, dacB, adc = map(int,line.split())
+                state, dacA, dacB, adc = map(int,line.split())
             except:
                 print 'invalid comm packet'
-                return
+                return False
 
             dacA = dac_value_wrap(dacA)
             dacB = dac_value_wrap(dacB)
             if self._debug:
-                print 'rxu: %d %d %d'%(mode, dacA, dacB)
+                print 'rxu: %r %d %d'%(parse_state(state), dacA, dacB)
+
+            if not (state & STATE_INITIALIZED):
+                return False
 
             self._pub_adc_raw.publish(adc)
             self._pub_adc_sca.publish(adc * self._adc_scale)
 
             with self.lock:
-                self._last_posA = dacA
-                self._last_posB = dacB
+                self._last_pos['A'] = dacA
+                self._last_pos['B'] = dacB
                 self._last_vel_time = rospy.get_time()
+
+            return True
+
+        return False
 
 if __name__=='__main__':
     flymad_micro=FlyMADMicro()

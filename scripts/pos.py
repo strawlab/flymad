@@ -31,8 +31,17 @@ except ValueError:
     print 'input B is hex'
     b = int(sys.argv[2],16)
 
-print 'got values',a,b
-print 'hex',hex(a),hex(b)
+try:
+    try:
+        c = int(sys.argv[3])
+    except ValueError:
+        print 'input C is hex'
+        c = int(sys.argv[3],16)
+except IndexError:
+    c = 0
+
+print 'got values',a,b,c
+print 'hex',hex(a),hex(b),hex(c)
 
 rospy.init_node('pos')
 pub = rospy.Publisher( '/flymad_micro/position', MicroPosition )
@@ -42,6 +51,5 @@ for i in range(10):
     msg = MicroPosition()
     msg.posA = a
     msg.posB = b
-    assert msg.posA == a
-    assert msg.posB == b
+    msg.laser = c
     pub.publish(msg)

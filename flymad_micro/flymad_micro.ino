@@ -2,19 +2,29 @@
 #include <SPI.h>
 #include "dac714.h"
 
-const unsigned short AOUT_A0 = 10;
-const unsigned short AOUT_A1 = 9;
-const unsigned short LASER = 7;
+const unsigned short AOUT_A0 	= 10;
+const unsigned short AOUT_A1 	= 9;
+const unsigned short LASER 		= 7;
+const unsigned short PIN_PWM 	= 3;
 
 DAC714 analogOut = DAC714(AOUT_A0,AOUT_A1);
 
 // global vars for the state of the DACs
-uint8_t velocity_mode=0;
-uint8_t enable_adc=0;
 uint16_t posA=0;
 uint16_t posB=0;
 uint16_t adcVal=0;
 
+#define STATE_INITIALIZED 			(0x1)
+#define IS_INITIALIZED(_v) 			(_v & STATE_INITIALIZED)
+#define STATE_ADC_ENABLED			(0x2)
+#define IS_ADC_ENABLED(_v) 			(_v & STATE_ADC_ENABLED)
+#define STATE_VELOCITY_MODE			(0x4)
+#define IS_VELOCITY_MODE(_v)		(_v & STATE_VELOCITY_MODE)
+#define STATE_LASER_MODULATABLE		(0x8)
+#define IS_LASER_MODULATABLE(_v)	(_v & STATE_LASER_MODULATABLE)
+uint32_t state=0;
+
+// for tracking velocity mode
 uint32_t rateA=0;
 uint32_t rateB=0;
 int8_t signA=1;
@@ -27,23 +37,35 @@ unsigned long last_stampB;
 
 const unsigned long COMM_HZ = (1000000/10); //100Hz, in microseconds
 
-#define ADC_EN_BIT 	 0X08
-#define VELOCITY_BIT 0X04
-#define LASER_BIT    0X02
-#define DEBUG_BIT    0X01
+#define VELOCITY_BIT 0X02
+#define SETUP_BIT    0X01
+
+#define SETUP_ENABLE_ADC			0x01
+#define SETUP_LASER_MODULATABLE		0x02
 
 void setup() {
+  state = 0;
+
   // initialize the digital pin as an output.
   pinMode(LASER, OUTPUT);
   // start serial port at 115200 bps:
   Serial.begin(115200);
+
+  pinMode(PIN_PWM, OUTPUT);
 
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(MSBFIRST);
   SPI.setClockDivider(SPI_CLOCK_DIV2);
   SPI.begin();
 
-  digitalWrite(LASER, LOW);
+  // currently, at statup this is always true, but I can imagine loading
+  // this from EEPROM if the laser takes especially long to turn on/off
+  if ( IS_LASER_MODULATABLE(state) ) {
+	;
+  } else {
+    digitalWrite(LASER, LOW);
+  }
+
   analogOut.setValue_AB(posA,posB);
 
   analogReference(INTERNAL); //1.1V
@@ -78,7 +100,7 @@ void loop() {
   uint8_t cmd = 0;
   unsigned long cur_stamp = micros();
 
-  if (velocity_mode) {
+  if ( IS_VELOCITY_MODE(state) ) {
 	unsigned long dtA = (cur_stamp-last_stampA);
 	unsigned long dtB = (cur_stamp-last_stampB);
 
@@ -112,42 +134,54 @@ void loop() {
 
     int32_t cmdA = Serial.parseInt();
     int32_t cmdB = Serial.parseInt();
+    uint8_t cmdC = Serial.parseInt();
 
     if (Serial.read() == '\n') {
-		if (cmd & LASER_BIT) {
-			digitalWrite(LASER, HIGH);   // set the output on
-		} else {
-			digitalWrite(LASER, LOW);      // set the output off
-		}
-		if (cmd & VELOCITY_BIT) {
-			velocity_mode=1;
-			set_stuff( cmdA, &rateA, &signA );
-			set_stuff( cmdB, &rateB, &signB );
+		if (cmd == SETUP_BIT) {
+			state |= STATE_INITIALIZED;
 
-			unsigned long cur_stamp = micros();
-			last_stampA = cur_stamp-rateA; // trigger update next cycle
-			last_stampB = cur_stamp-rateB;
+			if (cmdA & SETUP_ENABLE_ADC)
+				state |= STATE_ADC_ENABLED;
+
+			if (cmdA & SETUP_LASER_MODULATABLE)
+				state |= STATE_LASER_MODULATABLE;
+
+			posA = posB = adcVal = 0;
 
 		} else {
-			velocity_mode=0;
-			posA = (uint16_t)cmdA;
-			posB = (uint16_t)cmdB;
-			analogOut.setValue_AB(posA,posB);
+			if (cmd & VELOCITY_BIT) {
+				state |= STATE_VELOCITY_MODE;
+				set_stuff( cmdA, &rateA, &signA );
+				set_stuff( cmdB, &rateB, &signB );
+
+				unsigned long cur_stamp = micros();
+				last_stampA = cur_stamp-rateA; // trigger update next cycle
+				last_stampB = cur_stamp-rateB;
+
+			} else {
+				state &= (~STATE_VELOCITY_MODE);
+				posA = (uint16_t)cmdA;
+				posB = (uint16_t)cmdB;
+				analogOut.setValue_AB(posA,posB);
+			}
 		}
 
-		enable_adc = cmd & ADC_EN_BIT;
-
+		if ( IS_LASER_MODULATABLE(state) ) {
+			analogWrite(PIN_PWM, cmdC);
+		} else {
+			digitalWrite(LASER, cmdC > 0);
+		}
     }
   }
 
   unsigned long dt = cur_stamp - time;
   if (cmd || (dt > COMM_HZ)) {
 
-		if (enable_adc) {
+		if ( IS_ADC_ENABLED(state) ) {
 			adcVal = analogRead(A0);
 		}
 
-		Serial.print(velocity_mode, DEC);
+		Serial.print(state, DEC);
 		Serial.write(" ");
 		Serial.print(posA, DEC);
 		Serial.write(" ");
