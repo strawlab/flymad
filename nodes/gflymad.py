@@ -4,6 +4,8 @@ import roslib
 import roslib.packages
 roslib.load_manifest('flymad')
 import flymad.laser_camera_calibration
+import flymad.refined_utils
+import flymad.msg
 
 import os.path
 import subprocess
@@ -18,7 +20,9 @@ import rosgobject.gtk
 import rosgobject.managers
 from rosgobject.wrappers import *
 
-from gi.repository import Gtk
+#lbl_stat_pt_2_30
+
+from gi.repository import Gtk, GLib
 
 DEFAULT_PATH = os.path.expanduser("~/FLYMAD")
 USB_PARAM = '/flymad_micro/port'
@@ -59,6 +63,17 @@ class UI:
         self._cfcb.connect('file-set', self._on_calib_file_set)
         self._short_set_lbl(self._lbl_calib_f, c)
 
+        #keep stats of TTM
+        self._stats = {
+                1:flymad.refined_utils.StatsManager(1),
+                5:flymad.refined_utils.StatsManager(5),
+                30:flymad.refined_utils.StatsManager(30),
+        }
+        _ = rospy.Subscriber('/flymad/laser_head_delta',
+                             flymad.msg.HeadDetect,
+                             self._on_head_delta)
+        GLib.timeout_add_seconds(1, self._update_stats)
+
         #Workaround, keep references of all rosgobject elements
         self._refs = []
         self._manager = rosgobject.managers.ROSNodeManager()
@@ -77,6 +92,26 @@ class UI:
         #Start ros joy_node, so that in manual control mode the joystick can be used
         self._joynode_proc = subprocess.Popen(['rosrun', 'joy', 'joy_node'])
         self._rosbag_proc = None
+
+    def _on_head_delta(self, msg):
+        for v in self._stats.itervalues():
+            v.process(msg)
+
+    def _update_stats(self):
+        for time,stat in self._stats.iteritems():
+            pt,ac = stat.get_stats()
+            #the widgets are named according to target and time
+            #lbl_stat_pt_2_30
+            #            ^  ^--- time
+            #            |------ target 
+            for trg in flymad.refined_utils.TTM_NAMES:
+                lbl = self._ui.get_object("lbl_stat_pt_%d_%d" % (trg,time))
+                lbl.set_text("%.0f" % (1.0/pt[trg]))
+            for trg in flymad.refined_utils.TTM_NAMES:
+                lbl = self._ui.get_object("lbl_stat_ac_%d_%d" % (trg,time))
+                lbl.set_text("%.2f" % (100.0*ac[trg]))
+
+        return True
 
     def _short_set_lbl(self, lbl, txt):
         h = os.path.expanduser('~')
