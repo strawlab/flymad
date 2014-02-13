@@ -3,4 +3,19 @@ PHOENIX CONTACT - MKDSN2,5/2-5.08 - STECKER,PCB,SCHRAUB,5.08MM,2POLIG
 
 http://at.farnell.com/phoenix-contact/mkdsn2-5-2-5-08/stecker-pcb-schraub-5-08mm-2polig/dp/1792766
 
+Software improvements without hardware implementation on the PCB
+* Analog pin A0 is sampled (relative to internal 1.1V refernce)
+* DAC channel 3 produces an analog laser modulation signal 0-5V (8 bit resolution)
+* Digital pin 3 outputs a 500Hz PWM signal whose duty cycle is proportional to
+  laser power (8-bit resolution)
+
+Wanted hardware improvements
+* Install a current sense resisitor and isolation amplifier (AD202 unity
+  configuration) to connect to A0. This will allow continued isolated
+  current measurement if wanted
+* Add two LEDS - one for init OK and one for Laser On
+* Expose the LASER pin to an external header, not just to the relay
+* Fix the missing trace??? Andrew??
+
+
 
