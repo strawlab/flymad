@@ -130,6 +130,16 @@ class Targeter:
             self.start_tracking(obj_id)
 
     def on_tracking(self, msg):
+        if (self.cur_obj_id is None) and msg.is_living:
+            self.start_tracking(msg.obj_id)
+
+        if self.cur_obj_id != msg.obj_id:
+            return
+
+        if not msg.is_living:
+            self.stop_tracking(self.cur_obj_id)
+            return
+
         # calculate fly position in pixel coordinates
         s = msg.state_vec
         self._cur_x = s[0]
@@ -146,16 +156,6 @@ class Targeter:
                 else:
                     self._track_mode = 'F'
                     return
-
-        if self.cur_obj_id is None:
-            self.start_tracking(msg.obj_id)
-
-        if self.cur_obj_id != msg.obj_id:
-            return
-
-        if not msg.is_living:
-            self.stop_tracking(self.cur_obj_id)
-            return
 
         #self._cur_x = s[0] + s[2]*LATENCY
         #self._cur_y = s[1] + s[3]*LATENCY
