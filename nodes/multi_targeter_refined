@@ -14,8 +14,7 @@ from flymad.msg import MicroVelocity, MicroPosition, TargetedObj, HeadDetect
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint16
 from flymad.hitutils import HitBox, HitImage
-
-from refined_utils import PX, PY, target_dx_dy_from_message
+from flymad.refined_utils import PX, PY, target_dx_dy_from_message
 
 PRINT_TIME      = False
 PRINT_DAC       = True

@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+import roslib; roslib.load_manifest('flymad')
+import rospy
+
+from flymad.msg import HeadDetect
+from flymad.refined_utils import StatsManager, TTM_NAMES
+
+class StatsUI:
+    def __init__(self):
+        self._stats = {
+                1:StatsManager(1),
+                5:StatsManager(5),
+                30:StatsManager(30),
+        }
+        _ = rospy.Subscriber('/flymad/laser_head_delta',
+                             HeadDetect,
+                             self.on_head_delta)
+
+        _ = rospy.Timer(rospy.Duration(1), self.get_stats)
+
+    def on_head_delta(self, msg):
+        for v in self._stats.itervalues():
+            v.process(msg)
+
+    def get_stats(self, *args):
+        print "statistics"
+        for k,v in self._stats.iteritems():
+            pt,ac = v.get_stats()
+            print "% 2ds" % k
+            print "\tfps"
+            for trg in TTM_NAMES:
+                print "\t\t%s: %.2f" % (TTM_NAMES[trg],1.0/pt[trg])
+            print "\tdetect pct"
+            for trg in TTM_NAMES:
+                print "\t\t%s: %.2f" % (TTM_NAMES[trg],100.0*ac[trg])
+
+
+if __name__ == "__main__":
+    rospy.init_node('ttm_stats')
+    m = StatsUI()
+    rospy.spin()
+
+        
