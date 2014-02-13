@@ -42,6 +42,9 @@ class Targeter:
         self._track_wait = 0
         self._track_zoom_misses = 0
 
+        self._disable_laser_when_lose_targeting = rospy.get_param(
+                    'disable_laser_when_lose_targeting', False)
+
         self._laser_power = LASER_POWER_OFF
 
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
@@ -69,6 +72,13 @@ class Targeter:
         _ = rospy.Subscriber('/flymad/laser_head_delta',
                              HeadDetect,
                              self.on_head_delta)
+
+        _ = rospy.Subscriber('/experiment/laser',
+                            UInt8,
+                            self.on_laser)
+
+    def on_laser(self, msg):
+        self._laser_power = LASER_POWER_ON if msg.data else LASER_POWER_OFF
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -112,7 +122,12 @@ class Targeter:
     def stop_tracking(self,old_obj_id):
         rospy.loginfo('stopped targeting object %s'%old_obj_id)
         self.cur_obj_id = None
-        self.turnoff_laser()
+        if self._disable_laser_when_lose_targeting:
+            #arguably this should be on for safety, although
+            #we are moving to model where experiment times are
+            #controlled from another node using the
+            #/experiment/laser message
+            self.turnoff_laser()
 
     def start_tracking(self,obj_id):
         with self._track_lock:
@@ -207,22 +222,8 @@ class Targeter:
             self.last_vals = this_vals
 
     def run(self):
-        if 1:
-            now = start = time.time()
-            self._laser_power = LASER_POWER_OFF
-            while not rospy.is_shutdown():
-                now = time.time()
-
-                if (now - start) > 30:
-                    self._laser_power = LASER_POWER_ON
-                if (now-start) > 60:
-                    break
-
-                time.sleep(0.1)
-        else:
-            self._laser_power = LASER_POWER_ON
-            rospy.spin()
-
+        self._laser_power = LASER_POWER_ON
+        rospy.spin()
         self.send_dac(0, 0, LASER_POWER_OFF)
 
 
