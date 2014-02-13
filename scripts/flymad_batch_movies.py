@@ -70,8 +70,8 @@ if __name__ == "__main__":
                         tmpdir,
                         destfn
                 )
-            except:
-                print "ERROR making movie:", bag
+            except Exception, e:
+                print "ERROR making movie: %s\n%s" % (bag,e)
                 pass
 
             shutil.rmtree(tmpdir)
