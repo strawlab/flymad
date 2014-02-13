@@ -1,0 +1,8 @@
+<launch>
+  <node name="flymad_micro" pkg="flymad" type="flymad_micro" >
+    <param name="laser_modulatable" type="int" value="1" />
+    <param name="debug" type="int" value="2" />
+    <param name="adc_scale" type="double" value="0" />
+  </node>
+</launch>
+

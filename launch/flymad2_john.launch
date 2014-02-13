@@ -9,7 +9,8 @@
   <param name="/ttm/headtrack_downsample" type="int" value="2" />
   <param name="/ttm/headtrack_templateimg" type="string" value="$(find flymad)/data/templates/ds2_flybody.png" />
 
-  <node name="flymad_micro" pkg="flymad" type="flymad_micro" />
+  <include file="$(find flymad)/launch/flymad2_micro.launch" />
+
   <node name="flymad_tracker" pkg="flymad" type="tracker" args="$(find flymad)/data/calibration/flymad2_newsetup.yaml" />
   <node name="flymad_viewer" pkg="flymad" type="viewer" args="$(find flymad)/data/calibration/flymad2_newsetup.yaml" />
   <node name="gflymad" pkg="flymad" type="gflymad.py" />
