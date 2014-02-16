@@ -283,6 +283,8 @@ class UI:
         ndir = os.path.join(roslib.packages.get_pkg_dir('flymad'), 'nodes')
         for n in glob.glob('%s/*targeter*' % ndir):
             nn = os.path.basename(n)
+            if nn.endswith('~'):
+                continue
             self._targeters.append(nn,nn)
         self._targeters.set_active_id('targeter')
 
