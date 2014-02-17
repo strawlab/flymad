@@ -9,7 +9,7 @@ import rospy
 from flymad.msg import TrackedObj
 from geometry_msgs.msg import Vector3
 from std_msgs.msg import UInt8, Int64
-from flymad.msg import MicroVelocity, MicroPosition, TargetedObj, HeadDetect
+from flymad.msg import MicroPosition, TargetedObj, HeadDetect
 
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32, myint16
@@ -30,9 +30,6 @@ class Targeter:
     def __init__(self, cal_fname):
         self.cal = load_calibration(cal_fname)
         rospy.init_node('flymad_targeter')
-        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
-                                                MicroVelocity,
-                                                tcp_nodelay=True)
         self.cur_obj_id = 0
         self.dacs       = 0,0
         self.last_vals  = 0,0,LASER_POWER_OFF #a,b,laser
@@ -50,10 +47,6 @@ class Targeter:
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
                                                 MicroPosition,
                                                 tcp_nodelay=True)
-        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
-                                                MicroVelocity,
-                                                tcp_nodelay=True)
-
         self.pub_targeted = rospy.Publisher('/targeter/targeted',
                                             TargetedObj,
                                             tcp_nodelay=True)
