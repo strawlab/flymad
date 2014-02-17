@@ -83,6 +83,7 @@ class FlyMADMicro(object):
             self._last_pos = {k:0 for k in 'ABC'}
             self._last_vel = {k:0 for k in 'ABC'}
             self._last_vel_time = rospy.get_time()
+            self._last_laser = 0
         rospy.Timer( rospy.Duration(1.0/100.0),
                      self.on_timer )
 
@@ -156,6 +157,7 @@ class FlyMADMicro(object):
             with self.lock:
                 self._last_vel['A'] = velA
                 self._last_vel['B'] = velB
+                self._last_laser = argC
                 self._last_vel_time = rospy.get_time()
 
         if posA is not None or posB is not None:
@@ -177,6 +179,7 @@ class FlyMADMicro(object):
                 self._last_pos['B'] = posB
                 self._last_vel['A'] = 0
                 self._last_vel['B'] = 0
+                self._last_laser = argC
                 self._last_vel_time = rospy.get_time()
 
         if self.velocity_mode:
@@ -202,6 +205,7 @@ class FlyMADMicro(object):
         msg = MicroPosition()
         msg.posA = a
         msg.posB = b
+        msg.laser = self._last_laser
         self._pub_dac_position.publish(msg)
 
     def run(self):
