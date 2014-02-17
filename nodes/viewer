@@ -24,6 +24,7 @@ class PixelCoordWidget(Gtk.DrawingArea):
         Gtk.DrawingArea.__init__(self)
         self.laser_x = np.nan
         self.laser_y = np.nan
+        self.laser_on = False
         self.pts_x = np.array([])
         self.pts_y = np.array([])
         self.dataw = 1024
@@ -88,9 +89,10 @@ class PixelCoordWidget(Gtk.DrawingArea):
 
         return new,old
 
-    def on_dac_pixels(self,px,py):
+    def on_dac_pixels(self,px,py,laser_on):
         self.laser_x = px
         self.laser_y = py
+        self.laser_on = laser_on
 
     def on_update(self):
         bb = self.backbuf
@@ -101,11 +103,19 @@ class PixelCoordWidget(Gtk.DrawingArea):
             user_rect = (0,0,self.dataw,self.datah)
             with bc.set_user_coords( device_rect,
                                      user_rect ):
-                bc.scatter( [self.laser_x],
-                            [self.laser_y],
-                            color_rgba=(1,0.0,0.0,1.0),
-                            radius=6.0,
-                            )
+                if self.laser_on:
+                    for radius in [3,6,12]:
+                        bc.scatter( [self.laser_x],
+                                    [self.laser_y],
+                                    color_rgba=(1,0.0,0.0,1.0),
+                                    radius=radius,
+                                    )
+                else:
+                    bc.scatter( [self.laser_x],
+                                [self.laser_y],
+                                color_rgba=(1,0.0,0.0,1.0),
+                                radius=6.0,
+                                )
                 bc.scatter( self.pts_x,
                             self.pts_y,
                             color_rgba=(0,1,0,1),
@@ -202,7 +212,7 @@ class ViewerApp(Gtk.Window):
             ix = msg.posA, msg.posB
             px = self.cal.d2px(ix)
             py = self.cal.d2py(ix)
-            self.pcw.on_dac_pixels( px, py )
+            self.pcw.on_dac_pixels( px, py, msg.laser )
 
 if __name__ == "__main__":
     argv = rospy.myargv()
