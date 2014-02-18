@@ -786,8 +786,8 @@ class _FMFPlotter:
     def __init__(self, path):
         if path:
             self.fmf = motmot.FlyMovieFormat.FlyMovieFormat.FlyMovie(path)
-            self.width = self.fmf.width
-            self.height = self.fmf.height
+            self.width = self.fmf.get_width()
+            self.height = self.fmf.get_height()
         else:
             self.fmf = None
 
