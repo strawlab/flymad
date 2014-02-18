@@ -185,23 +185,22 @@ def get_matching_fmf_and_bag(gt, base_dir, maxtime=0):
 
     for fmffile in glob.glob(os.path.join(base_dir,'%s_*.fmf' % gt)):
         fmfname = os.path.basename(fmffile)
-        try:
-            target,trial,year,date = bag_re.search(fmfname).groups()
-            bagdir = os.path.join(base_dir,'%s_%s_%s' % (gt, target, trial))
-            if os.path.isdir(bagdir):
-                #we found a directory with matching bag files
-                fmftime = time.strptime("%s%s" % (year,date), FMF_DATE_FMT)
-                bagfile = get_matching_bag(fmftime, bagdir)
-                if bagfile is None:
-                    print "no bag for",fmffile
-                else:
-                    matching.append( Pair(fmf=fmffile, bag=bagfile, maxt=maxtime) )
+        matchobj = bag_re.search(fmfname)
+        if matchobj is None:
+             print "error: incorrectly named fmf file?", fmffile
+             continue
+        target,trial,year,date = matchobj.groups()
+        bagdir = os.path.join(base_dir,'%s_%s_%s' % (gt, target, trial))
+        if os.path.isdir(bagdir):
+            #we found a directory with matching bag files
+            fmftime = time.strptime("%s%s" % (year,date), FMF_DATE_FMT)
+            bagfile = get_matching_bag(fmftime, bagdir)
+            if bagfile is None:
+                print "no bag for",fmffile
             else:
-                print "no bags for",fmffile
-            #    
-        except AttributeError:
-            #no regex match
-            print "error: incorrectly named fmf file?", fmffile
+                matching.append( Pair(fmf=fmffile, bag=bagfile, maxt=maxtime) )
+        else:
+            print "no bags for",fmffile
 
     return matching
 
@@ -227,6 +226,8 @@ if __name__ == "__main__":
     matching = [(m,args.outdir,args.show_theta,args.show_velocity)\
                 for m in get_matching_fmf_and_bag(args.genotype, path, args.max_time)]
     print len(matching),"matching"
+    if len(matching)==0:
+        sys.exit(0)
 
     if args.dry_run:
         for match in matching:
