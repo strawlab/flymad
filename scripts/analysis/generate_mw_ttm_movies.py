@@ -190,7 +190,7 @@ def get_matching_fmf_and_bag(gt, base_dir, maxtime=0):
              print "error: incorrectly named fmf file?", fmffile
              continue
         target,trial,year,date = matchobj.groups()
-        bagdir = os.path.join(base_dir,'%s_%s_%s' % (gt, target, trial))
+        bagdir = os.path.join(base_dir,'TH_Gal4_bagfiles')
         if os.path.isdir(bagdir):
             #we found a directory with matching bag files
             fmftime = time.strptime("%s%s" % (year,date), FMF_DATE_FMT)
