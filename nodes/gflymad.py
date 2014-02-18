@@ -132,7 +132,7 @@ class UI:
 
     def _get_unfiltered_calibration_file(self):
         if self._newcalib and os.path.isfile(self._newcalib):
-            {'args':self._newcalib}
+            return {'args':self._newcalib}
         else:
             self._short_set_lbl(
                         self._lbl_calib,
