@@ -44,6 +44,9 @@ class FlyMADMicro(object):
         self._pub_adc_sca = rospy.Publisher('~adc_scaled',
                                         Float32,
                                         tcp_nodelay=True)
+        self._pub_state = rospy.Publisher('~state',
+                                        String,
+                                        tcp_nodelay=True)
 
         self._send_timezone()
 
@@ -232,8 +235,11 @@ class FlyMADMicro(object):
 
             dacA = dac_value_wrap(dacA)
             dacB = dac_value_wrap(dacB)
+            st = parse_state(state)
             if self._debug:
-                print 'rxu: %r %d %d'%(parse_state(state), dacA, dacB)
+                print 'rxu: %r %d %d'%(st, dacA, dacB)
+
+            self._pub_state.publish(repr(st))
 
             if not (state & STATE_INITIALIZED):
                 return False
