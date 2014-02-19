@@ -1,10 +1,14 @@
 <launch>
 
-  <param name="/ttm/headtrack_downsample" type="int" value="3" />
-  <param name="/ttm/headtrack_mincontourarea" type="int" value="2000" />
+  <env name="LIBCAMIFACE_ARAVIS_DEBUG" value="1" />
+  <env name="LIBCAMIFACE_ARAVIS_PACKET_SIZE" value="8000" />
+  <env name="LIBCAMIFACE_ARAVIS_ENABLE_RESEND" value="0" />
+
+  <param name="/ttm/headtrack_downsample" type="int" value="4" />
+  <param name="/ttm/headtrack_mincontourarea" type="int" value="1000" />
   <param name="/ttm/headtrack_checkflipped" type="int" value="1" />
   <param name="/ttm/headtrack_usegpu" type="int" value="1" />
-  <param name="/ttm/headtrack_templateimg" type="string" value="$(find flymad)/data/templates/ds3_from_1024_flybody.png" />
+  <param name="/ttm/headtrack_templateimg" type="string" value="$(find flymad)/data/templates/ds4_flybody_dan_ts18.png" />
 
   <node name="gflymad" pkg="flymad" type="gflymad.py" />
 
