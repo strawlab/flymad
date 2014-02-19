@@ -10,7 +10,7 @@ import rospy
 
 from flymad.msg import Raw2dPositions, TrackedObj
 from geometry_msgs.msg import Pose2D
-from std_msgs.msg import UInt8, Int64
+from std_msgs.msg import UInt8, Int64, String
 from flymad.msg import MicroVelocity, MicroPosition, StampedObject
 
 from flymad.laser_camera_calibration import load_calibration
@@ -26,6 +26,13 @@ class Targeter:
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
                                                 MicroVelocity,
                                                 tcp_nodelay=True)
+
+        buf = open(cal_fname).read()
+        cal_pub = rospy.Publisher('/targeter/calibration',
+                                  String,
+                                  latch=True)
+        cal_pub.publish(String(buf))
+
         self.cur_obj_id = None
         self.dacs = 0,0
         self.last_vals = None

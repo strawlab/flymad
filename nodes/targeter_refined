@@ -8,7 +8,7 @@ import rospy
 
 from flymad.msg import TrackedObj
 from geometry_msgs.msg import Vector3
-from std_msgs.msg import UInt8, Int64
+from std_msgs.msg import UInt8, Int64, String
 from flymad.msg import MicroPosition, TargetedObj, HeadDetect
 
 from flymad.laser_camera_calibration import load_calibration
@@ -50,6 +50,11 @@ class Targeter:
         self.pub_targeted = rospy.Publisher('/targeter/targeted',
                                             TargetedObj,
                                             tcp_nodelay=True)
+        buf = open(cal_fname).read()
+        cal_pub = rospy.Publisher('/targeter/calibration',
+                                  String,
+                                  latch=True)
+        cal_pub.publish(String(buf))
 
         self.stop_tracking(None)
 
