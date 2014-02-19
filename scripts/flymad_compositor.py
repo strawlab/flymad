@@ -253,6 +253,15 @@ def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
                                    r['x'], r['y'],
                                    color_rgba=(1,0,1,0.4))
 
+        _dx0,_dy0,_dw,_dh = d
+        canv.poly([_dx0,_dx0+_dw,_dx0+_dw,_dx0,_dx0],
+                  [_dy0,_dy0,_dy0+30,_dy0+30,_dy0],
+                  color_rgba=(0,0,0,1))
+
+        canv.text( '%s' % pretty_time.format_date(cur_time),
+                   15,25,
+                   color_rgba=(1,1,1,1),
+                   font_face="Ubuntu", bold=False, font_size=14)
 
         # zoomed view --------------------------
         w,h = zoom.get_width(), zoom.get_height()
@@ -277,11 +286,6 @@ def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
                                5,25,
                                color_rgba=(1,1,1,1),
                                font_face="Droid Sans Mono",bold=False)
-
-        canv.text( '%s' % pretty_time.format_date(cur_time),
-                   15,25,
-                   color_rgba=(1,1,1,1),
-                   font_face="Droid Sans Mono")
 
         canv.save()
 
