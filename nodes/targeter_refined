@@ -109,6 +109,24 @@ class Targeter:
 
             print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)" % (a,b,cmdA,cmdB,dx,dy)
 
+
+            if 1:
+                # check if we are in the bounds of reason
+                # target position from widefield camera
+                self._cur_x
+                self._cur_y
+                cmd = (cmdA,cmdB)
+                dac_pixel_x = self.cal.d2px(cmd)
+                dac_pixel_y = self.cal.d2py(cmd)
+                pixel_distance = np.sqrt(  (self._cur_x-dac_pixel_x)**2 + (self._cur_y-dac_pixel_y)**2 )
+                if pixel_distance > 50:
+                    with self._track_lock:
+                        print "                                   give up due to pixel distance"
+                        self._track_mode = 'W'
+                        self._track_wait = 0
+                        self._track_zoom_misses = 0
+                        return
+
             self.send_dac(cmdA, cmdB, self._laser_power)
             self.send_targeted(MODE_ZOOM)
 
