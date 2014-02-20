@@ -1203,13 +1203,18 @@ class MovieMaker:
 
         if not os.path.isdir(moviedir):
             os.makedirs(moviedir)
-        moviefname = os.path.join(moviedir,"%s.mp4" % self.obj_id)
+
 
         sh.x264("--output=%s/movie.mp4" % self.tmpdir,
                 "%s/movie.y4m" % self.tmpdir,
         )
 
+        moviefname = self.get_target_movie_name()
         sh.mv("-u", "%s/movie.mp4" % self.tmpdir, moviefname)
+        return moviefname
+
+    def get_target_movie_name(self,moviedir):
+        moviefname = os.path.join(moviedir,"%s.mp4" % self.obj_id)
         return moviefname
 
     def cleanup(self):
