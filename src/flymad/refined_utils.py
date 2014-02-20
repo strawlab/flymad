@@ -38,16 +38,13 @@ class ControlManager:
     PX = -0.6
     PY = -0.6
     PV = 1.0
-    LATENCY = 0.05
+    LATENCY = 0.0
 
     def __init__(self, enable_latency_correction=False):
         self.PX = float(rospy.get_param('ttm/px', ControlManager.PX))
         self.PY = float(rospy.get_param('ttm/py', ControlManager.PY))
         self.PV = float(rospy.get_param('ttm/pv', ControlManager.PV))
-        if enable_latency_correction:
-            self.LATENCY = float(rospy.get_param('ttm/latency', ControlManager.LATENCY))
-        else:
-            self.LATENCY = 0.0
+        self.LATENCY = float(rospy.get_param('ttm/latency', ControlManager.LATENCY))
 
     def compute_dac_cmd(self, a, b, dx, dy, v=0.0):
         """
@@ -55,6 +52,9 @@ class ControlManager:
         and possibly increases gain if fly is walking fast (another strategy
         to minimise lag
         """
+        #in the flymad_dorothea setup
+        #left = +ve dx
+        #up   = +ve dy
         cmdA = a+(self.PX*dx)+(self.PV*abs(v))
         cmdB = b+(self.PY*dy)+(self.PV*abs(v))
         return cmdA,cmdB
@@ -66,6 +66,10 @@ class ControlManager:
             return s[0] + s[2]*self.LATENCY,s[1] + s[3]*self.LATENCY,s[2],s[3]
         else:
             return s[0],s[1],s[2],s[3]
+
+    def __repr__(self):
+        return "<ControlManager PX:%.1f PY:%.1f PV:%.1f LATENCY:%.1f>" % (
+                    self.PX,self.PY,self.PV,self.LATENCY)
 
 class StatsManager:
     def __init__(self, secs, fps=100):

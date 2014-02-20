@@ -13,7 +13,7 @@ from flymad.msg import MicroPosition, TargetedObj, HeadDetect
 
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32, myint16
-from flymad.refined_utils import PX, PY, target_dx_dy_from_message
+from flymad.refined_utils import ControlManager, target_dx_dy_from_message
 
 LASER_POWER_ON  = 255
 LASER_POWER_OFF = 0
@@ -37,6 +37,13 @@ class Targeter:
         self._track_mode = 'W' #W or F (wide or fine)
         self._track_wait = 0
         self._track_zoom_misses = 0
+
+        self._cur_x = 0
+        self._cur_y = 0
+        self._cur_vx = 0
+        self._cur_vy = 0
+
+        self._control = ControlManager()
 
         self._disable_laser_when_lose_targeting = rospy.get_param(
                     '~disable_laser_when_lose_targeting', False)
@@ -106,10 +113,9 @@ class Targeter:
 
             a,b,_ = self.last_vals
 
-            #left = +ve dx
-            #up   = +ve dy
-            cmdA = a+(PX*dx)
-            cmdB = b+(PY*dy)
+            cmdA,cmdB = self._control.compute_dac_cmd(
+                                        a, b, dx, dy,
+                                        v=np.sqrt((self._cur_vx)**2 + (self._cur_vy)**2))
 
             print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)" % (a,b,cmdA,cmdB,dx,dy)
 
@@ -170,10 +176,7 @@ class Targeter:
 
         # calculate fly position in pixel coordinates
         s = msg.state_vec
-        self._cur_x = s[0]
-        self._cur_y = s[1]
-        self._cur_vx = s[2]
-        self._cur_vy = s[3]
+        self._cur_x, self._cur_y, self._cur_vx, self._cur_vy = self._control.predict_position(s)
 
         with self._track_lock:
             if self._track_mode != 'W':

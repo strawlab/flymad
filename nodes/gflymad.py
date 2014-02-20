@@ -221,13 +221,29 @@ class UI:
         tg.attach(w.widget,
                   2,2,2,1)
         w = GtkSpinButtonParam(
+                nodepath="/ttm/pv",
+                min=0.0,
+                max=5.0,
+                step=0.001)
+        self._refs.append(w)
+        tg.attach(w.widget,
+                  2,3,2,1)
+        w = GtkSpinButtonParam(
+                nodepath="/ttm/latency",
+                min=0.0,
+                max=0.1,
+                step=0.001)
+        self._refs.append(w)
+        tg.attach(w.widget,
+                  2,4,2,1)
+        w = GtkSpinButtonParam(
                 nodepath="/ttm/ttm_gyro_axes_flip",
                 min=0,
                 max=1,
                 step=1)
         self._refs.append(w)
         tg.attach(w.widget,
-                  2,3,2,1)
+                  2,5,2,1)
 
         w = GtkSpinButtonParam(
                 nodepath="/ttm/headtrack_downsample",
@@ -236,7 +252,7 @@ class UI:
                 step=1)
         self._refs.append(w)
         tg.attach(w.widget,
-                  2,4,2,1)
+                  2,6,2,1)
         w = GtkSpinButtonParam(
                 nodepath="/ttm/headtrack_mincontourarea",
                 min=500,
@@ -244,7 +260,7 @@ class UI:
                 step=500)
         self._refs.append(w)
         tg.attach(w.widget,
-                  2,5,2,1)
+                  2,7,2,1)
 
         w = GtkSpinButtonParam(
                 nodepath="/ttm/headtrack_checkflipped",
@@ -253,7 +269,7 @@ class UI:
                 step=1)
         self._refs.append(w)
         tg.attach(w.widget,
-                  2,6,2,1)
+                  2,8,2,1)
         w = GtkSpinButtonParam(
                 nodepath="/ttm/headtrack_usegpu",
                 min=0,
@@ -261,7 +277,7 @@ class UI:
                 step=1)
         self._refs.append(w)
         tg.attach(w.widget,
-                  2,7,2,1)
+                  2,9,2,1)
 
         self._targeters = self._ui.get_object("comboboxtext1")
         ndir = os.path.join(roslib.packages.get_pkg_dir('flymad'), 'nodes')
