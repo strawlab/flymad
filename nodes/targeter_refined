@@ -39,7 +39,7 @@ class Targeter:
         self._track_zoom_misses = 0
 
         self._disable_laser_when_lose_targeting = rospy.get_param(
-                    'disable_laser_when_lose_targeting', False)
+                    '~disable_laser_when_lose_targeting', False)
 
         self._laser_power = LASER_POWER_OFF
 
