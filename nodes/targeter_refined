@@ -15,7 +15,6 @@ from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32, myint16
 from flymad.refined_utils import PX, PY, target_dx_dy_from_message
 
-LATENCY     = 0.05
 LASER_POWER_ON  = 255
 LASER_POWER_OFF = 0
 
@@ -118,8 +117,6 @@ class Targeter:
             if 1:
                 # check if we are in the bounds of reason
                 # target position from widefield camera
-                self._cur_x
-                self._cur_y
                 cmd = (cmdA,cmdB)
                 dac_pixel_x = self.cal.d2px(cmd)
                 dac_pixel_y = self.cal.d2py(cmd)
@@ -175,6 +172,8 @@ class Targeter:
         s = msg.state_vec
         self._cur_x = s[0]
         self._cur_y = s[1]
+        self._cur_vx = s[2]
+        self._cur_vy = s[3]
 
         with self._track_lock:
             if self._track_mode != 'W':
@@ -187,9 +186,6 @@ class Targeter:
                 else:
                     self._track_mode = 'F'
                     return
-
-        #self._cur_x = s[0] + s[2]*LATENCY
-        #self._cur_y = s[1] + s[3]*LATENCY
 
         x = int(max(0,self._cur_x))
         y = int(max(0,self._cur_y))
