@@ -37,7 +37,7 @@ class ControlManager:
 
     PX = -0.6
     PY = -0.6
-    PV = 1.0
+    PV = 0.0
     LATENCY = 0.0
 
     def __init__(self, enable_latency_correction=False, debug=True):
@@ -63,10 +63,15 @@ class ControlManager:
         """
         #in the flymad_dorothea setup
         #left = +ve dx
-        #up   = +ve dy
-        pv = self.PV*abs(v)
-        cmdA = a+(self.PX*dx)+pv
-        cmdB = b+(self.PY*dy)+pv
+        #up = +ve dy
+
+        #never less than 1, we don't want to slow tracking
+        pv = max(self.PV*abs(v) if self.PV > 0 else 1.0, 1.0)
+
+        cmdA = a+(self.PX*dx*pv)
+        cmdB = b+(self.PY*dy*pv)
+
+        print self
 
         if self._debug:
             print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)(v:%+.3f)" % (a,b,cmdA,cmdB,dx,dy,pv)

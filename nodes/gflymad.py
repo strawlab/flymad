@@ -223,8 +223,8 @@ class UI:
         w = GtkSpinButtonParam(
                 nodepath="/ttm/pv",
                 min=0.0,
-                max=5.0,
-                step=0.001)
+                max=0.2,
+                step=0.0001)
         self._refs.append(w)
         tg.attach(w.widget,
                   2,3,2,1)
