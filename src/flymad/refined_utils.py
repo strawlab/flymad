@@ -46,6 +46,15 @@ class ControlManager:
         self.PV = float(rospy.get_param('ttm/pv', ControlManager.PV))
         self.LATENCY = float(rospy.get_param('ttm/latency', ControlManager.LATENCY))
         self._debug = debug
+        self._timer = rospy.Timer(rospy.Duration(1.0), self._update_params)
+
+    def _update_params(self, evt):
+        #get the params in one call for efficiency
+        cfg = rospy.get_param('/ttm/', {})
+        self.PX = float(cfg.get('px', ControlManager.PX))
+        self.PY = float(cfg.get('py', ControlManager.PY))
+        self.PV = float(cfg.get('pv', ControlManager.PV))
+        print self
 
     def compute_dac_cmd(self, a, b, dx, dy, v=0.0):
         """
