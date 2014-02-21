@@ -33,7 +33,8 @@ import flymad.conv as bagconv
 # Create a single vlc.Instance() to be shared by (possible) multiple players.
 instance = vlc.Instance("--no-snapshot-preview --snapshot-format png")
 
-DOROTHEA_NAME_REGEXP = re.compile(r'^(?P<condition>.*)_(?P<condition_flynum>\d)_(?P<trialnum>\d)(?P<datetime>.*).fmf.mp4$')
+from analysis.th_experiments import DOROTHEA_NAME_RE_BASE
+DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '.mp4$')
 
 class OCRThread(threading.Thread):
 

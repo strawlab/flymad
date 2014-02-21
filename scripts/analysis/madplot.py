@@ -1209,7 +1209,7 @@ class MovieMaker:
                 "%s/movie.y4m" % self.tmpdir,
         )
 
-        moviefname = self.get_target_movie_name()
+        moviefname = self.get_target_movie_name(moviedir)
         sh.mv("-u", "%s/movie.mp4" % self.tmpdir, moviefname)
         return moviefname
 

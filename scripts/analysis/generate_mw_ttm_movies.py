@@ -22,6 +22,9 @@ import rosbag
 
 import madplot
 
+from th_experiments import DOROTHEA_NAME_RE_BASE
+DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '$')
+
 USE_MULTIPROCESSING = True
 
 Pair = collections.namedtuple('Pair', 'fmf bag maxt')
@@ -122,7 +125,7 @@ def doit_using_framenumber(user_data):
 
     actual_w, actual_h = benu.utils.negotiate_panel_size_same_height(panels, TARGET_OUT_W)
 
-    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(zoomf), fps=14)
+    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(zoomf), fps=60)
     target_moviefname = moviemaker.get_target_movie_name(mdir)
     if os.path.exists(target_moviefname):
         print 'target %r exists: skipping movie'%(target_moviefname,)
@@ -163,7 +166,12 @@ def get_matching_bag(fmftime, bagdir):
     bags = []
     for bag in glob.glob(os.path.join(bagdir,'*.bag')):
         btime = madplot.strptime_bagfile(bag)
-        dt = abs(time.mktime(fmftime) - time.mktime(btime))
+        try:
+            dt = abs(time.mktime(fmftime) - time.mktime(btime))
+        except:
+            print 'fmftime',fmftime
+            print 'btime',btime
+            raise
         bags.append( (bag, dt) )
 
     #sort based on dt (smallest dt first)    
@@ -174,8 +182,6 @@ def get_matching_bag(fmftime, bagdir):
         return bag
     else:
         return None
-
-DOROTHEA_NAME_REGEXP = re.compile(r'^(?P<condition>.*)_(?P<condition_flynum>\d)_(?P<trialnum>\d)(?P<datetime>.*).fmf$')
 
 def get_matching_fmf_and_bag(#gt,
                              base_dir, maxtime=0):
@@ -191,7 +197,8 @@ def get_matching_fmf_and_bag(#gt,
             continue
         parsed_data = matchobj.groupdict()
         print '%s -> %s'%(fmfname,parsed_data)
-        bagdir = os.path.join(base_dir,'TH_Gal4_bagfiles')
+        #bagdir = os.path.join(base_dir,'TH_Gal4_bagfiles')
+        bagdir = base_dir
         if os.path.isdir(bagdir):
             #we found a directory with matching bag files
             fmftime = time.strptime(parsed_data['datetime'], FMF_DATE_FMT)
