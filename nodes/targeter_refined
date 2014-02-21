@@ -117,9 +117,6 @@ class Targeter:
                                         a, b, dx, dy,
                                         v=np.sqrt((self._cur_vx)**2 + (self._cur_vy)**2))
 
-            print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)" % (a,b,cmdA,cmdB,dx,dy)
-
-
             if 1:
                 # check if we are in the bounds of reason
                 # target position from widefield camera

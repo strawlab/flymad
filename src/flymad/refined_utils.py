@@ -40,11 +40,12 @@ class ControlManager:
     PV = 1.0
     LATENCY = 0.0
 
-    def __init__(self, enable_latency_correction=False):
+    def __init__(self, enable_latency_correction=False, debug=True):
         self.PX = float(rospy.get_param('ttm/px', ControlManager.PX))
         self.PY = float(rospy.get_param('ttm/py', ControlManager.PY))
         self.PV = float(rospy.get_param('ttm/pv', ControlManager.PV))
         self.LATENCY = float(rospy.get_param('ttm/latency', ControlManager.LATENCY))
+        self._debug = debug
 
     def compute_dac_cmd(self, a, b, dx, dy, v=0.0):
         """
@@ -55,8 +56,13 @@ class ControlManager:
         #in the flymad_dorothea setup
         #left = +ve dx
         #up   = +ve dy
-        cmdA = a+(self.PX*dx)+(self.PV*abs(v))
-        cmdB = b+(self.PY*dy)+(self.PV*abs(v))
+        pv = self.PV*abs(v)
+        cmdA = a+(self.PX*dx)+pv
+        cmdB = b+(self.PY*dy)+pv
+
+        if self._debug:
+            print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)(v:%+.3f)" % (a,b,cmdA,cmdB,dx,dy,pv)
+
         return cmdA,cmdB
 
     def predict_position(self, s):
