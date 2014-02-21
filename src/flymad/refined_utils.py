@@ -71,8 +71,6 @@ class ControlManager:
         cmdA = a+(self.PX*dx*pv)
         cmdB = b+(self.PY*dy*pv)
 
-        print self
-
         if self._debug:
             print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)(v:%+.3f)" % (a,b,cmdA,cmdB,dx,dy,pv)
 
