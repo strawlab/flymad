@@ -54,7 +54,6 @@ class ControlManager:
         self.PX = float(cfg.get('px', ControlManager.PX))
         self.PY = float(cfg.get('py', ControlManager.PY))
         self.PV = float(cfg.get('pv', ControlManager.PV))
-        print self
 
     def compute_dac_cmd(self, a, b, dx, dy, v=0.0):
         """
