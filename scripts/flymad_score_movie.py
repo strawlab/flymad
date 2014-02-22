@@ -430,7 +430,7 @@ if __name__ == '__main__':
         random.shuffle(inputmp4s)
         inputbags = glob.glob(args.bagdir + "/*.bag")
         if len(inputbags)==0:
-            print 'no bag files found in %r, nothing to do'%directory
+            print 'no bag files found in %r, nothing to do'%args.bagdir
             sys.exit(0)
     elif os.path.isfile(directory):
         p = VideoScorer(mode, args.force_date)
