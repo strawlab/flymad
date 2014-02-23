@@ -21,7 +21,7 @@ if __name__ == "__main__":
     fmf.enable_color_correction(brightness=20, contrast=1.5)
 
     frames = fmf.fmf.get_all_timestamps()
-    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(path)+'_plain', fps=args.fps)
+    moviemaker = madplot.MovieMaker(basename=os.path.basename(path)+'_plain', fps=args.fps)
     pbar = madplot.get_progress_bar(moviemaker.movie_fname, len(frames))
 
     for i,ts in enumerate(frames):

@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
     actual_w, actual_h = benu.utils.negotiate_panel_size_same_height(panels, TARGET_OUT_W)
 
-    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(BAG_FILE))
+    moviemaker = madplot.MovieMaker(basename=os.path.basename(BAG_FILE))
 
     ass = Assembler(actual_w, actual_h,
                     panels, 

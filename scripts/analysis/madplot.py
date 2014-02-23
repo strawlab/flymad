@@ -1169,9 +1169,9 @@ class TTLPlotter:
                 fig.subplots_adjust(left=0.035, right=0.98)
 
 class MovieMaker:
-    def __init__(self, tmpdir='/tmp/', obj_id='movie', fps=20):
-        self.tmpdir = tempfile.mkdtemp(str(obj_id), dir=tmpdir)
-        self.obj_id = obj_id
+    def __init__(self, tmpdir='/tmp/', basename='movie', fps=20):
+        self.tmpdir = tempfile.mkdtemp(str(basename), dir=tmpdir)
+        self.basename = basename
         self.num = 0
         self.fps = fps
 
@@ -1179,7 +1179,7 @@ class MovieMaker:
 
     @property
     def movie_fname(self):
-        return "%s.mp4" % self.obj_id
+        return "%s.mp4" % self.basename
 
     @property
     def frame_number(self):
@@ -1214,7 +1214,7 @@ class MovieMaker:
         return moviefname
 
     def get_target_movie_name(self,moviedir):
-        moviefname = os.path.join(moviedir,"%s.mp4" % self.obj_id)
+        moviefname = os.path.join(moviedir,"%s.mp4" % self.basename)
         return moviefname
 
     def cleanup(self):
