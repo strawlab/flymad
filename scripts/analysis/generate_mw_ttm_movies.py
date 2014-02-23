@@ -223,13 +223,16 @@ if __name__ == "__main__":
     parser.add_argument('--show-theta', action='store_true', default=False)
     parser.add_argument('--show-velocity', action='store_true', default=False)
     parser.add_argument('--max-time', type=int, default=0, help='max time of video')
-    parser.add_argument('--outdir', default='mp4s', help='dir to save mp4s')
+    parser.add_argument('--outdir', default=None, help='dir to save mp4s')
 
     args = parser.parse_args()
     path = args.path[0]
 
     if not os.path.isdir(path):
         parser.error('must be a directory')
+
+    if args.outdir is None:
+        args.outdir = os.path.join(path,'mp4s')
 
     matching = [(m,args.outdir,args.show_theta,args.show_velocity)\
                 for m in get_matching_fmf_and_bag(#args.genotype,
