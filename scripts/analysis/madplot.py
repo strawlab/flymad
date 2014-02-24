@@ -354,7 +354,7 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, tzname='CET'):
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, tzname=None):
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -364,6 +364,11 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     print "loading", bagpath
     bag = rosbag.Bag(bagpath)
+    if tzname is None:
+        if int(os.environ.get('MADPLOT_FORCE_USER_TZNAME','0'))==1:
+            raise ValueError('tzname is not specified')
+        else:
+            tzname = 'CET'
 
     tz = pytz.timezone( tzname )
 
@@ -866,9 +871,14 @@ class ArenaPlotter(_FMFPlotter):
     show_velocity = False
     show_framenumber = False
 
-    def __init__(self, arena, bgcolor=(0.0,0.0,0.0,1), tzname='CET'):
+    def __init__(self, arena, bgcolor=(0.0,0.0,0.0,1), tzname=None):
         _FMFPlotter.__init__(self, None) #no fmf
         self.bgcolor = bgcolor
+        if tzname is None:
+            if int(os.environ.get('MADPLOT_FORCE_USER_TZNAME','0'))==1:
+                raise ValueError('tzname is not specified')
+            else:
+                tzname = 'CET'
         self.tz = pytz.timezone( tzname )
         self.enable_show_arena(arena)
 
