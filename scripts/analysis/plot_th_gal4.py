@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import collections
+import cPickle as pickle
+import argparse
 
 import madplot
 
@@ -169,8 +171,7 @@ def my_subplot( n_conditions ):
         1/0
     return n_rows, n_cols
 
-dirname = sys.argv[1]
-if 1:
+def prepare_data( arena, dirname, smooth ):
     dfs = collections.defaultdict(list)
     csv_files = glob.glob( os.path.join(dirname,'csvs','*.csv') )
     bag_dirname = os.path.join(dirname,'bags')
@@ -190,11 +191,7 @@ if 1:
         #print 'parsed_data',parsed_data
         #print 'CSV datetime',parsed_data['datetime']
         bag_filename = get_bagfilename( bag_dirname, parsed_data['datetime'] )
-        arena = madplot.Arena('mm')
 
-
-        smooth=True
-#        smooth=False
 
 
 #        l_df, t_df, h_df, geom = madplot.load_bagfile(bag_filename, arena, smooth=smooth)
@@ -207,6 +204,14 @@ if 1:
         # x = np.arange( len(y) )
         # plt.plot(x,y,label='%s'%(parsed_data['condition'],))
         dfs[parsed_data['condition']].append( (t_df, parsed_data) )
+
+    pickle.dump(dfs, open(os.path.join(dirname,'cached_%s_%s.pkl' % (arena.unit,smooth)),'wb'), -1)
+    return dfs
+
+def load_data(arena, dirname, smooth):
+    return pickle.load(open(os.path.join(dirname,'cached_%s_%s.pkl' % (arena.unit,smooth)),'rb'))
+
+def plot_data(arena, dirname, smooth, dfs):
     conditions = dfs.keys()
     n_conditions = len(conditions)
     for measurement in ['proboscis',
@@ -230,3 +235,24 @@ if 1:
             ax.set_title('%s (n=%d)'%(condition, len(dfs[condition])))
             #ax.legend()
     plt.show()
+
+if __name__=='__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path', nargs=1, help='path to mp4s')
+    parser.add_argument('--only-plot', action='store_true', default=False)
+    parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
+    parser.add_argument('--show', action='store_true', default=False)
+    args = parser.parse_args()
+    dirname = args.path[0]
+
+    arena = madplot.Arena('mm')
+
+    if args.only_plot:
+        data = load_data(arena, dirname, smooth=args.smooth)
+    else:
+        data = prepare_data(arena, dirname, smooth=args.smooth)
+
+    plot_data( arena, dirname, args.smooth, data)
+
+    if args.show:
+        plt.show()
