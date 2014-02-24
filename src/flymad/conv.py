@@ -32,7 +32,7 @@ def fmt_msg_generic(msg, rt, data_dict):
 
 def fmt_msg_position(msg, rt, data_dict):
     t = rt.to_sec()
-    data_dict["laser"].append(msg.laser)
+    data_dict["laser"].append(1 if msg.laser > 0 else 0)
     data_dict["t"].append(t)
 
 SECOND_TO_NANOSEC = 1e9
