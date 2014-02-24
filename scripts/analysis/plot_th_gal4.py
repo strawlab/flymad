@@ -94,6 +94,8 @@ def load_bagfile_get_laseron(arena, score, smooth):
             1/0
 
     s = pd.Series(proboscis_scored_v,index=proboscis_scored_ix)
+    if len(s.index) > 1000:
+        raise RuntimeError('file %r seems corrupt. Delete and re-score it.'%score.csv)
     t_df['proboscis'] = s
 
     s = pd.Series(wing_scored_v,index=wing_scored_ix)
