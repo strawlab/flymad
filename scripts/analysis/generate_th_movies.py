@@ -38,6 +38,7 @@ assert benu.__version__ >= "0.1.0"
 
 TARGET_OUT_W, TARGET_OUT_H = 1280, 1024
 MARGIN = 2
+TZNAME = 'CET'
 
 class Assembler:
     def __init__(self, w, h, panels, wfmf, zfmf, moviemaker):
@@ -80,7 +81,7 @@ def doit_using_framenumber(user_data):
     arena = madplot.Arena(False)
     zoom = madplot.FMFImagePlotter(zoomf, 'z_frame')
     zoom.enable_color_correction(brightness=15, contrast=1.5)
-    wide = madplot.ArenaPlotter(arena)
+    wide = madplot.ArenaPlotter(arena,tzname=TZNAME)
 
     wide.show_theta = show_theta
     wide.show_velocity = show_velocity
@@ -92,7 +93,8 @@ def doit_using_framenumber(user_data):
     renderlist = []
 
     zoom_ts = zoom.fmf.get_all_timestamps().tolist()
-    df = madplot.load_bagfile_single_dataframe(rosbagf, arena, ffill=True)
+    df = madplot.load_bagfile_single_dataframe(rosbagf, arena, ffill=True,
+                                               tzname=TZNAME)
     t0 = df.index[0].asm8.astype(np.int64) / 1e9
 
     # find start and stop frames based on laser transition ----
