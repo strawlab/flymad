@@ -109,9 +109,13 @@ def doit_using_framenumber(user_data):
     for i,idx in enumerate(laser_transitions):
         if i==0:
             startframenumber = framenumber[idx-PRE_LASER_FRAMES]
-        else:
-            assert i==1
+        elif i==1:
             stopframenumber = framenumber[idx+POST_LASER_FRAMES]
+        else:
+            print 'ERROR: unknown laser transition in %r'%zoomf
+            moviemaker.cleanup()
+            return
+
     # got start and stop frames -----
 
     for idx,group in df.groupby('h_framenumber'):
