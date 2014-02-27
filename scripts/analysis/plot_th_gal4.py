@@ -233,8 +233,12 @@ def plot_data(arena, dirname, smooth, dfs):
                 action_trials = 0
                 mean_vels = []
                 for (t_df,parsed_data) in dfs[condition]:
-                    if int(parsed_data['trialnum']) != trial_num:
-                        continue
+                    if parsed_data['trialnum'] is not None:
+                        if int(parsed_data['trialnum']) != trial_num:
+                            continue
+                    else:
+                        if trial_num != 1:
+                            continue
 
                     v_mm = np.sqrt(t_df['vx'].values**2 + t_df['vy'].values**2)
                     mean_v_mm = np.mean(v_mm)
