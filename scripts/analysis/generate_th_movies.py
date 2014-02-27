@@ -220,17 +220,17 @@ def get_matching_bag(fmftime, bagdir):
     else:
         return None
 
-def get_matching_fmf_and_bag(#gt,
-                             fmf_dir, maxtime=0):
+def get_matching_fmf_and_bag(fmf_dir, maxtime,
+                             bagdir):
 
     matching = []
-    bagdir = DOROTHEA_BAGDIR
     if not os.path.isdir(bagdir):
         raise RuntimeError('bagdir not a directory')
 
     for fmffile in glob.glob(os.path.join(fmf_dir,'*.fmf')):
         fmfname = os.path.basename(fmffile)
         matchobj = DOROTHEA_NAME_REGEXP.match(fmfname)
+
         if matchobj is None:
             print "error: incorrectly named fmf file?", fmffile
             print 'fmfname',fmfname
@@ -259,6 +259,7 @@ if __name__ == "__main__":
     parser.add_argument('--show-velocity', action='store_true', default=False)
     parser.add_argument('--max-time', type=int, default=0, help='max time of video')
     parser.add_argument('--outdir', default=None, help='dir to save mp4s')
+    parser.add_argument('--bagdir', default=None, help='dir to save mp4s')
 
     args = parser.parse_args()
     fmfdir = args.fmfdir[0]
@@ -266,12 +267,16 @@ if __name__ == "__main__":
     if not os.path.isdir(fmfdir):
         parser.error('fmfdir must be a directory')
 
+    if args.bagdir is None:
+        args.bagdir = DOROTHEA_BAGDIR
+
     if args.outdir is None:
         args.outdir = DOROTHEA_MP4DIR
 
     matching = [(m,args.outdir,args.show_theta,args.show_velocity)\
-                for m in get_matching_fmf_and_bag(#args.genotype,
-                                                  fmfdir, args.max_time)]
+                for m in get_matching_fmf_and_bag(fmfdir, args.max_time,
+                                                  args.bagdir,
+                                                  )]
     print len(matching),"matching"
     if len(matching)==0:
         sys.exit(0)
