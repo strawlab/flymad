@@ -226,12 +226,15 @@ class VideoScorer(Gtk.Window):
         "x":"zx",
         "c":"cv",
         "v":"cv",
+        "q":"qw",
+        "w":"qw",
     }
     #which of the pair as defined above means 'OFF'
     KEY_DEFAULTS = {
         "as":"s",
         "zx":"x",
         "cv":"v",
+        "qw":"w",
     }
 
 
