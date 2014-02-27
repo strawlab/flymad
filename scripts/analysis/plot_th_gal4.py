@@ -216,7 +216,18 @@ def load_data(arena, dirname, bag_dirname, smooth):
 def plot_data(arena, dirname, smooth, dfs):
     conditions = dfs.keys()
     n_conditions = len(conditions)
-    for trial_num in [1,2,3]:
+
+    # how many trials do we want to analyze?
+    condition = conditions[0]
+    r =  dfs[conditions[0]]
+    (_,parsed_data) = dfs[conditions[0]][0]
+    if parsed_data['trialnum'] is None:
+        trial_num_list = [1]
+    else:
+        trial_num_list = [1,2,3]
+
+    # now iterate trial by trial
+    for trial_num in trial_num_list:
         for measurement in ['proboscis',
                             'wing',
                             'jump']:
