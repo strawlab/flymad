@@ -473,8 +473,9 @@ if __name__ == '__main__':
             if matchobj is None:
                 continue
             parsed_data = matchobj.groupdict()
-            if int(parsed_data['trialnum']) > args.max_trial:
-                continue
+            if parsed_data['trialnum'] is not None:
+                if int(parsed_data['trialnum']) > args.max_trial:
+                    continue
             #genotype,datestr = mp4fn.split("_",1)
             mp4time = time.strptime(parsed_data['datetime'], MP4_DATE_FMT)
             best_diff = np.inf
