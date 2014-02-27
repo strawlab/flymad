@@ -1,0 +1,73 @@
+#!/usr/bin/env python
+import roslib; roslib.load_manifest('flymad')
+
+import rospy
+import std_msgs.msg
+
+import numpy as np
+
+import Phidgets.Devices.Stepper
+import Phidgets.PhidgetException
+
+class StepperController(object):
+    def __init__(self):
+        self.stp = self._connect_phidget(
+                int(rospy.get_param('~serial', -1)))
+        self._setup_motor()
+
+        _ = rospy.Subscriber('~velocity',
+                             std_msgs.msg.Float32,
+                             self._on_velocity)
+
+        rospy.Timer(rospy.Duration(3.0), self._on_timer)
+
+    def _on_timer(self, *args):
+        rospy.logdebug('stepper position: %s' % self.stp.getCurrentPosition(0))
+
+    def _connect_phidget(self, serial):
+        try:
+            stp = Phidgets.Devices.Stepper.Stepper()
+            stp.openPhidget(serial)
+        except RuntimeError, Phidgets.PhidgetException.PhidgetException:
+            raise
+        # wait for the device to attach
+        try:
+            stp.waitForAttach(2000)
+        except Phidgets.PhidgetException.PhidgetException:
+            raise
+        return stp
+
+    def _setup_motor(self):
+        self.stp.setCurrentLimit(0,
+                float(rospy.get_param('~current_limit', 0.5)))
+        self.stp.setAcceleration(0,
+                float(rospy.get_param('~acceleration_limit',10000)))
+        self._velocity_max = float(rospy.get_param('~velocity_limit',10000))
+        self.stp.setCurrentPosition(0,0)
+        self.stp.setTargetPosition(0,0)
+        self.stp.setVelocityLimit(0,0)
+
+        self._pmax = self.stp.getPositionMax(0)
+        self._pmin = self.stp.getPositionMin(0)
+
+    def _on_velocity(self, msg):
+        if msg.data > 0:
+            self.stp.setTargetPosition(0, self._pmax)
+        elif msg.data < 0:
+            self.stp.setTargetPosition(0, self._pmin)
+        elif msg.data == 0:
+            self.stp.setEngaged(0, False)
+            return
+
+        self.stp.setEngaged(0, True)
+        self.stp.setVelocityLimit(0, min(self._velocity_max,abs(msg.data)))
+
+    def close(self):
+        self.stp.setEngaged(0, False)
+        
+if __name__ == "__main__":
+    rospy.init_node('rotator')
+    s = StepperController()
+    rospy.spin()
+    s.close()
+
