@@ -25,9 +25,6 @@ import madplot
 from th_experiments import DOROTHEA_NAME_RE_BASE, DOROTHEA_BAGDIR, DOROTHEA_MP4DIR
 DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '$')
 
-PRE_LASER_FRAMES = 5
-POST_LASER_FRAMES = 120
-
 USE_MULTIPROCESSING = True
 
 Pair = collections.namedtuple('Pair', 'fmf bag maxt')
@@ -65,7 +62,7 @@ class Assembler:
         return png
 
 def doit_using_framenumber(user_data):
-    match, mp4_dir, show_theta, show_velocity = user_data
+    match, mp4_dir, show_theta, show_velocity, pre_frames, post_frames = user_data
 
     zoomf = match.fmf
     rosbagf = match.bag
@@ -108,15 +105,20 @@ def doit_using_framenumber(user_data):
     laser_transitions = np.nonzero(dlaser)[0]
     startframenumber = -np.inf
     stopframenumber = np.inf
-    for i,idx in enumerate(laser_transitions):
-        if i==0:
-            startframenumber = framenumber[idx-PRE_LASER_FRAMES]
-        elif i==1:
-            stopframenumber = framenumber[idx+POST_LASER_FRAMES]
-        else:
-            print 'ERROR: unknown laser transition in %r'%zoomf
-            moviemaker.cleanup()
-            return
+    if pre_frames is None:
+        assert post_frames is None
+    if pre_frames is not None:
+        assert post_frames is not None
+
+        for i,idx in enumerate(laser_transitions):
+            if i==0:
+                startframenumber = framenumber[idx-pre_frames]
+            elif i==1:
+                stopframenumber = framenumber[idx+post_frames]
+            else:
+                print 'ERROR: unknown laser transition in %r'%zoomf
+                moviemaker.cleanup()
+                return
 
     # got start and stop frames -----
 
@@ -260,6 +262,8 @@ if __name__ == "__main__":
     parser.add_argument('--max-time', type=int, default=0, help='max time of video')
     parser.add_argument('--outdir', default=None, help='dir to save mp4s')
     parser.add_argument('--bagdir', default=None, help='dir to save mp4s')
+    parser.add_argument('--n-frames-pre-laser', type=int, default=None)
+    parser.add_argument('--n-frames-post-laser', type=int, default=None)
 
     args = parser.parse_args()
     fmfdir = args.fmfdir[0]
@@ -273,7 +277,9 @@ if __name__ == "__main__":
     if args.outdir is None:
         args.outdir = DOROTHEA_MP4DIR
 
-    matching = [(m,args.outdir,args.show_theta,args.show_velocity)\
+    matching = [(m,args.outdir,args.show_theta,args.show_velocity,
+                 args.n_frames_pre_laser, args.n_frames_post_laser,
+                 )\
                 for m in get_matching_fmf_and_bag(fmfdir, args.max_time,
                                                   args.bagdir,
                                                   )]
