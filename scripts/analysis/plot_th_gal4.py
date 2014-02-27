@@ -12,7 +12,7 @@ import pprint
 
 import madplot
 
-from th_experiments import DOROTHEA_NAME_RE_BASE, DOROTHEA_BAGDIR
+from th_experiments import DOROTHEA_NAME_RE_BASE
 DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '.mp4.csv$')
 BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S.bag"
 
@@ -174,10 +174,9 @@ def my_subplot( n_conditions ):
         1/0
     return n_rows, n_cols
 
-def prepare_data( arena, dirname, smooth ):
+def prepare_data( arena, dirname, bag_dirname, smooth ):
     dfs = collections.defaultdict(list)
     csv_files = glob.glob( os.path.join(dirname,'csvs','*.csv') )
-    bag_dirname = os.path.join(dirname,'bags')
     for csv_filename in csv_files:
         matchobj = DOROTHEA_NAME_REGEXP.match(os.path.basename(csv_filename))
         if matchobj is None:
@@ -211,7 +210,7 @@ def prepare_data( arena, dirname, smooth ):
     pickle.dump(dfs, open(os.path.join(dirname,'cached_%s_%s.pkl' % (arena.unit,smooth)),'wb'), -1)
     return dfs
 
-def load_data(arena, dirname, smooth):
+def load_data(arena, dirname, bag_dirname, smooth):
     return pickle.load(open(os.path.join(dirname,'cached_%s_%s.pkl' % (arena.unit,smooth)),'rb'))
 
 def plot_data(arena, dirname, smooth, dfs):
@@ -274,15 +273,19 @@ if __name__=='__main__':
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--bagdir', type=str, default=None)
     args = parser.parse_args()
     dirname = args.path[0]
+
+    if args.bagdir is None:
+        args.bagdir = os.path.join(dirname,'bags')
 
     arena = madplot.Arena('mm')
 
     if args.only_plot:
-        data = load_data(arena, dirname, smooth=args.smooth)
+        data = load_data(arena, dirname, args.bagdir, smooth=args.smooth)
     else:
-        data = prepare_data(arena, dirname, smooth=args.smooth)
+        data = prepare_data(arena, dirname, args.bagdir, smooth=args.smooth)
 
     plot_data( arena, dirname, args.smooth, data)
 
