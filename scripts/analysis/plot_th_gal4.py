@@ -8,6 +8,7 @@ import time
 import collections
 import cPickle as pickle
 import argparse
+import pprint
 
 import madplot
 
@@ -187,9 +188,9 @@ def prepare_data( arena, dirname, smooth ):
         parsed_data = matchobj.groupdict()
         parsed_data['condition'] = parsed_data['condition'].lower()
         #print parsed_data
-#        if int(parsed_data['trialnum'])!=2:
-#            print "parsed_data['trialnum']",parsed_data['trialnum']
-#            continue
+        # if int(parsed_data['trialnum'])!=2:
+        #     print "parsed_data['trialnum']",parsed_data['trialnum']
+        #     continue
         #print 'parsed_data',parsed_data
         #print 'CSV datetime',parsed_data['datetime']
         bag_filename = get_bagfilename( bag_dirname, parsed_data['datetime'] )
@@ -216,27 +217,52 @@ def load_data(arena, dirname, smooth):
 def plot_data(arena, dirname, smooth, dfs):
     conditions = dfs.keys()
     n_conditions = len(conditions)
-    for measurement in ['proboscis',
-                        'wing',
-                        'jump']:
-        fig = plt.figure(measurement)
-        n_rows, n_cols = my_subplot( n_conditions )
-        for i, condition in enumerate(conditions):
-            ax = fig.add_subplot(n_rows, n_cols, i+1 )
-            arrs = []
-            for (t_df,parsed_data) in dfs[condition]:
-                ax.plot(t_df[measurement],
-                        label='%s (fly %s, trial %s)'%(parsed_data['condition'],
-                                                       parsed_data['condition_flynum'],
-                                                       parsed_data['trialnum'],
-                                                       ))
-                arrs.append( t_df['proboscis'] )
-            all_arrs = np.array( arrs )
-            mean_arr = np.mean( all_arrs, axis=0 )
-            ax.plot( mean_arr, color='k', lw=2 )
-            ax.set_title('%s (n=%d)'%(condition, len(dfs[condition])))
-            #ax.legend()
-    plt.show()
+    for trial_num in [1,2,3]:
+        for measurement in ['proboscis',
+                            'wing',
+                            'jump']:
+
+            counts = {}
+
+            fig = plt.figure('timeseries %s, trial %d'%(measurement,trial_num))
+            n_rows, n_cols = my_subplot( n_conditions )
+            for i, condition in enumerate(conditions):
+                ax = fig.add_subplot(n_rows, n_cols, i+1 )
+                arrs = []
+                total_trials = 0
+                action_trials = 0
+                mean_vels = []
+                for (t_df,parsed_data) in dfs[condition]:
+                    if int(parsed_data['trialnum']) != trial_num:
+                        continue
+
+                    v_mm = np.sqrt(t_df['vx'].values**2 + t_df['vy'].values**2)
+                    mean_v_mm = np.mean(v_mm)
+                    mean_vels.append( mean_v_mm )
+
+                    #print t_df.head()
+                    #sys.exit(1)
+
+                    ax.plot(t_df[measurement],
+                            label='%s (fly %s, trial %s)'%(parsed_data['condition'],
+                                                           parsed_data['condition_flynum'],
+                                                           parsed_data['trialnum'],
+                                                           ))
+                    arrs.append( t_df['proboscis'] )
+                    if np.any( t_df[measurement] > 0.5 ):
+                        action_trials += 1
+                    total_trials += 1
+                counts[condition] = (action_trials,total_trials, np.mean(mean_vels))
+                all_arrs = np.array( arrs )
+                mean_arr = np.mean( all_arrs, axis=0 )
+                ax.plot( mean_arr, color='k', lw=2 )
+                ax.set_title('%s (n=%d)'%(condition, counts[condition][1]))
+                #ax.legend()
+            print '_'*30, '%s, trial %d'%(measurement, trial_num), '_'*30
+            pprint.pprint(counts)
+            print '_'*80
+            fig.subplots_adjust(hspace=0.39)
+        print '='*80
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
