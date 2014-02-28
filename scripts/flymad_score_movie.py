@@ -452,11 +452,9 @@ if __name__ == '__main__':
             print 'no bag files found in %r, nothing to do'%args.bagdir
             sys.exit(0)
     elif os.path.isfile(directory):
-        base_fname = os.path.basename(directory)
-        out_fname = os.path.join(args.outdir, base_fname+'.csv')
-        p = VideoScorer(mode, args.force_date, out_fname)
-        p.main(directory, "", args.set_title)
-        sys.exit(0)
+        inputmp4s = [directory]
+        random.shuffle(inputmp4s)
+        inputbags = glob.glob(args.bagdir + "/*.bag")
     else:
         sys.exit(1)
 
