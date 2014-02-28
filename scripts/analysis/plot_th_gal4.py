@@ -28,6 +28,9 @@ def load_bagfile_get_laseron(arena, score, smooth):
     NO_JUMPING = 0
     JUMPING = 1
 
+    NO_ABDOMENING = 0
+    ABDOMENING = 1
+
     l_df, t_df, h_df, geom = madplot.load_bagfile(score.bag, arena, smooth=smooth)
 
     proboscis_scored_ix = [t_df.index[0]]
@@ -38,6 +41,9 @@ def load_bagfile_get_laseron(arena, score, smooth):
 
     jump_scored_ix = [t_df.index[0]]
     jump_scored_v = [NO_JUMPING]
+
+    abdomen_scored_ix = [t_df.index[0]]
+    abdomen_scored_v = [NO_ABDOMENING]
 
     score_df = pd.read_csv(score.csv)
 
@@ -89,6 +95,20 @@ def load_bagfile_get_laseron(arena, score, smooth):
             else:
                 raise ValueError('unknown row value: %r'%rowval)
 
+            # abdomen ---------------
+            abdomen_scored_ix.append(matching.index[0])
+            rowval = row['qw']
+            if rowval=='q':
+                abdomen_scored_v.append( ABDOMENING )
+            elif rowval=='w':
+                abdomen_scored_v.append( NO_ABDOMENING )
+            elif np.isnan(rowval):
+                #abdomen_scored_v.append( NO_ABDOMENING )
+                abdomen_scored_v.append(np.nan)
+            else:
+                raise ValueError('unknown row value: %r'%rowval)
+        elif len(matching)==0:
+            continue
         else:
             print "len(matching)",len(matching)
             # why would we ever get here?
@@ -105,9 +125,13 @@ def load_bagfile_get_laseron(arena, score, smooth):
     s = pd.Series(jump_scored_v,index=jump_scored_ix)
     t_df['jump'] = s
 
+    s = pd.Series(abdomen_scored_v,index=abdomen_scored_ix)
+    t_df['abdomen'] = s
+
     t_df['proboscis'].fillna(method='ffill', inplace=True)
     t_df['wing'].fillna(method='ffill', inplace=True)
     t_df['jump'].fillna(method='ffill', inplace=True)
+    t_df['abdomen'].fillna(method='ffill', inplace=True)
 #    t_df['Vfwd'] = t_df['v'] * t_df['fwd']
 
     lon = l_df[l_df['laser_power'] > 0]
@@ -230,7 +254,9 @@ def plot_data(arena, dirname, smooth, dfs):
     for trial_num in trial_num_list:
         for measurement in ['proboscis',
                             'wing',
-                            'jump']:
+                            'jump',
+                            'abdomen',
+                            ]:
 
             counts = {}
 
