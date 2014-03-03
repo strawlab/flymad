@@ -447,14 +447,24 @@ if __name__ == '__main__':
     if os.path.isdir(directory):
         inputmp4s = glob.glob(directory + "/*.mp4")
         random.shuffle(inputmp4s)
-        inputbags = glob.glob(args.bagdir + "/*.bag")
+
+        if args.bagdir is None:
+            bagdir = directory
+        else:
+            bagdir = args.bagdir
+
+        inputbags = glob.glob(bagdir + "/*.bag")
         if len(inputbags)==0:
-            print 'no bag files found in %r, nothing to do'%args.bagdir
+            print 'no bag files found in %r, nothing to do' % bagdir
             sys.exit(0)
     elif os.path.isfile(directory):
         inputmp4s = [directory]
         random.shuffle(inputmp4s)
-        inputbags = glob.glob(args.bagdir + "/*.bag")
+
+        if args.bagdir is None:
+            inputbags = []
+        else:
+            inputbags = glob.glob(os.path.dirname(directory) + "/*.bag")
     else:
         sys.exit(1)
 
@@ -479,18 +489,20 @@ if __name__ == '__main__':
                     continue
             #genotype,datestr = mp4fn.split("_",1)
             mp4time = time.strptime(parsed_data['datetime'], MP4_DATE_FMT)
-            best_diff = np.inf
+
             bname = None
-            for bag in inputbags:
-                bagtime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
-                this_diff = abs(time.mktime(bagtime)-time.mktime(mp4time))
-                if this_diff < best_diff:
-                    bname = bag
-                    best_diff = this_diff
-                else:
-                    continue
-            assert best_diff < 10.0
-            assert os.path.exists(bname)
+            if inputbags:
+                best_diff = np.inf
+                for bag in inputbags:
+                    bagtime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
+                    this_diff = abs(time.mktime(bagtime)-time.mktime(mp4time))
+                    if this_diff < best_diff:
+                        bname = bag
+                        best_diff = this_diff
+                    else:
+                        continue
+                assert best_diff < 10.0
+                assert os.path.exists(bname)
 
         assert os.path.exists(fname)
 
