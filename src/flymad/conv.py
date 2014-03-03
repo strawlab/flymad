@@ -7,6 +7,17 @@ import rosbag
 
 import pandas as pd
 import numpy as np
+import datetime
+
+def _check_t(msg_t, rt, msg_name=''):
+    dt = datetime.datetime.fromtimestamp(msg_t)
+    if dt.year < 2013:
+        print "WARNING: INVALID TIME IN MSG %s - USING RECEIVED TIME INSTEAD" % msg_name
+        dt = datetime.datetime.fromtimestamp(rt)
+        if dt.year < 2013:
+            raise Exception("INVALID RECEIVED TIME. CHECK YOUR CLOCK")
+        return rt
+    return msg_t
 
 def pp_df_raw2d(df):
     dt = np.gradient(df['tracked_t'].values)
@@ -18,12 +29,15 @@ def fmt_msg_raw2d(msg, rt, data_dict):
     if len(msg.points) == 1:
         pt = msg.points[0]
         t = msg.header.stamp.to_sec()
+
         data_dict["x"].append(pt.x)
         data_dict["y"].append(pt.y)
         data_dict["theta"].append(pt.theta)
         data_dict["tracked_t"].append(t)
 
-        data_dict["t"].append(t)
+        data_dict["t"].append(
+                    _check_t(t,rt.to_sec(),'/flymad/raw_2d_positions')
+        )
 
 def fmt_msg_generic(msg, rt, data_dict):
     t = rt.to_sec()
