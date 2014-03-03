@@ -2,8 +2,9 @@ import numpy as np
 import collections
 import threading
 
-
 import roslib; roslib.load_manifest('flymad')
+
+import rospy
 from flymad.msg import HeadDetect
 
 PX = -0.6
@@ -31,6 +32,61 @@ def target_dx_dy_from_message(msg):
         dy = msg.target_y - ty
 
     return dx, dy
+
+class ControlManager:
+
+    PX = -0.6
+    PY = -0.6
+    PV = 0.0
+    LATENCY = 0.0
+
+    def __init__(self, enable_latency_correction=False, debug=True):
+        self.PX = float(rospy.get_param('ttm/px', ControlManager.PX))
+        self.PY = float(rospy.get_param('ttm/py', ControlManager.PY))
+        self.PV = float(rospy.get_param('ttm/pv', ControlManager.PV))
+        self.LATENCY = float(rospy.get_param('ttm/latency', ControlManager.LATENCY))
+        self._debug = debug
+        self._timer = rospy.Timer(rospy.Duration(1.0), self._update_params)
+
+    def _update_params(self, evt):
+        #get the params in one call for efficiency
+        cfg = rospy.get_param('/ttm/', {})
+        self.PX = float(cfg.get('px', ControlManager.PX))
+        self.PY = float(cfg.get('py', ControlManager.PY))
+        self.PV = float(cfg.get('pv', ControlManager.PV))
+
+    def compute_dac_cmd(self, a, b, dx, dy, v=0.0):
+        """
+        calculates dac values based on position gains (PX,Y), errors dx,dy
+        and possibly increases gain if fly is walking fast (another strategy
+        to minimise lag
+        """
+        #in the flymad_dorothea setup
+        #left = +ve dx
+        #up = +ve dy
+
+        #never less than 1, we don't want to slow tracking
+        pv = max(self.PV*abs(v) if self.PV > 0 else 1.0, 1.0)
+
+        cmdA = a+(self.PX*dx*pv)
+        cmdB = b+(self.PY*dy*pv)
+
+        if self._debug:
+            print "%+.1f,%+.1f -> %+.1f,%+.1f (%+.1f,%+.1f)(v:%+.3f)" % (a,b,cmdA,cmdB,dx,dy,pv)
+
+        return cmdA,cmdB
+
+    def predict_position(self, s):
+        """ returns (x,y,vx,vy) """
+        if self.LATENCY > 0:
+            #add predict the position based on the current velocity
+            return s[0] + s[2]*self.LATENCY,s[1] + s[3]*self.LATENCY,s[2],s[3]
+        else:
+            return s[0],s[1],s[2],s[3]
+
+    def __repr__(self):
+        return "<ControlManager PX:%.1f PY:%.1f PV:%.1f LATENCY:%.1f>" % (
+                    self.PX,self.PY,self.PV,self.LATENCY)
 
 class StatsManager:
     def __init__(self, secs, fps=100):

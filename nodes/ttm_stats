@@ -5,6 +5,8 @@ import rospy
 from flymad.msg import HeadDetect
 from flymad.refined_utils import StatsManager, TTM_NAMES
 
+SPIN = """/-\|"""
+
 class StatsUI:
     def __init__(self):
         self._stats = {
@@ -18,12 +20,16 @@ class StatsUI:
 
         _ = rospy.Timer(rospy.Duration(1), self.get_stats)
 
+        self._i = 0
+
     def on_head_delta(self, msg):
         for v in self._stats.itervalues():
             v.process(msg)
 
     def get_stats(self, *args):
-        print "statistics"
+        print "statistics", SPIN[self._i % len(SPIN)]
+        self._i += 1
+
         for k,v in self._stats.iteritems():
             pt,ac = v.get_stats()
             print "% 2ds" % k

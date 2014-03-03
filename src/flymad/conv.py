@@ -44,6 +44,11 @@ def fmt_msg_generic(msg, rt, data_dict):
     data_dict["data"].append(msg.data)
     data_dict["t"].append(t)
 
+def fmt_msg_position(msg, rt, data_dict):
+    t = rt.to_sec()
+    data_dict["laser"].append(1 if msg.laser > 0 else 0)
+    data_dict["t"].append(t)
+
 SECOND_TO_NANOSEC = 1e9
 
 TOPICS = [
@@ -52,24 +57,18 @@ TOPICS = [
     "/flymad/raw_2d_positions/y",
     "/flymad/raw_2d_positions/theta",
     "/flymad/raw_2d_positions/tracked_t",
-    "/flymad_micro/laser/data",
+    "/flymad_micro/position/laser",
     "/flymad_micro/adc/data",
 ]
 
 TOPIC_COL_MAP = {
-    "/flymad_micro/laser/data" : "laser_state",
+    "/flymad_micro/position/laser" : "laser_state",
     "/flymad_micro/adc/data" : "laser_power",
 }
 
 TOPIC_FMT_MAP = {
     "/flymad/raw_2d_positions" : fmt_msg_raw2d,
-    "/flymad_micro/laser" : fmt_msg_generic,
-    "/flymad_micro/adc" : fmt_msg_generic
-}
-
-TOPIC_FMT_MAP = {
-    "/flymad/raw_2d_positions" : fmt_msg_raw2d,
-    "/flymad_micro/laser" : fmt_msg_generic,
+    "/flymad_micro/position" : fmt_msg_position,
     "/flymad_micro/adc" : fmt_msg_generic
 }
 
