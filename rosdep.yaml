@@ -2,3 +2,17 @@ python-serial:
   ubuntu: python-serial
 python-adskalman:
   ubuntu: python-adskalman
+python-motmot-fview-draw-geom:
+  ubuntu: python-motmot-fview-draw-geom
+vlc:
+  ubuntu: vlc
+python-motmot-flytrax:
+  ubuntu: python-motmot-flytrax
+python-motmot-trackem:
+  ubuntu: python-motmot-trackem
+python-benu:
+  ubuntu: python-benu
+python-motmot-fview-head-track:
+  ubuntu: python-motmot-fview-head-track
+gocr:
+  ubuntu: gocr
