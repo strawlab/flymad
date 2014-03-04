@@ -6,6 +6,7 @@ import time
 import collections
 import tempfile
 import shutil
+import cPickle as pickle
 import itertools
 
 import sh
@@ -101,6 +102,24 @@ class Arena:
         #cache the simgear object for quick tests if the fly is in the area
         (sgcx,sgcy),sgr = self.circ
         self._sg_circ = sg.Point(sgcx,sgcy).buffer(sgr)
+
+    def __eq__(self,other):
+        if self._x != other._x:
+            return False
+        if self._y != other._y:
+            return False
+        if self._r != other._r:
+            return False
+
+        if self._xlim != other._xlim:
+            return False
+        if self._ylim != other._ylim:
+            return False
+
+        if self._convert != other._convert:
+            return False
+
+        return True
 
     @property
     def unit(self):
@@ -355,6 +374,24 @@ def merge_bagfiles(bfs, geom_must_interect=True):
     return l_df, t_df, h_df, geom
 
 def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, tzname=None):
+    cache_args = bagpath, arena, filter_short, filter_short_pct, smooth, tzname
+    cache_fname = bagpath+'.madplot-cache'
+    if os.path.exists(cache_fname):
+        print 'cache file exists...'
+        cache_dict = pickle.load( open(cache_fname,'rb'))
+        if cache_dict['version']==1:
+            if cache_dict['args']==cache_args:
+                results = cache_dict['results']
+                print 'loaded cache',cache_fname
+                return results
+            else:
+                print 'args different'
+                print 'cache:',cache_dict['args']
+                print 'this call:',cache_args
+        else:
+            print 'version wrong'
+        print '... but is not valid'
+
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -548,7 +585,14 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     t_df['experiment'] = 0
 
-    return l_df, t_df, h_df, geom
+    results = l_df, t_df, h_df, geom
+    cache_dict = {}
+    cache_dict['version']=1
+    cache_dict['args']=cache_args
+    cache_dict['results']=results
+    pickle.dump(cache_dict, open(cache_fname,'wb'), -1)
+    print 'saved cache',cache_fname
+    return results
 
 def load_bagfile_single_dataframe(bagpath, arena, ffill, warn=False, **kwargs):
     l_df, t_df, h_df, geom = load_bagfile(bagpath, arena, **kwargs)
