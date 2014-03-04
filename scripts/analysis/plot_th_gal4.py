@@ -216,13 +216,21 @@ def prepare_data( arena, dirname, bag_dirname, smooth ):
         #     continue
         #print 'parsed_data',parsed_data
         #print 'CSV datetime',parsed_data['datetime']
-        bag_filename = get_bagfilename( bag_dirname, parsed_data['datetime'] )
+        try:
+            bag_filename = get_bagfilename( bag_dirname, parsed_data['datetime'] )
+        except:
+            print 'FAILED TO FIND BAG FOR CSV',csv_filename
+            raise
 
 
 
 #        l_df, t_df, h_df, geom = madplot.load_bagfile(bag_filename, arena, smooth=smooth)
         score = Scored(bag_filename, csv_filename)
-        t_df,lon = load_bagfile_get_laseron(arena, score, smooth)
+        try:
+            t_df,lon = load_bagfile_get_laseron(arena, score, smooth)
+        except:
+            print 'FAILED TO GET LASER DATA FOR CSV',csv_filename
+            raise
         assert t_df is not None
 
         # y = dataframe['as'].values
