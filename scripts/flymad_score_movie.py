@@ -455,8 +455,8 @@ if __name__ == '__main__':
 
         inputbags = glob.glob(bagdir + "/*.bag")
         if len(inputbags)==0:
-            print 'no bag files found in %r, nothing to do' % bagdir
-            sys.exit(0)
+            print 'no bag files found in %r'
+
     elif os.path.isfile(directory):
         inputmp4s = [directory]
         random.shuffle(inputmp4s)
@@ -468,13 +468,26 @@ if __name__ == '__main__':
     else:
         sys.exit(1)
 
+    real_input_mp4s = []
     for mp4 in inputmp4s:
         fname = mp4
         base_fname = os.path.basename(fname)
         out_fname = os.path.join(args.outdir, base_fname+'.csv')
-        if args.skip_existing and os.path.exists(out_fname):
-            print "skipping", fname
-            continue
+        if os.path.exists(out_fname):
+            if args.skip_existing:
+                print "skipping", fname
+                continue
+            else:
+                print 'will overwrite output file',out_fname
+        real_input_mp4s.append( mp4 )
+
+    inputmp4s = real_input_mp4s
+    print 'will score %d mp4 movies'%(len(inputmp4s),)
+
+    for mp4 in inputmp4s:
+        fname = mp4
+        base_fname = os.path.basename(fname)
+        out_fname = os.path.join(args.outdir, base_fname+'.csv')
 
         if args.no_merge_bags:
             bname = None
