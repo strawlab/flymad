@@ -6,6 +6,7 @@ import time
 import collections
 import tempfile
 import shutil
+import cPickle as pickle
 import itertools
 
 import sh
@@ -110,6 +111,24 @@ class Arena:
         self._calibration = None
         if calibration is not None:
             self.update_from_calibration(calibration)
+
+    def __eq__(self,other):
+        if self._x != other._x:
+            return False
+        if self._y != other._y:
+            return False
+        if self._r != other._r:
+            return False
+
+        if self._xlim != other._xlim:
+            return False
+        if self._ylim != other._ylim:
+            return False
+
+        if self._convert != other._convert:
+            return False
+
+        return True
 
     def __repr__(self):
         return "<Arena cx:%.1f cy:%.1f r:%.1f sx:%f sy:%f>" % (
@@ -410,7 +429,25 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, extra_topics=None):
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, extra_topics=None, tzname=None):
+    cache_args = bagpath, arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
+    cache_fname = bagpath+'.madplot-cache'
+    if os.path.exists(cache_fname):
+        print 'cache file exists...'
+        cache_dict = pickle.load( open(cache_fname,'rb'))
+        if cache_dict['version']==1:
+            if cache_dict['args']==cache_args:
+                results = cache_dict['results']
+                print 'loaded cache',cache_fname
+                return results
+            else:
+                print 'args different'
+                print 'cache:',cache_dict['args']
+                print 'this call:',cache_args
+        else:
+            print 'version wrong'
+        print '... but is not valid'
+
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -428,6 +465,14 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     print "loading", bagpath
     bag = rosbag.Bag(bagpath)
+
+    if tzname is None:
+        if int(os.environ.get('MADPLOT_FORCE_USER_TZNAME','0'))==1:
+            raise ValueError('tzname is not specified')
+        else:
+            tzname = 'CET'
+
+    tz = pytz.timezone( tzname )
 
     geom_msg = None
 
@@ -464,7 +509,10 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     for topic,msg,rostime in bag.read_messages(topics=topics):
         if topic == "/targeter/targeted":
-            l_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
+            ts = msg.header.stamp.to_sec()
+            naive_datetime_timestamp = datetime.datetime.fromtimestamp(ts)
+            aware_ts = datetime.datetime.fromtimestamp(ts, tz)
+            l_index.append( aware_ts )
             l_data['lobj_id'].append(msg.obj_id)
             l_data['laser_power'].append(msg.laser_power)
             l_data['mode'].append(msg.mode)
@@ -475,7 +523,9 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
         elif topic == "/flymad/tracked":
             if msg.is_living:
                 ts = msg.header.stamp.to_sec()
-                t_index.append( datetime.datetime.fromtimestamp(ts) )
+                naive_datetime_timestamp = datetime.datetime.fromtimestamp(ts)
+                aware_ts = datetime.datetime.fromtimestamp(ts, tz)
+                t_index.append( aware_ts )
                 #pandas > 0.11.0 and numpy 1.6.x do not play well together wrt datetime colums
                 #but it does seem to work for datetime indexe??.
                 #Until we upgrade to numpy 1.7.1 it is easier to keep around a
@@ -497,7 +547,10 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                 print "WARNING: DUPLICATE GEOM MSG", msg, "vs", geom_msg
             geom_msg = msg
         elif topic == "/flymad/laser_head_delta":
-            h_index.append( datetime.datetime.fromtimestamp(rostime.to_sec()) )
+            ts = rostime.to_sec()
+            naive_datetime_timestamp = datetime.datetime.fromtimestamp(ts)
+            aware_ts = datetime.datetime.fromtimestamp(ts, tz)
+            h_index.append( aware_ts )
             for k in h_data_names:
                 h_data[k].append( getattr(msg,k,np.nan) )
             h_data["h_framenumber"].append( getattr(msg,"framenumber",0) )
@@ -505,11 +558,16 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
         elif topic == "/flymad/raw_2d_positions":
             if len(msg.points) == 1:
                 ts = msg.header.stamp.to_sec()
-                r_index.append( datetime.datetime.fromtimestamp(ts) )
+                naive_datetime_timestamp = datetime.datetime.fromtimestamp(ts)
+                aware_ts = datetime.datetime.fromtimestamp(ts, tz)
+                r_index.append( aware_ts )
                 r_data["r_framenumber"].append(msg.framenumber)
                 r_data["r_theta"].append(msg.points[0].theta)
         elif topic in extra_topics:
-            e_index.append( datetime.datetime.fromtimestamp(rostime.to_sec()) )
+            ts = rostime.to_sec()
+            naive_datetime_timestamp = datetime.datetime.fromtimestamp(ts)
+            aware_ts = datetime.datetime.fromtimestamp(ts, tz)
+            e_index.append( aware_ts )
             for attr in extra_topics[topic]:
                 e_data[get_extra_key(topic, attr)].append(getattr(msg,attr))
 
@@ -641,7 +699,15 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     t_df['experiment'] = 0
 
-    return geom, {"targeted":l_df, "tracked":t_df, "ttm":h_df, "extra":e_df}
+    results = geom, {"targeted":l_df, "tracked":t_df, "ttm":h_df, "extra":e_df}
+
+    cache_dict = {}
+    cache_dict['version']=1
+    cache_dict['args']=cache_args
+    cache_dict['results']=results
+    pickle.dump(cache_dict, open(cache_fname,'wb'), -1)
+    print 'saved cache',cache_fname
+    return results
 
 def load_bagfile_single_dataframe(bagpath, arena, ffill, warn=False, **kwargs):
     geom, dfs = load_bagfile(bagpath, arena, **kwargs)
@@ -864,11 +930,11 @@ def get_progress_bar(name, maxval):
 FMFFrame = collections.namedtuple('FMFFrame', 'offset timestamp')
 
 class FrameDescriptor:
-    def __init__(self, w_frame, z_frame, df_or_series, epoch):
+    def __init__(self, w_frame, z_frame, df_or_series, timestamp_localtime_secs):
         self.w_frame = w_frame
         self.z_frame = z_frame
         self.df = df_or_series
-        self.epoch = epoch
+        self.timestamp_localtime_secs = timestamp_localtime_secs
 
     def get_row(self, *cols):
         if isinstance(self.df, pd.Series):
@@ -967,9 +1033,14 @@ class ArenaPlotter(_FMFPlotter):
     show_velocity = False
     show_framenumber = False
 
-    def __init__(self, arena, bgcolor=(0.0,0.0,0.0,1), tzname='CET'):
+    def __init__(self, arena, bgcolor=(0.0,0.0,0.0,1), tzname=None):
         _FMFPlotter.__init__(self, None) #no fmf
         self.bgcolor = bgcolor
+        if tzname is None:
+            if int(os.environ.get('MADPLOT_FORCE_USER_TZNAME','0'))==1:
+                raise ValueError('tzname is not specified')
+            else:
+                tzname = 'CET'
         self.tz = pytz.timezone( tzname )
         self.enable_show_arena(arena)
 
@@ -1008,7 +1079,7 @@ class ArenaPlotter(_FMFPlotter):
                               radius=1 )
 
             if self.show_epoch:
-                canv.text(str(datetime.datetime.fromtimestamp(desc.epoch, self.tz)),
+                canv.text(str(datetime.datetime.fromtimestamp(desc.timestamp_localtime_secs, self.tz)),
                           15,25,
                           color_rgba=(1.,1.,1.,1.),
                           font_face="Ubuntu", bold=False, font_size=14)
@@ -1020,7 +1091,7 @@ class ArenaPlotter(_FMFPlotter):
                           font_face="Ubuntu", bold=False, font_size=14)
 
             if self.show_epoch:
-                canv.text("%.1fs" % (desc.epoch - self.t0),
+                canv.text("%.1fs" % (desc.timestamp_localtime_secs - self.t0),
                           15,75,
                           color_rgba=(1.,1.,1.,1.),
                           font_face="Ubuntu", bold=False, font_size=14)
@@ -1280,9 +1351,9 @@ class TTLPlotter:
                 fig.subplots_adjust(left=0.035, right=0.98)
 
 class MovieMaker:
-    def __init__(self, tmpdir='/tmp/', obj_id='movie', fps=20):
-        self.tmpdir = tempfile.mkdtemp(str(obj_id), dir=tmpdir)
-        self.obj_id = obj_id
+    def __init__(self, tmpdir='/tmp/', basename='movie', fps=20):
+        self.tmpdir = tempfile.mkdtemp(str(basename), dir=tmpdir)
+        self.basename = basename
         self.num = 0
         self.fps = fps
 
@@ -1290,7 +1361,7 @@ class MovieMaker:
 
     @property
     def movie_fname(self):
-        return "%s.mp4" % self.obj_id
+        return "%s.mp4" % self.basename
 
     @property
     def frame_number(self):
@@ -1314,13 +1385,18 @@ class MovieMaker:
 
         if not os.path.isdir(moviedir):
             os.makedirs(moviedir)
-        moviefname = os.path.join(moviedir,"%s.mp4" % self.obj_id)
+
 
         sh.x264("--output=%s/movie.mp4" % self.tmpdir,
                 "%s/movie.y4m" % self.tmpdir,
         )
 
+        moviefname = self.get_target_movie_name(moviedir)
         sh.mv("-u", "%s/movie.mp4" % self.tmpdir, moviefname)
+        return moviefname
+
+    def get_target_movie_name(self,moviedir):
+        moviefname = os.path.join(moviedir,"%s.mp4" % self.basename)
         return moviefname
 
     def cleanup(self):
