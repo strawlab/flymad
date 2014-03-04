@@ -18,8 +18,8 @@ Rsigma=10.0 # observation covariance
 
 max_dist_squared = MAX_DIST_PIXELS**2
 
-def make_new_object(xy):
-    x,y=xy
+def make_new_object(xy_theta):
+    x,y,theta=xy_theta
     return TrackedObject(x,y)
 
 class ObjIdGetter:
@@ -61,38 +61,33 @@ class TrackedObject:
         #print self.obj_id,'------------------------ start'
         #print x0
 
-    def step(self, xy, framenumber, pub):
+    def step(self, xy_theta, framenumber, pub):
         # xy is Nx2 array of possible observations
         xhatminus, Pminus = \
                    self.kf.step1__calculate_a_priori(isinitial=self.isinitial)
         #print self.obj_id,'------------------------'
         #print 'isinitial',self.isinitial
 
-        if len(xy)>=1:
+        if len(xy_theta)>=1:
             # XXX should calculate mahalanobis distance...
-
-            #print xy
-            #print xhatminus
-            diff = xy-xhatminus[:2]
+            diff = xy_theta[:,:2]-xhatminus[:2]
             d2 = np.sum(diff**2,axis=1)
             idx = np.argmin(d2)
             this_d2 = d2[idx]
-            ##print diff
-            ##print d2
-            #print idx
-            #print 'np.sqrt(this_d2)',np.sqrt(this_d2)
 
-        if len(xy)==0 or (this_d2 > max_dist_squared):
+        if len(xy_theta)==0 or (this_d2 > max_dist_squared):
             #print 'no observation'
             # best point is not good enough
             observation = None
-            unused = xy
+            unused = xy_theta
+            theta_passthrough = np.nan
 
         else:
             # remove used observation from list of points
-            observation = xy[idx,:]
-            N = len(xy)
-            unused = xy[ np.arange(N)!=idx ]
+            observation = xy_theta[idx,:2]
+            N = len(xy_theta)
+            unused = xy_theta[ np.arange(N)!=idx ]
+            theta_passthrough = xy_theta[idx,2]
 
         xhat,P = \
                self.kf.step2__calculate_a_posteri(xhatminus, Pminus,
@@ -116,6 +111,7 @@ class TrackedObject:
             msg.header.frame_id = "pixels"
             msg.framenumber = framenumber
             msg.state_vec = map(float,xhat) # convert from numpy
+            msg.theta_passthrough = theta_passthrough
             msg.covariance_diagonal = map(float, np.diag(P) )
             msg.is_living = self.is_living
             pub.publish(msg)
@@ -167,19 +163,19 @@ class Tracker:
 
         self.last_framenumber = framenumber
         # generate 2D array of all 2D candidates
-        xy = np.array([(p.x,p.y) for p in msg.points])
+        xy_theta = np.array([(p.x,p.y,p.theta) for p in msg.points])
 
         if dframes > 1:
             rospy.logwarn('missing data')
 
         for obj in self.objs:
             # iff object takes 2D candidate, remove from xy array.
-            xy = obj.step( xy, framenumber, self.pub )
+            xy_theta = obj.step( xy_theta, framenumber, self.pub )
 
         # perform births
-        while len(xy):
-            self.objs.append( make_new_object( xy[0] ))
-            xy = xy[1:]
+        while len(xy_theta):
+            self.objs.append( make_new_object( xy_theta[0] ))
+            xy_theta = xy_theta[1:]
 
         # perform deaths
         self.objs = [o for o in self.objs if o.keep() ]
