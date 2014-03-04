@@ -269,6 +269,8 @@ def plot_data(arena, dirname, smooth, dfs):
                 action_trials = 0
                 mean_vels = []
                 for (t_df,parsed_data) in dfs[condition]:
+                    if measurement not in t_df:
+                        continue
                     if parsed_data['trialnum'] is not None:
                         if int(parsed_data['trialnum']) != trial_num:
                             continue
