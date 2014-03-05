@@ -491,7 +491,7 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                 #theta message was added later, in old bag files we reconstruct
                 #it from the tracked object message iff there was only one
                 #tracked object
-                t_data['theta'] = getattr(msg,'theta',np.nan)
+                t_data['theta'].append(getattr(msg,'theta_passthrough',np.nan))
         elif topic == "/draw_geom/poly":
             if geom_msg is not None:
                 print "WARNING: DUPLICATE GEOM MSG", msg, "vs", geom_msg
@@ -575,7 +575,7 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
             n_s = pd.Series(n_theta, index=n_idx)
             t_df['theta'] = n_s
-        
+
     #optionally find short trials here, print the length of kept trials
     if (filter_short_pct > 0) or (filter_short > 0):
         if filter_short_pct > 0:
