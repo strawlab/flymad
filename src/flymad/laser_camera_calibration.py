@@ -11,6 +11,9 @@ roslib.load_manifest('flymad')
 import rospy
 import rosbag
 
+class NoCalibration(Exception):
+    pass
+
 def get_calibration_file_path(default=None, create=False, suffix='OUT.filtered'):
     if default and os.path.isfile(default):
         return default
@@ -68,10 +71,13 @@ def read_raw_calibration_data(fname):
                 if topic == '/targeter/calibration':
                     calibs.append(msg.data)
 
+        if not calibs:
+            raise NoCalibration("No calibration detected in %s" % fname)
+
         #remove identical calib strings
         calibs = set(calibs)
         if len(calibs) != 1:
-            raise Exception("Multiple different calibrations detected in same bag file")
+            raise ValueError("Multiple different calibrations detected in same bag file")
 
         data = yaml.load(calibs.pop())
     else:

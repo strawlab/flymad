@@ -122,7 +122,12 @@ class Arena:
         """
 
         if not isinstance(calibration, flymad.laser_camera_calibration.Calibration):
-            calibration = flymad.laser_camera_calibration.load_calibration(calibration)
+            try:
+                calibration = flymad.laser_camera_calibration.load_calibration(calibration)
+            except flymad.laser_camera_calibration.NoCalibration, e:
+                #likely old data from initial submission, assume defaults were
+                #correct
+                return
 
         if self._calibration is None:
             print "updating arena from calibration source"
