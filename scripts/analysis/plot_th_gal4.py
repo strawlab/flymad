@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import collections
-import cPickle as pickle
 import argparse
 import pprint
 
@@ -239,11 +238,7 @@ def prepare_data( arena, dirname, bag_dirname, smooth ):
         # plt.plot(x,y,label='%s'%(parsed_data['condition'],))
         dfs[parsed_data['condition']].append( (t_df, parsed_data) )
 
-    pickle.dump(dfs, open(os.path.join(dirname,'cached_%s_%s.pkl' % (arena.unit,smooth)),'wb'), -1)
     return dfs
-
-def load_data(arena, dirname, bag_dirname, smooth):
-    return pickle.load(open(os.path.join(dirname,'cached_%s_%s.pkl' % (arena.unit,smooth)),'rb'))
 
 def plot_data(arena, dirname, smooth, dfs):
     conditions = dfs.keys()
@@ -329,10 +324,7 @@ if __name__=='__main__':
 
     arena = madplot.Arena('mm')
 
-    if args.only_plot:
-        data = load_data(arena, dirname, args.bagdir, smooth=args.smooth)
-    else:
-        data = prepare_data(arena, dirname, args.bagdir, smooth=args.smooth)
+    data = prepare_data(arena, dirname, args.bagdir, smooth=args.smooth)
 
     plot_data( arena, dirname, args.smooth, data)
 
