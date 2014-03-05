@@ -213,7 +213,6 @@ def my_subplot( n_conditions ):
         1/0
     return n_rows, n_cols
 
-MAX_LATENCY = 10.0
 NAMES = OrderedDict([('th1stim_head',('head','TH>trpA1')),
                      ('th1stim_thorax',('thorax','TH>trpA1')),
                      ('thcstrpa11stim_head',('head','trpA1')),
@@ -294,6 +293,9 @@ def plot_data(arena, dirname, smooth, dfs):
             df = {'latency':[],
                   'name_key':[],
                   }
+            df_pooled = {'latency':[],
+                         'name_key':[],
+                         }
             for i, condition in enumerate(conditions):
                 target_location, genotype = NAMES[condition]
                 ax = fig.add_subplot(n_rows, n_cols, i+1 )
@@ -323,16 +325,20 @@ def plot_data(arena, dirname, smooth, dfs):
                     arrs.append( t_df['proboscis'] )
                     selected_df = t_df[ t_df[measurement] > 0.5 ]
                     if len(selected_df)==0:
-                        this_latency = MAX_LATENCY
+                        this_latency = np.inf
                     else:
                         first_behavior_time = selected_df.index[0]
                         this_latency = (first_behavior_time - laser_on).total_seconds()
-                        if this_latency > MAX_LATENCY:
-                            this_latency = MAX_LATENCY
                     latency_values[condition].append( this_latency )
                     df['latency'].append( this_latency )
-                    name_key = '%s %s'%(target_location, genotype)
+                    df_pooled['latency'].append( this_latency )
+                    name_key = '%s %s'%(genotype, target_location)
+                    if '>' not in genotype:
+                        pooled_name_key = 'controls '+target_location
+                    else:
+                        pooled_name_key = name_key
                     df['name_key'].append(name_key)
+                    df_pooled['name_key'].append( pooled_name_key )
 
                     if np.any( t_df[measurement] > 0.5 ):
                         action_trials += 1
@@ -344,9 +350,15 @@ def plot_data(arena, dirname, smooth, dfs):
                 ax.set_title('%s (n=%d)'%(condition, counts[condition][1]))
                 #ax.legend()
             fig.subplots_adjust(hspace=0.39)
+
             df = pd.DataFrame(df)
-            df_fname = '%s.df'%(measurement,)
+            df_fname = '%s_notpooled.df'%(measurement,)
             df.to_pickle(df_fname)
+            print 'saved',df_fname
+
+            df_pooled = pd.DataFrame(df_pooled)
+            df_fname = '%s_pooled.df'%(measurement,)
+            df_pooled.to_pickle(df_fname)
             print 'saved',df_fname
             print '_'*30, '%s, trial %d'%(measurement, trial_num), '_'*30
             pprint.pprint(counts)
