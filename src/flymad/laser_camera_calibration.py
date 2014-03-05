@@ -9,6 +9,7 @@ import roslib.rosenv
 import roslib.packages
 roslib.load_manifest('flymad')
 import rospy
+import rosbag
 
 def get_calibration_file_path(default=None, create=False, suffix='OUT.filtered'):
     if default and os.path.isfile(default):
@@ -54,14 +55,28 @@ def save_raw_calibration_data(fname,dac,pixels):
     fd.close()
 
 def read_raw_calibration_data(fname):
-    fd = open(fname,mode='r')
-    try:
-        # speculative attempt to open as JSON (a faster, and valid
-        # subset of YAML)
-        data = json.load(fd)
-    except ValueError:
-        fd.seek(0)
-        data = yaml.load(fd)
+    if fname.endswith('.yaml'):
+        with open(fname, mode='r') as fd:
+            data = yaml.load(fd)
+    elif fname.endswith('.json'):
+        with open(fname, mode='r') as fd:
+            data = json.load(fd)
+    elif fname.endswith('.bag'):
+        calibs = []
+        with rosbag.Bag(fname, mode='r') as bag:
+            for topic,msg,rostime in bag.read_messages(topics=['/targeter/calibration']):
+                if topic == '/targeter/calibration':
+                    calibs.append(msg.data)
+
+        #remove identical calib strings
+        calibs = set(calibs)
+        if len(calibs) != 1:
+            raise Exception("Multiple different calibrations detected in same bag file")
+
+        data = yaml.load(calibs.pop())
+    else:
+        raise Exception("Only calibrations stored in .yaml, .json or .bag files supported "\
+                        "(not %s files)" % fname)
 
     pixels = np.array(data['pixels'])
     bad_cond = pixels==-9223372036854775808
