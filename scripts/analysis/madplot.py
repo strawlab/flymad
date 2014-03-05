@@ -381,22 +381,27 @@ def merge_bagfiles(bfs, geom_must_interect=True):
     return l_df, t_df, h_df, geom
 
 def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, tzname=None):
-    cache_args = bagpath, arena, filter_short, filter_short_pct, smooth, tzname
+    cache_args = os.path.basename(bagpath), arena, filter_short, filter_short_pct, smooth, tzname
     cache_fname = bagpath+'.madplot-cache'
     if os.path.exists(cache_fname):
         print 'cache file exists...'
-        cache_dict = pickle.load( open(cache_fname,'rb'))
-        if cache_dict['version']==1:
-            if cache_dict['args']==cache_args:
-                results = cache_dict['results']
-                print 'loaded cache',cache_fname
-                return results
-            else:
-                print 'args different'
-                print 'cache:',cache_dict['args']
-                print 'this call:',cache_args
+        cache_buf = open(cache_fname,'rb')
+        try:
+            cache_dict = pickle.load( cache_buf )
+        except Exception as err:
+            print 'pickle load failed: %s'%(err,)
         else:
-            print 'version wrong'
+            if cache_dict['version']==1:
+                if cache_dict['args']==cache_args:
+                    results = cache_dict['results']
+                    print 'loaded cache',cache_fname
+                    return results
+                else:
+                    print 'args different'
+                    print 'cache:',cache_dict['args']
+                    print 'this call:',cache_args
+            else:
+                print 'version wrong'
         print '... but is not valid'
 
     def in_area(row, poly):
