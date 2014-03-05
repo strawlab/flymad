@@ -376,7 +376,7 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                              "laser_power","mode")}
 
     t_index = []
-    t_data = {k:[] for k in ("tobj_id","x_px","y_px","vx_px","vy_px","v_px",'t_framenumber','t_ts')}
+    t_data = {k:[] for k in ("tobj_id","x_px","y_px","vx_px","vy_px","v_px",'t_framenumber','t_ts','theta')}
 
     h_index = []
     h_data = {k:[] for k in ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type", "h_framenumber", "h_processing_time")}
@@ -414,6 +414,10 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                 #these will be replaced later with smoothed versions
                 t_data['vx_px'].append(msg.state_vec[2])
                 t_data['vy_px'].append(msg.state_vec[3])
+                #theta message was added later, in old bag files we reconstruct
+                #it from the tracked object message iff there was only one
+                #tracked object
+                t_data['theta'] = getattr(msg,'theta',np.nan)
         elif topic == "/draw_geom/poly":
             if geom_msg is not None:
                 print "WARNING: DUPLICATE GEOM MSG", msg, "vs", geom_msg
@@ -426,8 +430,10 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
             h_data["h_processing_time"].append( msg.processing_time )
         elif topic == "/flymad/raw_2d_positions":
             if len(msg.points) == 1:
+                ts = msg.header.stamp.to_sec()
+                r_index.append( datetime.datetime.fromtimestamp(ts) )
                 r_data["r_framenumber"].append(msg.framenumber)
-                r_data["theta"].append(msg.points[0].theta)
+                r_data["r_theta"].append(msg.points[0].theta)
 
     if geom_msg is not None:
         points_x = [pt.x for pt in geom_msg.points]
@@ -461,13 +467,35 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     l_df = pd.DataFrame(l_data, index=l_index)
     t_df = pd.DataFrame(t_data, index=t_index)
     h_df = pd.DataFrame(h_data, index=h_index)
-
-    r_df = pd.DataFrame(r_data)
-    if len(r_df) == len(t_df):
-        t_df['theta'] = r_df['theta'].values
     else:
         t_df['theta'] = np.nan
 
+    #check we didn't use an old version of the bag format with no 
+    #theta in the heading element
+    if np.all(t_df['theta'].isnull().values):
+        r_df = pd.DataFrame(r_data, index=r_index)
+        if len(r_df) == len(t_df):
+            #there was only one object_id, so all theta values correspond to that
+            #object
+            t_df['theta'] = r_df['r_theta'].values
+            print "\tload: copying all raw2d theta to tracked theta as only 1 obj id"
+        else:
+            print "\tload: copying raw2d theta to tracked theta by framenumber (SLOW!)"
+            #match up the first object theta value based on framenumber using 
+            #depressingly slow and inefficient iteration
+            n_idx = []
+            n_theta = []
+
+            for idx,s in r_df.iterrows():
+                fn = s['r_framenumber']
+                row = t_df[t_df['t_framenumber'] == fn]['theta']
+                if len(row) == 1:
+                    n_idx.append(row.index[0])
+                    n_theta.append(s['r_theta'])
+
+            n_s = pd.Series(n_theta, index=n_idx)
+            t_df['theta'] = n_s
+        
     #optionally find short trials here, print the length of kept trials
     if (filter_short_pct > 0) or (filter_short > 0):
         if filter_short_pct > 0:
