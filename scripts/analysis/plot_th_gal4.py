@@ -1,11 +1,27 @@
 #!/usr/bin/env python
+import strawlab_mpl.defaults as smd
+from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
+import matplotlib
+
+def setup_defaults():
+    rcParams = matplotlib.rcParams
+
+    rcParams['legend.numpoints'] = 1
+    rcParams['legend.fontsize'] = 'medium' #same as axis
+    rcParams['legend.frameon'] = False
+    rcParams['legend.numpoints'] = 1
+    rcParams['legend.scatterpoints'] = 1
+
+smd.setup_defaults()
+setup_defaults()
+
 import pandas as pd
 import sys, os,re
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-import collections
+from collections import namedtuple, OrderedDict, defaultdict
 import argparse
 import pprint
 
@@ -15,7 +31,7 @@ from th_experiments import DOROTHEA_NAME_RE_BASE
 DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '.mp4.csv$')
 BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S.bag"
 
-Scored = collections.namedtuple('Scored', 'bag csv')
+Scored = namedtuple('Scored', 'bag csv')
 
 def load_bagfile_get_laseron(arena, score, smooth):
     NO_PROBOSCIS = 0
@@ -136,16 +152,16 @@ def load_bagfile_get_laseron(arena, score, smooth):
     lon = l_df[l_df['laser_power'] > 0]
 
     if len(lon):
-        ton = lon.index[0]
+        laser_on = lon.index[0]
 
-        l_off_df = l_df[ton:]
-        loff = l_off_df[l_off_df['laser_power'] == 0]
-        toff = loff.index[0]
+        # l_off_df = l_df[laser_on:]
+        # loff = l_off_df[l_off_df['laser_power'] == 0]
+        # toff = loff.index[0]
 
-        onoffset = np.where(t_df.index >= ton)[0][0]
-        offoffset = np.where(t_df.index >= toff)[0][0]
+        # onoffset = np.where(t_df.index >= laser_on)[0][0]
+        # offoffset = np.where(t_df.index >= toff)[0][0]
 
-        return t_df, onoffset
+        return t_df, laser_on
 
     else:
         return None, None
@@ -197,8 +213,17 @@ def my_subplot( n_conditions ):
         1/0
     return n_rows, n_cols
 
+MAX_LATENCY = 10.0
+NAMES = OrderedDict([('th1stim_head',('head','TH>trpA1')),
+                     ('th1stim_thorax',('thorax','TH>trpA1')),
+                     ('thcstrpa11stim_head',('head','trpA1')),
+                     ('thcstrpa11stim_thorax',('thorax','trpA1')),
+                     ('thgal41stim_head',('head','TH')),
+                     ('thgal41stim_thorax',('thorax','TH')),
+                     ])
+
 def prepare_data( arena, dirname, bag_dirname, smooth ):
-    dfs = collections.defaultdict(list)
+    dfs = defaultdict(list)
     csv_files = glob.glob( os.path.join(dirname,'csvs','*.csv') )
     for csv_filename in csv_files:
         matchobj = DOROTHEA_NAME_REGEXP.match(os.path.basename(csv_filename))
@@ -226,7 +251,7 @@ def prepare_data( arena, dirname, bag_dirname, smooth ):
 #        l_df, t_df, h_df, geom = madplot.load_bagfile(bag_filename, arena, smooth=smooth)
         score = Scored(bag_filename, csv_filename)
         try:
-            t_df,lon = load_bagfile_get_laseron(arena, score, smooth)
+            t_df,laser_on = load_bagfile_get_laseron(arena, score, smooth)
         except:
             print 'FAILED TO GET LASER DATA FOR CSV',csv_filename
             raise
@@ -236,7 +261,7 @@ def prepare_data( arena, dirname, bag_dirname, smooth ):
         # print y.dtype
         # x = np.arange( len(y) )
         # plt.plot(x,y,label='%s'%(parsed_data['condition'],))
-        dfs[parsed_data['condition']].append( (t_df, parsed_data) )
+        dfs[parsed_data['condition']].append( (t_df, parsed_data, laser_on) )
 
     return dfs
 
@@ -247,7 +272,7 @@ def plot_data(arena, dirname, smooth, dfs):
     # how many trials do we want to analyze?
     condition = conditions[0]
     r =  dfs[conditions[0]]
-    (_,parsed_data) = dfs[conditions[0]][0]
+    (_,parsed_data,_) = dfs[conditions[0]][0]
     if parsed_data['trialnum'] is None:
         trial_num_list = [1]
     else:
@@ -262,16 +287,21 @@ def plot_data(arena, dirname, smooth, dfs):
                             ]:
 
             counts = {}
+            latency_values = defaultdict(list)
 
             fig = plt.figure('timeseries %s, trial %d'%(measurement,trial_num))
             n_rows, n_cols = my_subplot( n_conditions )
+            df = {'latency':[],
+                  'name_key':[],
+                  }
             for i, condition in enumerate(conditions):
+                target_location, genotype = NAMES[condition]
                 ax = fig.add_subplot(n_rows, n_cols, i+1 )
                 arrs = []
                 total_trials = 0
                 action_trials = 0
                 mean_vels = []
-                for (t_df,parsed_data) in dfs[condition]:
+                for (t_df,parsed_data,laser_on) in dfs[condition]:
                     if measurement not in t_df:
                         continue
                     if parsed_data['trialnum'] is not None:
@@ -285,15 +315,25 @@ def plot_data(arena, dirname, smooth, dfs):
                     mean_v_mm = np.mean(v_mm)
                     mean_vels.append( mean_v_mm )
 
-                    #print t_df.head()
-                    #sys.exit(1)
-
                     ax.plot(t_df[measurement],
                             label='%s (fly %s, trial %s)'%(parsed_data['condition'],
                                                            parsed_data['condition_flynum'],
                                                            parsed_data['trialnum'],
                                                            ))
                     arrs.append( t_df['proboscis'] )
+                    selected_df = t_df[ t_df[measurement] > 0.5 ]
+                    if len(selected_df)==0:
+                        this_latency = MAX_LATENCY
+                    else:
+                        first_behavior_time = selected_df.index[0]
+                        this_latency = (first_behavior_time - laser_on).total_seconds()
+                        if this_latency > MAX_LATENCY:
+                            this_latency = MAX_LATENCY
+                    latency_values[condition].append( this_latency )
+                    df['latency'].append( this_latency )
+                    name_key = '%s %s'%(target_location, genotype)
+                    df['name_key'].append(name_key)
+
                     if np.any( t_df[measurement] > 0.5 ):
                         action_trials += 1
                     total_trials += 1
@@ -303,10 +343,15 @@ def plot_data(arena, dirname, smooth, dfs):
                 ax.plot( mean_arr, color='k', lw=2 )
                 ax.set_title('%s (n=%d)'%(condition, counts[condition][1]))
                 #ax.legend()
+            fig.subplots_adjust(hspace=0.39)
+            df = pd.DataFrame(df)
+            df_fname = '%s.df'%(measurement,)
+            df.to_pickle(df_fname)
+            print 'saved',df_fname
             print '_'*30, '%s, trial %d'%(measurement, trial_num), '_'*30
             pprint.pprint(counts)
             print '_'*80
-            fig.subplots_adjust(hspace=0.39)
+
         print '='*80
 
 if __name__=='__main__':
