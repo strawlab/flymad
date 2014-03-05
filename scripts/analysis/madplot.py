@@ -421,6 +421,8 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     def get_extra_key(topic, attr):
         return "e%s_%s" % (topic.replace('/','_'),attr)
 
+    arena.update_from_calibration(bagpath)
+
     if extra_topics is None:
         extra_topics = {}
 
