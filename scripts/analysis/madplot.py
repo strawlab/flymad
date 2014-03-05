@@ -24,8 +24,10 @@ import motmot.FlyMovieFormat.FlyMovieFormat
 import benu.benu
 import benu.utils
 
-import roslib; roslib.load_manifest('rosbag')
+import roslib; roslib.load_manifest('flymad')
 import rosbag
+
+import flymad.laser_camera_calibration
 
 assert benu.__version__ >= "0.1.0"
 
@@ -83,7 +85,7 @@ class Arena:
         "mm":1000.0,
     }
 
-    def __init__(self, convert, jsonconf=dict()):
+    def __init__(self, convert, jsonconf=dict(), calibration=None):
         x = jsonconf.get('cx',360)
         y = jsonconf.get('cy',255)
         r = jsonconf.get('cr',200)
@@ -95,12 +97,61 @@ class Arena:
         self._convert = convert
         self._convert_mult = self.CONVERT_OPTIONS[convert]
         self._rw = float(jsonconf.get('rw',0.045))   #radius in m
+
+        #sx and sy are not perfect - see
+        #update_from_calibration
         self._sx = float(jsonconf.get('sx',0.045/208)) #scale factor px->m
         self._sy = float(jsonconf.get('sy',0.045/219)) #scale factor px->m
 
         #cache the simgear object for quick tests if the fly is in the area
         (sgcx,sgcy),sgr = self.circ
         self._sg_circ = sg.Point(sgcx,sgcy).buffer(sgr)
+
+        self._calibration = None
+        if calibration is not None:
+            self.update_from_calibration(calibration)
+
+    def __repr__(self):
+        return "<Arena cx:%.1f cy:%.1f r:%.1f sx:%f sy:%f>" % (
+                    self._x,self._y,self._r,self._sx,self._sy)
+
+    def update_from_calibration(self, calibration):
+        """
+        calibration can be a Calibration object or a path to a calibration
+        source (yaml, bag file, etc)
+        """
+
+        if not isinstance(calibration, flymad.laser_camera_calibration.Calibration):
+            calibration = flymad.laser_camera_calibration.load_calibration(calibration)
+
+        if self._calibration is None:
+            print "updating arena from calibration source"
+        else:
+            if calibration == self._calibration:
+                #calibrations are identical, nothing to do
+                return
+            else:
+                #arena is typically a global object in analysis (for plotting, etc),
+                #so mixing multiple different calibratied arenas in one analysis
+                #is not yet supported
+                print "warning: multiple different calibrations assigned to arena"
+                return
+
+        bounds,xlim,ylim = calibration.get_arena_measurements()
+
+        self._x, self._y, self._r = bounds
+        self._xlim = xlim
+        self._ylim = ylim
+
+        #this could be more correctly implemented by detecting the major
+        #axis of the ellipse (the circular arena viewed obliquely by the 
+        #wide camera) and calculating appropriate scale factors....
+        #but now we assume they are so close it doesn't matter (as often they
+        #are within a few pixels with the current widefield camera mounting)
+        self._sx = self._rw / ((self._xlim[1] - self._xlim[0]) / 2.0)
+        self._sy = self._rw / ((self._ylim[1] - self._ylim[0]) / 2.0)
+
+        self._calibration = calibration
 
     @property
     def unit(self):

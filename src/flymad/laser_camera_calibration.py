@@ -169,3 +169,37 @@ class Calibration:
 
         print 'Mean reprojection errors: %.1f, %.1f (DACa, DACb)'%(mean_da_error,mean_db_error)
 
+    def __eq__(self, other):
+        return np.allclose(self.dac,other.dac) and np.allclose(self.pixels,other.pixels)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def get_arena_measurements(self):
+        """ returns the bounds of the arena
+
+        (cx,cy,radius),xlim,ylim
+
+        where xlim = (xmin,xmax)
+
+        """
+        xpx = self.pixels[0,:]
+        ypx = self.pixels[1,:]
+        xlim = xpx.min(),xpx.max()
+        ylim = ypx.min(),ypx.max()
+
+        try:
+            from flymad.smallest_enclosing_circle import make_circle
+            print "finding smallest enclosing circle of calibration camera pixels"
+            circ = make_circle(self.pixels.T)
+        except ImportError:
+            #assume the circle is centered in xlim and ylim
+            rx = (xlim[1]-xlim[0])/2.0
+            ry = (ylim[1]-ylim[0])/2.0
+            cr = max(rx,ry)
+            cx = xlim[0] + rx
+            cy = ylim[0] + ry
+            circ = (cx, cy, cr)
+
+        return map(int,circ), map(int,xlim), map(int,ylim)
+
