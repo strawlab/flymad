@@ -30,10 +30,13 @@ def prepare_data(arena, path, smoothstr, smooth):
 
     for exp in fly_data:
 
-        l_df,t_df,h_df,geom = madplot.load_bagfile(
+        geom, dfs = madplot.load_bagfile(
                                     madplot.get_path(path,dat,exp["bag"]),
                                     arena,
                                     smooth=smooth)
+        l_df = dfs["targeted"]
+        t_df = dfs["tracked"]
+        h_df = dfs["ttm"]
 
         #find when the laser was on
         l_on = l_df[l_df['laser_power'] > 0]

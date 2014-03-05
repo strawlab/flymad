@@ -354,13 +354,19 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False):
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, extra_topics=None):
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
         else:
             in_area = False
         return pd.Series({"in_area":in_area})
+
+    def get_extra_key(topic, attr):
+        return "e%s_%s" % (topic.replace('/','_'),attr)
+
+    if extra_topics is None:
+        extra_topics = {}
 
     print "loading", bagpath
     bag = rosbag.Bag(bagpath)
@@ -382,13 +388,23 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     h_data = {k:[] for k in ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type", "h_framenumber", "h_processing_time")}
     h_data_names = ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type")
 
-    r_data = {k:[] for k in ("r_framenumber", "theta")}
+    r_index = []
+    r_data = {k:[] for k in ("r_framenumber", "r_theta")}
 
-    for topic,msg,rostime in bag.read_messages(topics=["/targeter/targeted",
-                                                       "/flymad/tracked",
-                                                       "/draw_geom/poly",
-                                                       "/flymad/laser_head_delta",
-                                                       "/flymad/raw_2d_positions"]):
+    e_index = []
+    e_data = {}
+    for et in extra_topics:
+        for attr in extra_topics[et]:
+            e_data[get_extra_key(et,attr)] = []
+
+    topics = ["/targeter/targeted",
+              "/flymad/tracked",
+              "/draw_geom/poly",
+              "/flymad/laser_head_delta",
+              "/flymad/raw_2d_positions"]
+    topics.extend( extra_topics.keys() )
+
+    for topic,msg,rostime in bag.read_messages(topics=topics):
         if topic == "/targeter/targeted":
             l_index.append( datetime.datetime.fromtimestamp(msg.header.stamp.to_sec()) )
             l_data['lobj_id'].append(msg.obj_id)
@@ -434,6 +450,10 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                 r_index.append( datetime.datetime.fromtimestamp(ts) )
                 r_data["r_framenumber"].append(msg.framenumber)
                 r_data["r_theta"].append(msg.points[0].theta)
+        elif topic in extra_topics:
+            e_index.append( datetime.datetime.fromtimestamp(rostime.to_sec()) )
+            for attr in extra_topics[topic]:
+                e_data[get_extra_key(topic, attr)].append(getattr(msg,attr))
 
     if geom_msg is not None:
         points_x = [pt.x for pt in geom_msg.points]
@@ -467,8 +487,10 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     l_df = pd.DataFrame(l_data, index=l_index)
     t_df = pd.DataFrame(t_data, index=t_index)
     h_df = pd.DataFrame(h_data, index=h_index)
+    if e_index:
+        e_df = pd.DataFrame(e_data, index=e_index)
     else:
-        t_df['theta'] = np.nan
+        e_df = None
 
     #check we didn't use an old version of the bag format with no 
     #theta in the heading element
@@ -561,10 +583,13 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     t_df['experiment'] = 0
 
-    return l_df, t_df, h_df, geom
+    return geom, {"targeted":l_df, "tracked":t_df, "ttm":h_df, "extra":e_df}
 
 def load_bagfile_single_dataframe(bagpath, arena, ffill, warn=False, **kwargs):
-    l_df, t_df, h_df, geom = load_bagfile(bagpath, arena, **kwargs)
+    geom, dfs = load_bagfile(bagpath, arena, **kwargs)
+    l_df = dfs["targeted"]
+    t_df = dfs["tracked"]
+    h_df = dfs["ttm"]
 
     #merge the dataframes
     if warn:
@@ -573,7 +598,7 @@ def load_bagfile_single_dataframe(bagpath, arena, ffill, warn=False, **kwargs):
         if size_similarity < 0.9:
             print "WARNING: ONLY %.1f%% TARGETED MESSAGES FOR ALL TRACKED MESSAGES" % (size_similarity*100)
 
-    pool_df = pd.concat([t_df, l_df, h_df], axis=1)
+    pool_df = pd.concat([_df for _df in dfs.itervalues() if _df is not None], axis=1)
     if ffill is True:
         return pool_df.fillna(method='ffill')
     elif isinstance(ffill, list) or isinstance(ffill, tuple):

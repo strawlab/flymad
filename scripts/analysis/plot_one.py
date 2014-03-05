@@ -32,7 +32,10 @@ if __name__ == "__main__":
     path = args.path[0]
 
     arena = madplot.Arena(args.unit)
-    ldf,tdf,hdf,geom = madplot.load_bagfile(path, arena, smooth=args.smooth)
+    geom, dfs = madplot.load_bagfile(path, arena, smooth=args.smooth)
+    ldf = dfs["targeted"]
+    tdf = dfs["tracked"]
+    hdf = dfs["ttm"]
 
     axt = plt.figure("Trajectory").add_subplot(1,1,1)
     plot_trajectory(axt,arena,ldf,tdf,hdf,geom)
