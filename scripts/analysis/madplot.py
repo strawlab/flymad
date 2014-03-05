@@ -128,6 +128,13 @@ class Arena:
         if self._convert != other._convert:
             return False
 
+        if self._rw != other._rw:
+            return False
+        if self._sx != other._sx:
+            return False
+        if self._sy != other._sy:
+            return False
+
         return True
 
     def __repr__(self):
