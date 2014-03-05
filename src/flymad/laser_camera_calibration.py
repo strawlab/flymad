@@ -91,15 +91,17 @@ def read_raw_calibration_data(fname):
     dac = np.array(data['dac'])
     return dac, pixels
 
-def load_calibration(fname):
+def load_calibration(fname, **kwargs):
     dac, pixels = read_raw_calibration_data(fname)
-    cal = Calibration( dac, pixels )
+    cal = Calibration(dac, pixels, **kwargs)
     return cal
 
 class Calibration:
-    def __init__(self, dac, pixels):
+
+    def __init__(self, dac, pixels, verbose=False):
         self.dac = dac
         self.pixels = pixels
+        self._verbose = verbose
 
         good_cond = ~np.isnan(self.pixels)
         n_good_pixels = np.sum(good_cond)
@@ -139,21 +141,6 @@ class Calibration:
         self.d2px = self._d2px
         self.d2py = self._d2py
 
-        if 1:
-            da, db = dac[:,0]
-            #da,db = -15096, 12357
-            #da,db = 5691, 4862
-            # expected
-            pxe, pye = pixels[:,0]
-            d = np.c_[da,db]
-            # actual
-            pxa = self._d2px( d )[0]
-            pya = self._d2py( d )[0]
-            #pxe, pye = self.d2px( d )
-            print 'da, db',da, db
-            print 'pxe, pye',pxe, pye
-            print 'pxa, pya',pxa, pya
-
         # calculate reprojection errors
         n_samples = pixels.shape[1]
         da_errors = []
@@ -170,10 +157,30 @@ class Calibration:
 
             da_errors.append( this_da_error )
             db_errors.append( this_db_error )
-        mean_da_error = np.mean(da_errors)
-        mean_db_error = np.mean(db_errors)
 
-        print 'Mean reprojection errors: %.1f, %.1f (DACa, DACb)'%(mean_da_error,mean_db_error)
+        self._mean_da_error = np.mean(da_errors)
+        self._mean_db_error = np.mean(db_errors)
+
+        #print 'Mean reprojection errors: %.1f, %.1f (DACa, DACb)'%(mean_da_error,mean_db_error)
+
+    def __repr__(self):
+        if self._verbose:
+            da, db = self.dac[:,0]
+            # expected
+            pxe, pye = self.pixels[:,0]
+            d = np.c_[da,db]
+            # actual
+            pxa = self._d2px( d )[0]
+            pya = self._d2py( d )[0]
+
+            extra = ' (da:%s db:%s' % (da, db)
+            extra += ' pxe:%s pye:%s' % (pxe, pye)
+            extra += ' pxa:%s pya:%s)' % (pxa, pya)
+        else:
+            extra = ''
+
+        return "<Calibration reproj_errors DACa:%.1f DACb:%.1f%s>" % (
+                    self._mean_da_error, self._mean_db_error, extra)
 
     def __eq__(self, other):
         return np.allclose(self.dac,other.dac) and np.allclose(self.pixels,other.pixels)

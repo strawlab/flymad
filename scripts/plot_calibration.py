@@ -8,7 +8,9 @@ import rospy
 from flymad.laser_camera_calibration import load_calibration
 
 def main(fname):
-    cal = load_calibration(fname)
+    cal = load_calibration(fname, verbose=True)
+
+    print "loaded calibration\n\t%s" % cal
 
     plt.figure()
     plt.plot( cal.pixels[0,:], cal.pixels[1,:], 'b.-' )
