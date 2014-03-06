@@ -85,7 +85,6 @@ def prepare_data(arena, path, smoothstr, smooth):
             for obj_id, group in df.groupby('tobj_id'):
                 if np.isnan(obj_id):
                     continue
-
                 dts.append( calc_dtheta(group) )
 
             #join the dthetas vertically (axis=0) and insert as a column into
@@ -101,11 +100,12 @@ def prepare_data(arena, path, smoothstr, smooth):
                 t1 = datetime.timedelta(seconds=s1)
 
                 mean_dtheta = df[t00+t0:t00+t1]["dtheta"].mean()
+                mean_v = df[t00+t0:t00+t1]["v"].mean()
 
                 try:
-                    data[gt][c].append(mean_dtheta)
+                    data[gt][c].append( (mean_dtheta, mean_v) )
                 except KeyError:
-                    data[gt][c] = [mean_dtheta]
+                    data[gt][c] = [(mean_dtheta, mean_v)]
 
     return data
 
@@ -117,30 +117,40 @@ def plot_data(arena, path, smoothstr, data):
 
     pprint.pprint(data)
 
-    fig = plt.figure('dtheta %s' % (smoothstr), figsize=(16,10))
-    ax = fig.add_subplot(1,1,1)
+    figt = plt.figure('dtheta %s' % (smoothstr), figsize=(16,10))
+    axt = figt.add_subplot(1,1,1)
+    figv = plt.figure('v %s' % (smoothstr), figsize=(16,10))
+    axv = figv.add_subplot(1,1,1)
+
 
     for gt in data:
         xdata = []
-        ydata = []
+        ytdata = []
+        yvdata = []
         for xlabel in sorted(data[gt]):
             xloc = int(xlabel[0])
-            for mean_dtheta in data[gt][xlabel]:
+            for mean_dtheta,mean_v in data[gt][xlabel]:
                 xdata.append(xloc)
-                ydata.append(mean_dtheta)
+                ytdata.append(mean_dtheta)
+                yvdata.append(mean_v)
 
-        print gt,xdata,ydata
+#        print gt,xdata,ydata
 
-        ax.plot(xdata,ydata,'o',color=COLORS[gt],markersize=5,label=gt)
+        axt.plot(xdata,ytdata,'o',color=COLORS[gt],markersize=5,label=gt)
+        axv.plot(xdata,yvdata,'o',color=COLORS[gt],markersize=5,label=gt)
 
-    ax.legend()
-    ax.set_xlim(0,9)
+    for ax in (axt,axv):
+        ax.legend()
+        ax.set_xlim(0,9)
 
-    ax.set_xticks([int(s[0]) for s in sorted(data["NINE"])])
-    ax.set_xticklabels([s[2:] for s in sorted(data["NINE"])])
+        ax.set_xticks([int(s[0]) for s in sorted(data["NINE"])])
+        ax.set_xticklabels([s[2:] for s in sorted(data["NINE"])])
 
     figpath = os.path.join(path,'dtheta_%s.png' % (smoothstr))
-    fig.savefig(figpath)
+    figt.savefig(figpath)
+    print "wrote", figpath
+    figpath = os.path.join(path,'v_%s.png' % (smoothstr))
+    figv.savefig(figpath)
     print "wrote", figpath
 
 
