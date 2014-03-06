@@ -437,9 +437,6 @@ def merge_bagfiles(bfs, geom_must_interect=True):
     return l_df, t_df, h_df, geom
 
 
-    cache_args = bagpath, arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
-    cache_fname = bagpath+'.madplot-cache'
-
 CACHE_VERSION = 2
 
 def _load_bagfile_cache(cache_args, cache_fname):
