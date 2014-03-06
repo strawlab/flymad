@@ -429,9 +429,11 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, extra_topics=None, tzname=None):
+
     cache_args = bagpath, arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
     cache_fname = bagpath+'.madplot-cache'
+
+def _load_bagfile_cache(cache_args, cache_fname):
     if os.path.exists(cache_fname):
         print 'cache file exists...'
         cache_dict = pickle.load( open(cache_fname,'rb'))
@@ -448,6 +450,17 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
             print 'version wrong'
         print '... but is not valid'
 
+    return None
+
+def _save_bagfile_cache(results, cache_args, cache_fname):
+    cache_dict = {}
+    cache_dict['version']=1
+    cache_dict['args']=cache_args
+    cache_dict['results']=results
+    pickle.dump(cache_dict, open(cache_fname,'wb'), -1)
+    print 'saved cache',cache_fname
+
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, extra_topics=None, tzname=None):
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -458,7 +471,15 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     def get_extra_key(topic, attr):
         return "e%s_%s" % (topic.replace('/','_'),attr)
 
+    #because the arena is updated between calls it is an argument to the function that
+    #changes, thus must be modified before checking cache_args
     arena.update_from_calibration(bagpath)
+
+    cache_args = bagpath, arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
+    cache_fname = bagpath+'.madplot-cache'
+    results = _load_bagfile_cache(cache_args, cache_fname)
+    if results is not None:
+        return results
 
     if extra_topics is None:
         extra_topics = {}
@@ -701,12 +722,8 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     results = geom, {"targeted":l_df, "tracked":t_df, "ttm":h_df, "extra":e_df}
 
-    cache_dict = {}
-    cache_dict['version']=1
-    cache_dict['args']=cache_args
-    cache_dict['results']=results
-    pickle.dump(cache_dict, open(cache_fname,'wb'), -1)
-    print 'saved cache',cache_fname
+    _save_bagfile_cache(results, cache_args, cache_fname)
+
     return results
 
 def load_bagfile_single_dataframe(bagpath, arena, ffill, warn=False, **kwargs):
