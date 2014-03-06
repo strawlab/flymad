@@ -25,8 +25,10 @@ import motmot.FlyMovieFormat.FlyMovieFormat
 import benu.benu
 import benu.utils
 
-import roslib; roslib.load_manifest('rosbag')
+import roslib; roslib.load_manifest('flymad')
 import rosbag
+
+import flymad.laser_camera_calibration
 
 assert benu.__version__ >= "0.1.0"
 
@@ -84,7 +86,7 @@ class Arena:
         "mm":1000.0,
     }
 
-    def __init__(self, convert, jsonconf=dict()):
+    def __init__(self, convert, jsonconf=dict(), calibration=None):
         x = jsonconf.get('cx',360)
         y = jsonconf.get('cy',255)
         r = jsonconf.get('cr',200)
@@ -96,12 +98,19 @@ class Arena:
         self._convert = convert
         self._convert_mult = self.CONVERT_OPTIONS[convert]
         self._rw = float(jsonconf.get('rw',0.045))   #radius in m
+
+        #sx and sy are not perfect - see
+        #update_from_calibration
         self._sx = float(jsonconf.get('sx',0.045/208)) #scale factor px->m
         self._sy = float(jsonconf.get('sy',0.045/219)) #scale factor px->m
 
         #cache the simgear object for quick tests if the fly is in the area
         (sgcx,sgcy),sgr = self.circ
         self._sg_circ = sg.Point(sgcx,sgcy).buffer(sgr)
+
+        self._calibration = None
+        if calibration is not None:
+            self.update_from_calibration(calibration)
 
     def __eq__(self,other):
         if self._x != other._x:
@@ -127,6 +136,53 @@ class Arena:
             return False
 
         return True
+
+    def __repr__(self):
+        return "<Arena cx:%.1f cy:%.1f r:%.1f sx:%f sy:%f>" % (
+                    self._x,self._y,self._r,self._sx,self._sy)
+
+    def update_from_calibration(self, calibration):
+        """
+        calibration can be a Calibration object or a path to a calibration
+        source (yaml, bag file, etc)
+        """
+
+        if not isinstance(calibration, flymad.laser_camera_calibration.Calibration):
+            try:
+                calibration = flymad.laser_camera_calibration.load_calibration(calibration)
+            except flymad.laser_camera_calibration.NoCalibration, e:
+                #likely old data from initial submission, assume defaults were
+                #correct
+                return
+
+        if self._calibration is None:
+            print "updating arena from calibration source"
+        else:
+            if calibration == self._calibration:
+                #calibrations are identical, nothing to do
+                return
+            else:
+                #arena is typically a global object in analysis (for plotting, etc),
+                #so mixing multiple different calibratied arenas in one analysis
+                #is not yet supported
+                print "warning: multiple different calibrations assigned to arena"
+                return
+
+        bounds,xlim,ylim = calibration.get_arena_measurements()
+
+        self._x, self._y, self._r = bounds
+        self._xlim = xlim
+        self._ylim = ylim
+
+        #this could be more correctly implemented by detecting the major
+        #axis of the ellipse (the circular arena viewed obliquely by the 
+        #wide camera) and calculating appropriate scale factors....
+        #but now we assume they are so close it doesn't matter (as often they
+        #are within a few pixels with the current widefield camera mounting)
+        self._sx = self._rw / ((self._xlim[1] - self._xlim[0]) / 2.0)
+        self._sy = self._rw / ((self._ylim[1] - self._ylim[0]) / 2.0)
+
+        self._calibration = calibration
 
     @property
     def unit(self):
@@ -380,30 +436,42 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
     return l_df, t_df, h_df, geom
 
-def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, tzname=None):
-    cache_args = os.path.basename(bagpath), arena, filter_short, filter_short_pct, smooth, tzname
-    cache_fname = bagpath+'.madplot-cache'
+
+CACHE_VERSION = 2
+
+def _load_bagfile_cache(cache_args, cache_fname):
     if os.path.exists(cache_fname):
-        print 'cache file exists...'
+        print 'loading cache', cache_fname
         cache_buf = open(cache_fname,'rb')
         try:
             cache_dict = pickle.load( cache_buf )
         except Exception as err:
-            print 'pickle load failed: %s'%(err,)
+            print 'loading cache failed\n\t%s' % (err,)
         else:
-            if cache_dict['version']==1:
+            if cache_dict['version']==CACHE_VERSION:
                 if cache_dict['args']==cache_args:
                     results = cache_dict['results']
-                    print 'loaded cache',cache_fname
+                    print '\tloaded cache succeeded'
                     return results
                 else:
-                    print 'args different'
-                    print 'cache:',cache_dict['args']
-                    print 'this call:',cache_args
+                    print 'loading cache failed'
+                    print '\targs different'
+                    print '\tcache:\n\t\t',cache_dict['args']
+                    print '\tthis call:\n\t\t',cache_args
             else:
-                print 'version wrong'
-        print '... but is not valid'
+                print 'loading cache failed\n\tcached version %s != %s' % (cache_dict['version'], CACHE_VERSION)
 
+    return None
+
+def _save_bagfile_cache(results, cache_args, cache_fname):
+    cache_dict = {}
+    cache_dict['version']=CACHE_VERSION
+    cache_dict['args']=cache_args
+    cache_dict['results']=results
+    pickle.dump(cache_dict, open(cache_fname,'wb'), -1)
+    print 'saved cache',cache_fname
+
+def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=False, extra_topics=None, tzname=None):
     def in_area(row, poly):
         if poly:
             in_area = poly.contains( sg.Point(row['x'], row['y']) )
@@ -411,8 +479,32 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
             in_area = False
         return pd.Series({"in_area":in_area})
 
+    def get_extra_key(topic, attr):
+        return "e%s_%s" % (topic.replace('/','_'),attr)
+
+    #because the arena is updated between calls it is an argument to the function that
+    #changes, thus must be modified before checking cache_args
+    arena.update_from_calibration(bagpath)
+
+    cache_args = os.path.basename(bagpath), arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
+    cache_fname = bagpath+'.madplot-cache'
+    results = _load_bagfile_cache(cache_args, cache_fname)
+    if results is not None:
+        return results
+
+    if extra_topics is None:
+        extra_topics = {}
+
     print "loading", bagpath
     bag = rosbag.Bag(bagpath)
+    if tzname is None:
+        if int(os.environ.get('MADPLOT_FORCE_USER_TZNAME','0'))==1:
+            raise ValueError('tzname is not specified')
+        else:
+            tzname = 'CET'
+
+    tz = pytz.timezone( tzname )
+
     if tzname is None:
         if int(os.environ.get('MADPLOT_FORCE_USER_TZNAME','0'))==1:
             raise ValueError('tzname is not specified')
@@ -432,19 +524,29 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                              "laser_power","mode")}
 
     t_index = []
-    t_data = {k:[] for k in ("tobj_id","x_px","y_px","vx_px","vy_px","v_px",'t_framenumber','t_ts')}
+    t_data = {k:[] for k in ("tobj_id","x_px","y_px","vx_px","vy_px","v_px",'t_framenumber','t_ts','theta')}
 
     h_index = []
     h_data = {k:[] for k in ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type", "h_framenumber", "h_processing_time")}
     h_data_names = ("head_x", "head_y", "body_x", "body_y", "target_x", "target_y", "target_type")
 
-    r_data = {k:[] for k in ("r_framenumber", "theta")}
+    r_index = []
+    r_data = {k:[] for k in ("r_framenumber", "r_theta")}
 
-    for topic,msg,rostime in bag.read_messages(topics=["/targeter/targeted",
-                                                       "/flymad/tracked",
-                                                       "/draw_geom/poly",
-                                                       "/flymad/laser_head_delta",
-                                                       "/flymad/raw_2d_positions"]):
+    e_index = []
+    e_data = {}
+    for et in extra_topics:
+        for attr in extra_topics[et]:
+            e_data[get_extra_key(et,attr)] = []
+
+    topics = ["/targeter/targeted",
+              "/flymad/tracked",
+              "/draw_geom/poly",
+              "/flymad/laser_head_delta",
+              "/flymad/raw_2d_positions"]
+    topics.extend( extra_topics.keys() )
+
+    for topic,msg,rostime in bag.read_messages(topics=topics):
         if topic == "/targeter/targeted":
             ts = msg.header.stamp.to_sec()
             naive_datetime_timestamp = datetime.datetime.fromtimestamp(ts)
@@ -475,6 +577,10 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
                 #these will be replaced later with smoothed versions
                 t_data['vx_px'].append(msg.state_vec[2])
                 t_data['vy_px'].append(msg.state_vec[3])
+                #theta message was added later, in old bag files we reconstruct
+                #it from the tracked object message iff there was only one
+                #tracked object
+                t_data['theta'].append(getattr(msg,'theta_passthrough',np.nan))
         elif topic == "/draw_geom/poly":
             if geom_msg is not None:
                 print "WARNING: DUPLICATE GEOM MSG", msg, "vs", geom_msg
@@ -490,8 +596,19 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
             h_data["h_processing_time"].append( msg.processing_time )
         elif topic == "/flymad/raw_2d_positions":
             if len(msg.points) == 1:
+                ts = msg.header.stamp.to_sec()
+                naive_datetime_timestamp = datetime.datetime.fromtimestamp(ts)
+                aware_ts = datetime.datetime.fromtimestamp(ts, tz)
+                r_index.append( aware_ts )
                 r_data["r_framenumber"].append(msg.framenumber)
-                r_data["theta"].append(msg.points[0].theta)
+                r_data["r_theta"].append(msg.points[0].theta)
+        elif topic in extra_topics:
+            ts = rostime.to_sec()
+            naive_datetime_timestamp = datetime.datetime.fromtimestamp(ts)
+            aware_ts = datetime.datetime.fromtimestamp(ts, tz)
+            e_index.append( aware_ts )
+            for attr in extra_topics[topic]:
+                e_data[get_extra_key(topic, attr)].append(getattr(msg,attr))
 
     if geom_msg is not None:
         points_x = [pt.x for pt in geom_msg.points]
@@ -525,12 +642,36 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     l_df = pd.DataFrame(l_data, index=l_index)
     t_df = pd.DataFrame(t_data, index=t_index)
     h_df = pd.DataFrame(h_data, index=h_index)
-
-    r_df = pd.DataFrame(r_data)
-    if len(r_df) == len(t_df):
-        t_df['theta'] = r_df['theta'].values
+    if e_index:
+        e_df = pd.DataFrame(e_data, index=e_index)
     else:
-        t_df['theta'] = np.nan
+        e_df = None
+
+    #check we didn't use an old version of the bag format with no 
+    #theta in the heading element
+    if np.all(t_df['theta'].isnull().values):
+        r_df = pd.DataFrame(r_data, index=r_index)
+        if len(r_df) == len(t_df):
+            #there was only one object_id, so all theta values correspond to that
+            #object
+            t_df['theta'] = r_df['r_theta'].values
+            print "\tload: copying all raw2d theta to tracked theta as only 1 obj id"
+        else:
+            print "\tload: copying raw2d theta to tracked theta by framenumber (SLOW!)"
+            #match up the first object theta value based on framenumber using 
+            #depressingly slow and inefficient iteration
+            n_idx = []
+            n_theta = []
+
+            for idx,s in r_df.iterrows():
+                fn = s['r_framenumber']
+                row = t_df[t_df['t_framenumber'] == fn]['theta']
+                if len(row) == 1:
+                    n_idx.append(row.index[0])
+                    n_theta.append(s['r_theta'])
+
+            n_s = pd.Series(n_theta, index=n_idx)
+            t_df['theta'] = n_s
 
     #optionally find short trials here, print the length of kept trials
     if (filter_short_pct > 0) or (filter_short > 0):
@@ -597,17 +738,17 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     t_df['experiment'] = 0
 
-    results = l_df, t_df, h_df, geom
-    cache_dict = {}
-    cache_dict['version']=1
-    cache_dict['args']=cache_args
-    cache_dict['results']=results
-    pickle.dump(cache_dict, open(cache_fname,'wb'), -1)
-    print 'saved cache',cache_fname
+    results = geom, {"targeted":l_df, "tracked":t_df, "ttm":h_df, "extra":e_df}
+
+    _save_bagfile_cache(results, cache_args, cache_fname)
+
     return results
 
 def load_bagfile_single_dataframe(bagpath, arena, ffill, warn=False, **kwargs):
-    l_df, t_df, h_df, geom = load_bagfile(bagpath, arena, **kwargs)
+    geom, dfs = load_bagfile(bagpath, arena, **kwargs)
+    l_df = dfs["targeted"]
+    t_df = dfs["tracked"]
+    h_df = dfs["ttm"]
 
     #merge the dataframes
     if warn:
@@ -616,7 +757,7 @@ def load_bagfile_single_dataframe(bagpath, arena, ffill, warn=False, **kwargs):
         if size_similarity < 0.9:
             print "WARNING: ONLY %.1f%% TARGETED MESSAGES FOR ALL TRACKED MESSAGES" % (size_similarity*100)
 
-    pool_df = pd.concat([t_df, l_df, h_df], axis=1)
+    pool_df = pd.concat([_df for _df in dfs.itervalues() if _df is not None], axis=1)
     if ffill is True:
         return pool_df.fillna(method='ffill')
     elif isinstance(ffill, list) or isinstance(ffill, tuple):
@@ -1293,6 +1434,10 @@ class MovieMaker:
         moviefname = os.path.join(moviedir,"%s.mp4" % self.basename)
         return moviefname
 
+    def get_target_movie_name(self,moviedir):
+        moviefname = os.path.join(moviedir,"%s.mp4" % self.basename)
+        return moviefname
+
     def cleanup(self):
         shutil.rmtree(self.tmpdir)
 
@@ -1311,4 +1456,12 @@ if __name__ == "__main__":
 
         print "400 px/s in +ve x", a.scale_vx(400), unit+'/s'
         print "400 px/s in +ve y", a.scale_vy(400), unit+'/s'
+
+    a.update_from_calibration('/mnt/strawscience/data/FlyMAD/revision_dorothea/NinaE/proof_of_concept/NIN_1_1_2014-03-04-13-48-32.bag')
+    with open('/tmp/arena.pkl','wb') as f:
+        pickle.dump(a, f, -1)
+    with open('/tmp/arena.pkl','rb') as f:
+        c = pickle.load(f)
+
+    print a == c
 

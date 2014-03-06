@@ -14,7 +14,10 @@ smooth = True
 smoothstr = {True:'smooth',False:'nosmooth'}[smooth]
 
 arena = madplot.Arena('mm')
-l_df, t_df, h_df, geom = madplot.load_bagfile(BAG, arena, smooth=smooth)
+geom, dfs = madplot.load_bagfile(BAG, arena, smooth=smooth)
+l_df = dfs["targeted"]
+t_df = dfs["tracked"]
+h_df = dfs["ttm"]
 
 fig = plt.figure('traj %s' % smoothstr)
 fig.suptitle('trajectory %s' % smoothstr)

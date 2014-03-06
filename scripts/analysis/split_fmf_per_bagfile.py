@@ -46,7 +46,9 @@ if __name__ == "__main__":
 
     cuts = []
     for bag in sorted(bags):
-        l_df, t_df, h_df, geom = madplot.load_bagfile(bag, arena)
+        geom, dfs = madplot.load_bagfile(bag, arena)
+        h_df = dfs["ttm"]
+
         fn = h_df['h_framenumber']
         start = fn.ix[0]
         stop = fn.ix[-1]

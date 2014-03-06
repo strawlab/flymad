@@ -21,7 +21,10 @@ def load_bagfile_get_laseron(arena, score, smooth):
     BWD = 'a'
     AS_MAP = {FWD:1,BWD:-1}
 
-    l_df, t_df, h_df, geom = madplot.load_bagfile(score.bag, arena, smooth=smooth)
+    geom, dfs = madplot.load_bagfile(score.bag, arena, smooth=smooth)
+    l_df = dfs["targeted"]
+    t_df = dfs["tracked"]
+    h_df = dfs["ttm"]
 
     scored_ix = [t_df.index[0]]
     scored_v = [AS_MAP[FWD]]

@@ -16,7 +16,8 @@ def get_df(smooth):
 
     smoothstr = {True:'smooth',False:'nosmooth'}[smooth]
 
-    l_df, t_df, h_df, geom = madplot.load_bagfile(BAG, arena, smooth=smooth)
+    geom, dfs = madplot.load_bagfile(BAG, arena, smooth=smooth)
+    t_df = dfs["tracked"]
 
     fig = plt.figure('traj %s' % smoothstr)
     fig.suptitle('trajectory %s' % smoothstr)
