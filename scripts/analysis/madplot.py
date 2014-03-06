@@ -440,28 +440,35 @@ def merge_bagfiles(bfs, geom_must_interect=True):
     cache_args = bagpath, arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
     cache_fname = bagpath+'.madplot-cache'
 
+CACHE_VERSION = 2
+
 def _load_bagfile_cache(cache_args, cache_fname):
     if os.path.exists(cache_fname):
-        print 'cache file exists...'
-        cache_dict = pickle.load( open(cache_fname,'rb'))
-        if cache_dict['version']==1:
-            if cache_dict['args']==cache_args:
-                results = cache_dict['results']
-                print 'loaded cache',cache_fname
-                return results
-            else:
-                print 'args different'
-                print 'cache:',cache_dict['args']
-                print 'this call:',cache_args
+        print 'loading cache', cache_fname
+        cache_buf = open(cache_fname,'rb')
+        try:
+            cache_dict = pickle.load( cache_buf )
+        except Exception as err:
+            print 'loading cache failed\n\t%s' % (err,)
         else:
-            print 'version wrong'
-        print '... but is not valid'
+            if cache_dict['version']==CACHE_VERSION:
+                if cache_dict['args']==cache_args:
+                    results = cache_dict['results']
+                    print '\tloaded cache succeeded'
+                    return results
+                else:
+                    print 'loading cache failed'
+                    print '\targs different'
+                    print '\tcache:\n\t\t',cache_dict['args']
+                    print '\tthis call:\n\t\t',cache_args
+            else:
+                print 'loading cache failed\n\tcached version %s != %s' % (cache_dict['version'], CACHE_VERSION)
 
     return None
 
 def _save_bagfile_cache(results, cache_args, cache_fname):
     cache_dict = {}
-    cache_dict['version']=1
+    cache_dict['version']=CACHE_VERSION
     cache_dict['args']=cache_args
     cache_dict['results']=results
     pickle.dump(cache_dict, open(cache_fname,'wb'), -1)
@@ -482,7 +489,7 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
     #changes, thus must be modified before checking cache_args
     arena.update_from_calibration(bagpath)
 
-    cache_args = bagpath, arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
+    cache_args = os.path.basename(bagpath), arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
     cache_fname = bagpath+'.madplot-cache'
     results = _load_bagfile_cache(cache_args, cache_fname)
     if results is not None:
