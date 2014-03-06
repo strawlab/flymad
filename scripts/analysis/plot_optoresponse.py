@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import re
 import os.path
 import collections
@@ -68,7 +69,7 @@ def prepare_data(arena, path, smoothstr, smooth):
 
     data = {gt:dict() for gt in GENOTYPES}
     for gt in GENOTYPES:
-        pattern = path + GENOTYPES[gt]
+        pattern = os.path.join(path, GENOTYPES[gt])
         bags = glob.glob(pattern)
         for bag in bags:
 
@@ -163,8 +164,9 @@ if __name__ == "__main__":
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
 
     args = parser.parse_args()
-    path = args.path[0]
+    path = os.path.abspath(args.path[0])
 
+    print 'bagfiles in',path
     assert os.path.isdir(path)
 
     smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
