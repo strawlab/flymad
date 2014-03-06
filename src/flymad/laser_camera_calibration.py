@@ -131,15 +131,8 @@ class Calibration:
         except RuntimeError:
             self.p2db = None
 
-        # this is the same function underlying griddata
-        if 0:
-            self._d2px = CloughTocher2DInterpolator(dac.T, pixels[0,:])
-            self._d2py = CloughTocher2DInterpolator(dac.T, pixels[1,:])
-        else:
-            self._d2px = LinearNDInterpolator(dac.T, pixels[0,:])
-            self._d2py = LinearNDInterpolator(dac.T, pixels[1,:])
-        self.d2px = self._d2px
-        self.d2py = self._d2py
+        self.d2px = LinearNDInterpolator(dac.T, pixels[0,:])
+        self.d2py = LinearNDInterpolator(dac.T, pixels[1,:])
 
         # calculate reprojection errors
         n_samples = pixels.shape[1]
@@ -163,6 +156,17 @@ class Calibration:
 
         #print 'Mean reprojection errors: %.1f, %.1f (DACa, DACb)'%(mean_da_error,mean_db_error)
 
+    def __getstate__(self):
+        d = self.__dict__.copy()
+        d.pop('d2px')
+        d.pop('d2py')
+        return d
+
+    def __setstate__(self, d):
+        self.__dict__.update(d)
+        self.d2px = LinearNDInterpolator(self.dac.T, self.pixels[0,:])
+        self.d2py = LinearNDInterpolator(self.dac.T, self.pixels[1,:])
+
     def __repr__(self):
         if self._verbose:
             da, db = self.dac[:,0]
@@ -170,8 +174,8 @@ class Calibration:
             pxe, pye = self.pixels[:,0]
             d = np.c_[da,db]
             # actual
-            pxa = self._d2px( d )[0]
-            pya = self._d2py( d )[0]
+            pxa = self.d2px( d )[0]
+            pya = self.d2py( d )[0]
 
             extra = ' (da:%s db:%s' % (da, db)
             extra += ' pxe:%s pye:%s' % (pxe, pye)

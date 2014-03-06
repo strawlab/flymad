@@ -1435,3 +1435,11 @@ if __name__ == "__main__":
         print "400 px/s in +ve x", a.scale_vx(400), unit+'/s'
         print "400 px/s in +ve y", a.scale_vy(400), unit+'/s'
 
+    a.update_from_calibration('/mnt/strawscience/data/FlyMAD/revision_dorothea/NinaE/proof_of_concept/NIN_1_1_2014-03-04-13-48-32.bag')
+    with open('/tmp/arena.pkl','wb') as f:
+        pickle.dump(a, f, -1)
+    with open('/tmp/arena.pkl','rb') as f:
+        c = pickle.load(f)
+
+    print a == c
+
