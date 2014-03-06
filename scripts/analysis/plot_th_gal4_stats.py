@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import pandas as pd
 import scipy.stats
+import datetime
 import numpy as np
 import strawlab_mpl.defaults as smd
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
@@ -68,7 +69,7 @@ if __name__=='__main__':
               'controls thorax':3,
               }
 
-    buf = '<html><body>'
+    buf = '<html><body>Page generated %s'%( datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') )
     for pooled_controls in [True,False]:
         if pooled_controls:
             pooled_str = 'pooled'

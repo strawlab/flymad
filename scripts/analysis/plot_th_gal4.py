@@ -46,7 +46,10 @@ def load_bagfile_get_laseron(arena, score, smooth):
     NO_ABDOMENING = 0
     ABDOMENING = 1
 
-    l_df, t_df, h_df, geom = madplot.load_bagfile(score.bag, arena, smooth=smooth)
+    geom, bag_results = madplot.load_bagfile(score.bag, arena, smooth=smooth)
+    l_df = bag_results['targeted']
+    t_df = bag_results['tracked']
+    h_df = bag_results['ttm']
 
     proboscis_scored_ix = [t_df.index[0]]
     proboscis_scored_v = [NO_PROBOSCIS]
