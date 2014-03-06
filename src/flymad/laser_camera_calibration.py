@@ -158,6 +158,8 @@ class Calibration:
 
     def __getstate__(self):
         d = self.__dict__.copy()
+        #LinearNDInterpolator cannot be pickled in versions of scipy <= 0.11
+        #https://github.com/scipy/scipy/pull/172
         d.pop('d2px')
         d.pop('d2py')
         return d
