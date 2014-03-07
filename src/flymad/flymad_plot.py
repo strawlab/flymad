@@ -40,6 +40,7 @@ def setup_defaults():
     rcParams['legend.frameon'] = False
     rcParams['legend.numpoints'] = 1
     rcParams['legend.scatterpoints'] = 1
+    matplotlib.rc('font', size=8)
 
 def get_plotpath(path, name):
     path_out = os.path.join(os.path.dirname(path),'plots')
