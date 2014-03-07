@@ -29,7 +29,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 np.random.seed(3) # prevent plots from changing
-MAX_LATENCY=10.0 # did not score longer than this...
+MAX_LATENCY=20.0 # did not score longer than this...
 EXTRA=2.0
 
 class DataFrameHolder(object):
@@ -116,7 +116,7 @@ if __name__=='__main__':
             spine_placer(ax, location='left,bottom' )
             ax.spines['bottom'].set_color('none')
             ax.spines['bottom'].set_position(('outward',5))
-            ax.set_yticks([0,10])
+            ax.set_yticks([0,20])
             ax.set_xticks(xticks)
             ax.set_xticklabels(tick_labels, rotation='vertical')
             ax.set_ylabel('latency (sec)')
@@ -151,7 +151,7 @@ if __name__=='__main__':
             ax.spines['bottom'].set_position(('outward',5))
             ax.spines['left'].set_bounds(0,MAX_LATENCY)
             ax.set_yticks([0,MAX_LATENCY,MAX_LATENCY+EXTRA])
-            ax.set_yticklabels(['0','10','']); assert MAX_LATENCY==10
+            ax.set_yticklabels(['0','20','']); assert MAX_LATENCY==20
             ax.set_xticks(xticks)
             ax.set_xticklabels(tick_labels, rotation='vertical')
             ax.set_ylabel('latency (sec)')
