@@ -264,28 +264,25 @@ def prepare_data(arena, path, smoothstr, smooth):
 
 
             good = ~np.isnan(df['time_since_start'])
-            '''
-            ax.plot( df['time_since_start'][good],
-                      df['theta_unwrapped_downsampled'][good], 'k-', lw=2)
-            ax.plot( df['time_since_start'][good],
-                      df['theta_unwrapped'][good], 'r-', lw=0.5)
-            ax.plot( df['time_since_start'][good],
-                      df['theta_unwrapped_lowpass'][good], 'b-', lw=1)
-                      '''
             ax.plot( df['time_since_start'][good],
                      df['angular_velocity'][good], 'k-', lw=0.5)
 
             if 'timeseries' not in data[gt]:
                 data[gt]['timeseries'] = []
                 data[gt]['save_times'] = save_times
-                data[gt]['laser_power'] = (df['time_since_start'][good],
-                                           df['laser_power'][good],
-                                           )
                 good_stim = ~np.isnan(df['e_rotator_velocity_data'].values)
                 good_both = good & good_stim
                 data[gt]['stimulus_velocity'] = (
                     df['time_since_start'].values[good_both],
                     df['e_rotator_velocity_data'].values[good_both])
+            if gt=='CSSHITS' and 'laser_power' not in data[gt]:
+                interp = scipy.interpolate.interp1d( df['time_since_start'][good],
+                                                     df['laser_power'][good],
+                                                     bounds_error=False,
+                                                     fill_value=np.nan,
+                                                     )
+                save_laser = interp(save_times)
+                data[gt]['laser_power'] = save_laser
 
             interp = scipy.interpolate.interp1d( df['time_since_start'][good],
                                                  df['angular_velocity'][good],
@@ -349,6 +346,7 @@ def plot_data(arena, path, smoothstr, data):
     fig_ts_all = plt.figure()
     #fig_ts_combined = plt.figure()
     fig_ts_combined = plt.figure(figsize=(3.5, 2.0))
+    fig_zzyzz = plt.figure(figsize=(3.5, 2.0))
 
     print data.keys()
 
@@ -358,6 +356,8 @@ def plot_data(arena, path, smoothstr, data):
     ax = None
     ax_combined = fig_ts_combined.add_subplot(111)
     ax_combined.axhline(0,color='black')
+    ax_zzyzz = fig_zzyzz.add_subplot(111)
+    ax_zzyzz.axhline(0,color='black')
 
     stim_vel = data['NINE']['stimulus_velocity'][1]
     if 1:
@@ -369,6 +369,9 @@ def plot_data(arena, path, smoothstr, data):
     ax_combined.plot( data['NINE']['stimulus_velocity'][0],
                       stim_vel*R2D,'k',
                       lw=0.5, label='stimulus')
+    ax_zzyzz.plot( data['NINE']['stimulus_velocity'][0],
+                  stim_vel*R2D,'k',
+                  lw=0.5, label='stimulus')
 
     for gti,gt in enumerate(order):
         ax = fig_ts_all.add_subplot( n_subplots, 1, gti+1, sharey=ax)
@@ -396,11 +399,45 @@ def plot_data(arena, path, smoothstr, data):
                                   facecolor=COLORS[gt],
                                   alpha=ALPHAS[gt],
                                   )
+        this_data_zzyzz = {'xaxis':times,
+                          'value':mean_timeseries*R2D,
+                          'std':error_timeseries*R2D,
+                          'label':gt,
+                          }
+        if gt=='NINE':
+            exp = this_data_zzyzz
+        elif gt=='pooled controls':
+            ctrl = this_data_zzyzz
+        else:
+            1/0
+
+#    assert np.allclose( data['pooled controls']['laser_power'], ctrl['xaxis'])
+    laser_power_cond = data['pooled controls']['laser_power']>1
+    laser_power_times = data['pooled controls']['save_times']
+
+    from flymad.flymad_plot import plot_timeseries_with_activation
+    plot_timeseries_with_activation( ax_zzyzz, exp, ctrl, targetbetween=laser_power_cond)
+    ax_zzyzz.set_xticks([0,180,360])
+    ax_zzyzz.set_yticks([-200,0,200])
+    ax_zzyzz.set_ylim(-200,200)
+    ax_zzyzz.spines['left'].set_bounds(-200,200.0)
+    ax_zzyzz.spines['bottom'].set_bounds(0,360.0)
+    ax_zzyzz.spines['bottom'].set_linewidth(0.3)
+    ax_zzyzz.spines['left'].set_linewidth(0.3)
+    ax_zzyzz.set_xlabel('Time (s)')
+    ax_zzyzz.set_ylabel('Angular velocity (deg/s)')
+    fig_zzyzz.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
+    fig_fname = 'fig_ts_zzyzz.png'
+    fig_zzyzz.savefig(fig_fname)
+    print 'saved',fig_fname
+    fig_fname = 'fig_ts_zzyzz.svg'
+    fig_zzyzz.savefig(fig_fname)
+    print 'saved',fig_fname
 
     trans = mtransforms.blended_transform_factory(ax_combined.transData,
                                                   ax_combined.transAxes)
-    ax_combined.fill_between(data['NINE']['laser_power'][0], 0, 1,
-                             where=data['NINE']['laser_power'][1]>1,
+    ax_combined.fill_between(laser_power_times, 0, 1,
+                             where=laser_power_cond,
                              edgecolor='none',
                              facecolor='#ffff00', alpha=38.0/255,
                              transform=trans)
