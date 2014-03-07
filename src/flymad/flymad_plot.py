@@ -64,6 +64,7 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
 
     if targetbetween is not None:
         ax.fill_between(ctrl['xaxis'], 0, 1, where=targetbetween,
+                        edgecolor='none',
                         facecolor='Yellow', alpha=0.15, transform=trans,
                         zorder=1)
 
