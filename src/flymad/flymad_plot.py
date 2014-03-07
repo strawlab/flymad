@@ -9,7 +9,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
 
+import math
 import numpy as np
+import scipy.signal
 
 BLACK       = '#292724'
 DARK_GRAY   = '#939598'
@@ -48,16 +50,20 @@ def get_plotpath(path, name):
     return fig_out
 
 def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None, downsample=1, sem=False):
+    def _ds(a):
+        if downsample == 1:
+            return a
+        else:
+            return scipy.signal.resample(a, (len(a)//downsample) + 1)
+
     #zorder = 1 = back
-    #downsample ::1 is a noop
-    ds = downsample
 
     #FIXME: make controls black, but the other black, not perfect black
 
     trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
 
     if targetbetween is not None:
-        ax.fill_between(ctrl['xaxis'][::ds], 0, 1, where=targetbetween[::ds],
+        ax.fill_between(ctrl['xaxis'], 0, 1, where=targetbetween,
                         facecolor='Yellow', alpha=0.15, transform=trans,
                         zorder=1)
 
@@ -72,42 +78,43 @@ def plot_timeseries_with_activation(ax, exp, ctrl, exp2=None, targetbetween=None
         exp_zorder = 2
 
     if sem:
-        spread = exp['std'][::ds] / np.sqrt(exp['n'][::ds])
+        spread = exp['std'] / np.sqrt(exp['n'])
     else:
-        spread = exp['std'][::ds]
+        spread = exp['std']
 
-    ax.fill_between(exp['xaxis'][::ds], exp['value'][::ds]+spread, exp['value'][::ds]-spread,
+    ax.fill_between(exp['xaxis'][::downsample], _ds(exp['value']+spread), _ds(exp['value']-spread),
                 alpha=0.1, color=RED,
                 zorder=exp_zorder)
-    ax.plot(exp['xaxis'][::ds], exp['value'][::ds],
+
+    ax.plot(exp['xaxis'][::downsample], _ds(exp['value']),
                 color=RED,label=exp.get('label'),lw=2,
                 zorder=exp_zorder+1)
 
     if sem:
-        spread = ctrl['std'][::ds] / np.sqrt(ctrl['n'][::ds])
+        spread = ctrl['std'] / np.sqrt(ctrl['n'])
     else:
-        spread = ctrl['std'][::ds]
+        spread = ctrl['std']
 
 
-    ax.fill_between(ctrl['xaxis'][::ds], ctrl['value'][::ds]+spread, ctrl['value'][::ds]-spread,
+    ax.fill_between(ctrl['xaxis'][::downsample], _ds(ctrl['value']+spread), _ds(ctrl['value']-spread),
                 alpha=0.1, color=BLACK,
                 zorder=ctrl_zorder)
-    ax.plot(ctrl['xaxis'][::ds], ctrl['value'][::ds],
+    ax.plot(ctrl['xaxis'][::downsample], _ds(ctrl['value']),
                 color=BLACK,label=ctrl.get('label'),lw=2,
                 zorder=ctrl_zorder+1)
 
     if exp2 is not None:
         if sem:
-            spread = exp2['std'][::ds] / np.sqrt(exp2['n'][::ds])
+            spread = exp2['std'] / np.sqrt(exp2['n'])
         else:
-            spread = exp2['std'][::ds]
+            spread = exp2['std']
 
         exp_zorder = exp_zorder + 2
 
-        ax.fill_between(exp2['xaxis'][::ds], exp2['value'][::ds]+spread, exp2['value'][::ds]-spread,
+        ax.fill_between(exp2['xaxis'][::downsample], _ds(exp2['value']+spread), _ds(exp2['value']-spread),
                     alpha=0.1, color=BLUE,
                     zorder=ctrl_zorder)
-        ax.plot(exp2['xaxis'][::ds], exp2['value'][::ds],
+        ax.plot(exp2['xaxis'][::downsample], _ds(exp2['value']),
                     color=BLUE,label=exp2.get('label'),lw=2,
                     zorder=ctrl_zorder+1)
 

@@ -439,7 +439,7 @@ def merge_bagfiles(bfs, geom_must_interect=True):
 
 CACHE_VERSION = 2
 
-def _load_bagfile_cache(cache_args, cache_fname):
+def load_bagfile_cache(cache_args, cache_fname):
     if os.path.exists(cache_fname):
         print 'loading cache', cache_fname
         cache_buf = open(cache_fname,'rb')
@@ -463,7 +463,7 @@ def _load_bagfile_cache(cache_args, cache_fname):
 
     return None
 
-def _save_bagfile_cache(results, cache_args, cache_fname):
+def save_bagfile_cache(results, cache_args, cache_fname):
     cache_dict = {}
     cache_dict['version']=CACHE_VERSION
     cache_dict['args']=cache_args
@@ -488,7 +488,7 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     cache_args = os.path.basename(bagpath), arena, filter_short, filter_short_pct, smooth, extra_topics, tzname
     cache_fname = bagpath+'.madplot-cache'
-    results = _load_bagfile_cache(cache_args, cache_fname)
+    results = load_bagfile_cache(cache_args, cache_fname)
     if results is not None:
         return results
 
@@ -740,7 +740,7 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     results = geom, {"targeted":l_df, "tracked":t_df, "ttm":h_df, "extra":e_df}
 
-    _save_bagfile_cache(results, cache_args, cache_fname)
+    save_bagfile_cache(results, cache_args, cache_fname)
 
     return results
 
