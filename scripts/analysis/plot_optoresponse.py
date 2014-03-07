@@ -9,14 +9,22 @@ import math
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import matplotlib
+import strawlab_mpl.defaults as smd
+from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
 import roslib; roslib.load_manifest('flymad')
 import rosbag
 
-import madplot
-import generate_mw_ttm_movies
-import flymad.trackingparams
+def setup_defaults():
+    rcParams = matplotlib.rcParams
+
+    rcParams['legend.numpoints'] = 1
+    rcParams['legend.fontsize'] = 'medium' #same as axis
+    rcParams['legend.frameon'] = False
+    rcParams['legend.numpoints'] = 1
+    rcParams['legend.scatterpoints'] = 1
+    matplotlib.rc('font', size=8)
 
 def wrap_dtheta_plus_minus(dtheta, around=np.pi):
     """
@@ -53,6 +61,9 @@ def calc_dtheta(df):
     return pd.Series(dtheta,index=dtheta_idx)
 
 def prepare_data(arena, path, smoothstr, smooth):
+    # keep here to allow use('Agg') to work
+    import matplotlib.pyplot as plt
+    import madplot
 
     GENOTYPES = {"NINE":"*.bag",
                  "CSSHITS":"ctrl/CSSHITS/*.bag",
@@ -118,6 +129,7 @@ def plot_data(arena, path, smoothstr, data):
 
     pprint.pprint(data)
 
+    import matplotlib.pyplot as plt
     figt = plt.figure('dtheta %s' % (smoothstr), figsize=(16,10))
     axt = figt.add_subplot(1,1,1)
     figv = plt.figure('v %s' % (smoothstr), figsize=(16,10))
@@ -164,6 +176,13 @@ if __name__ == "__main__":
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
 
     args = parser.parse_args()
+
+    if not args.show:
+        matplotlib.use('Agg')
+
+    smd.setup_defaults()
+    setup_defaults()
+
     path = os.path.abspath(args.path[0])
 
     print 'bagfiles in',path
@@ -171,11 +190,12 @@ if __name__ == "__main__":
 
     smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
 
+    import madplot # keep here to allow use('Agg') to work
     arena = madplot.Arena('mm')
 
     data = prepare_data(arena, path, smoothstr, args.smooth)
     plot_data(arena, path, smoothstr, data)
 
     if args.show:
+        import matplotlib.pyplot as plt
         plt.show()
-
