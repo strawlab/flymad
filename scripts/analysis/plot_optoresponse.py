@@ -1,20 +1,31 @@
 #!/usr/bin/env python
 import re
+import warnings
 import os.path
 import collections
 import glob
-import pprint
+import pprint, copy
 import datetime
 import math
+import cPickle as pickle
 
 import pandas as pd
 import numpy as np
 import matplotlib
+import matplotlib.transforms as mtransforms
 import strawlab_mpl.defaults as smd
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
 import roslib; roslib.load_manifest('flymad')
 import rosbag
+
+import scipy.signal
+import scipy.stats
+import scipy.interpolate
+
+R2D = 180/np.pi
+PLOT_DURATION = 360.0
+CACHE_FNAME = 'optodata.pkl'
 
 def setup_defaults():
     rcParams = matplotlib.rcParams
@@ -60,6 +71,141 @@ def calc_dtheta(df):
 
     return pd.Series(dtheta,index=dtheta_idx)
 
+def choose_orientations_primitive(theta):
+    """
+    Remove head/tail ambiguity.
+
+    Assumes theta is == orientation modulo pi, in other words,
+    that the orientation is ambiguous with respect to head/tail.
+    """
+    theta_prev = theta[0]
+    result = [theta_prev]
+    diffs = np.array([-3*np.pi,-2*np.pi,-np.pi,0,np.pi,2*np.pi,3*np.pi])
+    PI2 = 2*np.pi
+    for i, ambiguous_angle in enumerate( theta[1:] ):
+        possible_angles = diffs + ambiguous_angle
+        rotation_distance = abs( theta_prev - possible_angles)
+        diff_idx = np.argmin(rotation_distance)
+
+        # update for next
+        theta_prev = ambiguous_angle+diffs[diff_idx]
+        if theta_prev < 0:
+            theta_prev = theta_prev + PI2
+        elif theta_prev >= PI2:
+            theta_prev = theta_prev - PI2
+        result.append( theta_prev )
+    result = np.array(result)
+    assert len(result)==len(theta)
+    return result
+
+def supplement_times(df):
+    """create new column ('time_since_start') in DataFrame df"""
+    times = df['t_ts'].values
+    good_cond = ~np.isnan(times)
+    good_times = times[good_cond]
+    t0 = times[good_cond][0]
+    df['time_since_start'] = df['t_ts']-t0
+
+def supplement_angles(df,
+                      cutoff_hz=5.0,
+                      filter_order=8,
+                      method='downsampled',
+                      downsample_sec=1.0,
+                      ):
+    """create new column ('angular_velocity') in DataFrame df
+
+    if cutoff_hz==0, no lowpass filtering is done.
+
+    Assumes df['theta'] is == orientation modulo pi, in other words,
+    that the orientation is ambiguous with respect to head/tail.
+
+    Methods:
+         'raw' - central difference on raw theta values
+         'lowpassed' - central difference on lowpassed theta values
+         'downsampled' - central difference on downsampled theta values
+    """
+    stamps = df['t_ts'].values
+    bad_cond1 = np.isnan(stamps)
+    bad_cond2 = np.isnan(df['theta'].values)
+
+    bad_cond = bad_cond1 | bad_cond2
+
+    good_cond = ~bad_cond
+    goodstamps = stamps[good_cond]
+    dgoodstamps = goodstamps[1:]-goodstamps[:-1]
+    if 1:
+        # check assumptions about pandas
+        bad_cond2 = np.isnan(df['theta'].values)
+        assert bad_cond.ndim == bad_cond2.ndim
+        assert bad_cond.shape == bad_cond2.shape
+        assert np.allclose( bad_cond, bad_cond2 )
+
+        assert np.alltrue(dgoodstamps > 0)
+
+    # unwrap theta, dealing with nans
+    good_theta = df['theta'].values[good_cond]
+    good_theta_chosen = choose_orientations_primitive(good_theta)
+    good_theta_unwrapped = np.unwrap(good_theta_chosen)
+
+    dt = np.mean(dgoodstamps)
+
+    if cutoff_hz != 0:
+        sample_rate_hz = 1.0/dt
+        nyquist_rate_hz = sample_rate_hz*0.5
+
+        filt_b, filt_a = scipy.signal.butter(filter_order,
+                                             cutoff_hz/nyquist_rate_hz)
+        lowpassed = scipy.signal.filtfilt(filt_b, filt_a,
+                                          good_theta_unwrapped)
+
+    # calculate angular velocity using central difference
+    if method=='raw':
+        delta_theta = np.gradient(good_theta_unwrapped)
+        angular_velocity = delta_theta/dt
+    elif method=='lowpassed':
+        delta_theta = np.gradient(lowpassed)
+        angular_velocity = delta_theta/dt
+    elif method=='downsampled':
+        # downsample theta
+        n_samps = int(np.round(downsample_sec/dt))
+        downdt = n_samps*dt
+        downtime = goodstamps[::n_samps]
+        downtheta = lowpassed[::n_samps]
+        if 1:
+            # linear interpolation of downsampled theta
+            interp = scipy.interpolate.interp1d( downtime, downtheta,
+                                                 bounds_error=False,
+                                                 fill_value=np.nan,
+                                                 )
+            linear_theta_values = interp( goodstamps )
+            delta_theta = np.gradient(linear_theta_values)
+
+        downvel = np.gradient( downtheta )/downdt
+        interp = scipy.interpolate.interp1d( downtime, downvel,
+                                             bounds_error=False,
+                                             fill_value=np.nan,
+                                             )
+        angular_velocity = interp( goodstamps )
+
+    # now fill dataframe with computed values
+    tmp = np.nan*np.ones( (len(df,) ))
+    tmp[good_cond] = good_theta_chosen
+    df['theta_wrapped'] = tmp
+    tmp = np.nan*np.ones( (len(df,) ))
+    tmp[good_cond] = good_theta_unwrapped
+    df['theta_unwrapped'] = tmp
+    tmp = np.nan*np.ones( (len(df,) ))
+    tmp[good_cond] = lowpassed
+    df['theta_unwrapped_lowpass'] = tmp
+    if method=='downsampled':
+        tmp = np.nan*np.ones( (len(df,) ))
+        tmp[good_cond] = linear_theta_values
+        df['theta_unwrapped_downsampled'] = tmp
+    tmp = np.nan*np.ones( (len(df,) ))
+    tmp[good_cond] = angular_velocity
+    df['angular_velocity'] = tmp
+
+
 def prepare_data(arena, path, smoothstr, smooth):
     # keep here to allow use('Agg') to work
     import matplotlib.pyplot as plt
@@ -78,10 +224,18 @@ def prepare_data(arena, path, smoothstr, smooth):
     CHUNKS["6_loff-ve"] = (240,300)
     CHUNKS["7_loff+ve"] = (300,360)
 
-    data = {gt:dict() for gt in GENOTYPES}
-    for gt in GENOTYPES:
+    save_times = np.arange(0, PLOT_DURATION, 1.0 ) # every second
+
+    data = {gt:dict(chunk={}) for gt in GENOTYPES}
+    fig = plt.figure()
+    for gti,gt in enumerate(GENOTYPES):
+        #if gti>=1: break
         pattern = os.path.join(path, GENOTYPES[gt])
         bags = glob.glob(pattern)
+
+        ax = fig.add_subplot(3,1,gti+1)
+        ax.set_ylabel( 'vel (%s)'%gt )
+        ax.set_xlabel( 'time (s)')
         for bag in bags:
 
             df = madplot.load_bagfile_single_dataframe(
@@ -90,18 +244,59 @@ def prepare_data(arena, path, smoothstr, smooth):
                         extra_topics={'/rotator/velocity':['data']},
                         smooth=smooth
             )
+            supplement_angles(df)
+            supplement_times(df)
 
-            #there might be multiple object_ids in the same bagfile for the same
-            #fly, so calculate dtheta for all of them
-            dts = []
-            for obj_id, group in df.groupby('tobj_id'):
-                if np.isnan(obj_id):
-                    continue
-                dts.append( calc_dtheta(group) )
+            if 1:
+                # John's category stuff
 
-            #join the dthetas vertically (axis=0) and insert as a column into
-            #the full dataframe
-            df['dtheta'] = pd.concat(dts, axis=0)
+                #there might be multiple object_ids in the same bagfile for the same
+                #fly, so calculate dtheta for all of them
+                dts = []
+                for obj_id, group in df.groupby('tobj_id'):
+                    if np.isnan(obj_id):
+                        continue
+                    dts.append( calc_dtheta(group) )
+
+                #join the dthetas vertically (axis=0) and insert as a column into
+                #the full dataframe
+                df['dtheta'] = pd.concat(dts, axis=0)
+
+
+            good = ~np.isnan(df['time_since_start'])
+            '''
+            ax.plot( df['time_since_start'][good],
+                      df['theta_unwrapped_downsampled'][good], 'k-', lw=2)
+            ax.plot( df['time_since_start'][good],
+                      df['theta_unwrapped'][good], 'r-', lw=0.5)
+            ax.plot( df['time_since_start'][good],
+                      df['theta_unwrapped_lowpass'][good], 'b-', lw=1)
+                      '''
+            ax.plot( df['time_since_start'][good],
+                     df['angular_velocity'][good], 'k-', lw=0.5)
+
+            if 'timeseries' not in data[gt]:
+                data[gt]['timeseries'] = []
+                data[gt]['save_times'] = save_times
+                data[gt]['laser_power'] = (df['time_since_start'][good],
+                                           df['laser_power'][good],
+                                           )
+                good_stim = ~np.isnan(df['e_rotator_velocity_data'].values)
+                good_both = good & good_stim
+                data[gt]['stimulus_velocity'] = (
+                    df['time_since_start'].values[good_both],
+                    df['e_rotator_velocity_data'].values[good_both])
+
+            interp = scipy.interpolate.interp1d( df['time_since_start'][good],
+                                                 df['angular_velocity'][good],
+                                                 bounds_error=False,
+                                                 fill_value=np.nan,
+                                                 )
+            save_vel = interp(save_times)
+            data[gt]['timeseries'].append( save_vel )
+
+            # if 1:
+            #     break
 
             #calculate mean_dtheta over each phase of the experiment
             t00 = df.index[0]
@@ -114,35 +309,147 @@ def prepare_data(arena, path, smoothstr, smooth):
                 mean_dtheta = df[t00+t0:t00+t1]["dtheta"].mean()
                 mean_v = df[t00+t0:t00+t1]["v"].mean()
 
-                try:
-                    data[gt][c].append( (mean_dtheta, mean_v) )
-                except KeyError:
-                    data[gt][c] = [(mean_dtheta, mean_v)]
+                if c not in data[gt]:
+                    data[gt]['chunk'][c] = []
+                data[gt]['chunk'][c].append( (mean_dtheta, mean_v) )
 
+    fname = 'timeseries_raw.png'
+    fig.savefig(fname)
+    print 'saved',fname
+
+    pickle.dump(data, open(CACHE_FNAME,'wb'), -1)
+    print 'saved cache to %s'%CACHE_FNAME
     return data
 
 def plot_data(arena, path, smoothstr, data):
+    import matplotlib.pyplot as plt
 
     COLORS = {"NINE":"r",
               "CSSHITS":"g",
-              "NINGal4":"b"}
+              "NINGal4":"b",
+              'pooled controls':'k'
+              }
+    ALPHAS = {"NINE":0.3,
+              'pooled controls':0.1,
+              }
 
-    pprint.pprint(data)
+    # ---- pool controls ------------
+    data['pooled controls'] = copy.deepcopy(data['CSSHITS'])
+    print data['pooled controls'].keys()
+    assert np.allclose(data['NINGal4']['save_times'], data['pooled controls']['save_times'])
 
-    import matplotlib.pyplot as plt
+    for row in data['NINGal4']['timeseries']:
+        data['pooled controls']['timeseries'].append(row)
+    # for row in data['NINGal4']['chunk']:
+    #     for key in row:
+    #         data['pooled controls']['chunk'][key].append(row[key])
+
+    # ----- raw timeseries plots ------------
+
+    fig_ts_all = plt.figure()
+    #fig_ts_combined = plt.figure()
+    fig_ts_combined = plt.figure(figsize=(3.5, 2.0))
+
+    print data.keys()
+
+    #order = ['NINE', 'CSSHITS', 'NINGal4']
+    order = ['NINE', 'pooled controls']
+    n_subplots = len(order)
+    ax = None
+    ax_combined = fig_ts_combined.add_subplot(111)
+    ax_combined.axhline(0,color='black')
+
+    stim_vel = data['NINE']['stimulus_velocity'][1]
+    if 1:
+        # FIXME: measure converstion from steps/second to rad/second
+        print '*'*1000,'WARNING: HACKED STIMULUS VELOCITY'
+        steps_per_radian = 1000.0
+        stim_vel = stim_vel/steps_per_radian
+
+    ax_combined.plot( data['NINE']['stimulus_velocity'][0],
+                      stim_vel*R2D,'k',
+                      lw=0.5, label='stimulus')
+
+    for gti,gt in enumerate(order):
+        ax = fig_ts_all.add_subplot( n_subplots, 1, gti+1, sharey=ax)
+        all_timeseries = np.array(data[gt]['timeseries'])
+        times = data[gt]['save_times']
+        ax.axhline(0,color='black')
+        for timeseries in all_timeseries:
+            ax.plot( times, timeseries, lw=0.5, color=COLORS[gt] )
+        mean_timeseries = np.mean( all_timeseries, axis=0 )
+        #error_timeseries = scipy.stats.sem( all_timeseries, axis=0 )
+        error_timeseries = np.std( all_timeseries, axis=0 )
+        ax.plot( times, mean_timeseries, lw=0.5, color=COLORS[gt],
+                 label=gt)
+        ax.legend()
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Angular velocity')
+
+        ax_combined.plot( times, mean_timeseries*R2D,
+                          lw=0.5, color=COLORS[gt],
+                          label=gt)
+        ax_combined.fill_between( times,
+                                  (mean_timeseries+error_timeseries)*R2D,
+                                  (mean_timeseries-error_timeseries)*R2D,
+                                  edgecolor='none',
+                                  facecolor=COLORS[gt],
+                                  alpha=ALPHAS[gt],
+                                  )
+
+    trans = mtransforms.blended_transform_factory(ax_combined.transData,
+                                                  ax_combined.transAxes)
+    ax_combined.fill_between(data['NINE']['laser_power'][0], 0, 1,
+                             where=data['NINE']['laser_power'][1]>1,
+                             edgecolor='none',
+                             facecolor='#ffff00', alpha=38.0/255,
+                             transform=trans)
+
+    ax_combined.legend()
+
+    spine_placer(ax_combined, location='left,bottom' )
+    ax_combined.set_xticks([0,180,360])
+    ax_combined.set_yticks([-200,0,200])
+    ax_combined.spines['bottom'].set_bounds(0,360.0)
+    ax_combined.spines['bottom'].set_linewidth(0.3)
+    ax_combined.spines['left'].set_linewidth(0.3)
+    ax_combined.set_xlabel('Time (s)')
+    ax_combined.set_ylabel('Angular velocity (deg/s)')
+
+    fig_ts_combined.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
+
+    fig_fname = 'fig_ts_all.png'
+    fig_ts_all.savefig(fig_fname)
+    print 'saved',fig_fname
+
+    fig_fname = 'fig_ts_combined.png'
+    fig_ts_combined.savefig(fig_fname)
+    print 'saved',fig_fname
+
+    fig_fname = 'fig_ts_combined.svg'
+    fig_ts_combined.savefig(fig_fname,bbox_inches='tight')
+    print 'saved',fig_fname
+
+    if 1:
+        return
+
+    # - John's category stuff ----------------
+
+    #pprint.pprint(data)
+
     figt = plt.figure('dtheta %s' % (smoothstr), figsize=(16,10))
     axt = figt.add_subplot(1,1,1)
     figv = plt.figure('v %s' % (smoothstr), figsize=(16,10))
     axv = figv.add_subplot(1,1,1)
 
 
-    for gt in data:
+    for gt in order:
         xdata = []
         ytdata = []
         yvdata = []
-        for xlabel in sorted(data[gt]):
+        for xlabel in sorted(data[gt]['chunk']):
             xloc = int(xlabel[0])
-            for mean_dtheta,mean_v in data[gt][xlabel]:
+            for mean_dtheta,mean_v in data[gt]['chunk'][xlabel]:
                 xdata.append(xloc)
                 ytdata.append(mean_dtheta)
                 yvdata.append(mean_v)
@@ -156,8 +463,8 @@ def plot_data(arena, path, smoothstr, data):
         ax.legend()
         ax.set_xlim(0,9)
 
-        ax.set_xticks([int(s[0]) for s in sorted(data["NINE"])])
-        ax.set_xticklabels([s[2:] for s in sorted(data["NINE"])])
+        ax.set_xticks([int(s[0]) for s in sorted(data["NINE"]['chunk'])])
+        ax.set_xticklabels([s[2:] for s in sorted(data["NINE"]['chunk'])])
 
     figpath = os.path.join(path,'dtheta_%s.png' % (smoothstr))
     figt.savefig(figpath)
@@ -173,6 +480,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to bag files')
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
 
     args = parser.parse_args()
@@ -193,9 +501,15 @@ if __name__ == "__main__":
     import madplot # keep here to allow use('Agg') to work
     arena = madplot.Arena('mm')
 
-    data = prepare_data(arena, path, smoothstr, args.smooth)
+    if args.only_plot:
+        print 'loading cache',CACHE_FNAME
+        with open(CACHE_FNAME,mode='rb') as f:
+            data = pickle.load(f)
+    else:
+        data = prepare_data(arena, path, smoothstr, args.smooth)
+
     plot_data(arena, path, smoothstr, data)
 
     if args.show:
-        import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt # keep here to allow use('Agg') to work
         plt.show()
