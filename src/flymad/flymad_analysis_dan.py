@@ -10,6 +10,38 @@ SECOND_TO_NANOSEC = 1e9
 
 from trackingparams import Kalman
 
+def get_arena_conf(calibration_file=None):
+    #DEFAULTS FROM THE FIRST NMETH SUBMISSION - AS USED FOR DANS
+    #FIRST EXPERIMENTS
+
+    #from clicking on the outermost points to define the circlt
+    l = {'y': 253.9102822580644, 'x': 256.27620967741939}
+    r = {'y': 241.01108870967732, 'x': 624.82459677419365}
+    t = {'y': 30.017137096774036, 'x': 438.70766129032268}
+    b = {'y': 457.5332661290322, 'x': 429.49395161290329}
+
+    w = r['x'] - l['x']
+    h = b['y'] - t['y']
+
+    x = l['x'] + (w/2.0) + 12
+    y = t['y'] + (h/2.0)
+    r = min(w,h)/2.0
+
+    #NO DAN. NEVER REVERSE THE AXIS BY SETTING xlim[-1] < xlim[0]
+    #self._xlim = [self._y+self._r+10,self._y-self._r-10]
+
+    xlim = [y-r-10,y+r+10]
+    ylim = [x-r-10,x+r+10]
+
+    rw = 0.045
+    sx = 0.045/160
+    sy = 0.045/185
+
+    conf = {'cx':x,'cy':y,'cr':r,'rw':rw,'sx':sx,'sy':sy}
+
+    return {"jsonconf":conf, "calibration":calibration_file}
+
+
 class Arena:
 
     CONVERT_OPTIONS = {
@@ -48,6 +80,10 @@ class Arena:
         #cache the simgear object for quick tests if the fly is in the area
         (sgcx,sgcy),sgr = self.circ
         self._sg_circ = sg.Point(sgcx,sgcy).buffer(sgr)
+
+    def __repr__(self):
+        return "<ArenaDan cx:%.1f cy:%.1f r:%.1f sx:%f sy:%f>" % (
+                    self._x,self._y,self._r,self._sx,self._sy)
 
     @property
     def unit(self):
