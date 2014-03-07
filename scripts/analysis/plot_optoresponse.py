@@ -227,15 +227,11 @@ def prepare_data(arena, path, smoothstr, smooth):
     save_times = np.arange(0, PLOT_DURATION, 1.0 ) # every second
 
     data = {gt:dict(chunk={}) for gt in GENOTYPES}
-    fig = plt.figure()
     for gti,gt in enumerate(GENOTYPES):
         #if gti>=1: break
         pattern = os.path.join(path, GENOTYPES[gt])
         bags = glob.glob(pattern)
 
-        ax = fig.add_subplot(3,1,gti+1)
-        ax.set_ylabel( 'vel (%s)'%gt )
-        ax.set_xlabel( 'time (s)')
         for bag in bags:
 
             df = madplot.load_bagfile_single_dataframe(
@@ -264,8 +260,6 @@ def prepare_data(arena, path, smoothstr, smooth):
 
 
             good = ~np.isnan(df['time_since_start'])
-            ax.plot( df['time_since_start'][good],
-                     df['angular_velocity'][good], 'k-', lw=0.5)
 
             if 'timeseries' not in data[gt]:
                 data[gt]['timeseries'] = []
@@ -309,10 +303,6 @@ def prepare_data(arena, path, smoothstr, smooth):
                 if c not in data[gt]:
                     data[gt]['chunk'][c] = []
                 data[gt]['chunk'][c].append( (mean_dtheta, mean_v) )
-
-    fname = 'timeseries_raw.png'
-    fig.savefig(fname)
-    print 'saved',fname
 
     pickle.dump(data, open(CACHE_FNAME,'wb'), -1)
     print 'saved cache to %s'%CACHE_FNAME
