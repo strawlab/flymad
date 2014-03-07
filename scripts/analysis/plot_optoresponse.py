@@ -261,8 +261,9 @@ def prepare_data(arena, path, smoothstr, smooth):
 
             good = ~np.isnan(df['time_since_start'])
 
-            if 'timeseries' not in data[gt]:
-                data[gt]['timeseries'] = []
+            if 'timeseries_angular_vel' not in data[gt]:
+                data[gt]['timeseries_angular_vel'] = []
+                data[gt]['timeseries_vel'] = []
                 data[gt]['save_times'] = save_times
                 good_stim = ~np.isnan(df['e_rotator_velocity_data'].values)
                 good_both = good & good_stim
@@ -283,8 +284,16 @@ def prepare_data(arena, path, smoothstr, smooth):
                                                  bounds_error=False,
                                                  fill_value=np.nan,
                                                  )
+            save_angular_vel = interp(save_times)
+            data[gt]['timeseries_angular_vel'].append( save_angular_vel )
+
+            interp = scipy.interpolate.interp1d( df['time_since_start'][good],
+                                                 df['v'][good],
+                                                 bounds_error=False,
+                                                 fill_value=np.nan,
+                                                 )
             save_vel = interp(save_times)
-            data[gt]['timeseries'].append( save_vel )
+            data[gt]['timeseries_vel'].append( save_vel )
 
             # if 1:
             #     break
@@ -325,8 +334,8 @@ def plot_data(arena, path, smoothstr, data):
     print data['pooled controls'].keys()
     assert np.allclose(data['NINGal4']['save_times'], data['pooled controls']['save_times'])
 
-    for row in data['NINGal4']['timeseries']:
-        data['pooled controls']['timeseries'].append(row)
+    for row in data['NINGal4']['timeseries_angular_vel']:
+        data['pooled controls']['timeseries_angular_vel'].append(row)
     # for row in data['NINGal4']['chunk']:
     #     for key in row:
     #         data['pooled controls']['chunk'][key].append(row[key])
@@ -336,7 +345,8 @@ def plot_data(arena, path, smoothstr, data):
     fig_ts_all = plt.figure()
     #fig_ts_combined = plt.figure()
     fig_ts_combined = plt.figure(figsize=(3.5, 2.0))
-    fig_zzyzz = plt.figure(figsize=(3.5, 2.0))
+    fig_angular_vel = plt.figure(figsize=(3.5, 2.0))
+    fig_linear_vel = plt.figure(figsize=(3.5, 2.0))
 
     print data.keys()
 
@@ -346,8 +356,9 @@ def plot_data(arena, path, smoothstr, data):
     ax = None
     ax_combined = fig_ts_combined.add_subplot(111)
     ax_combined.axhline(0,color='black')
-    ax_zzyzz = fig_zzyzz.add_subplot(111)
-    ax_zzyzz.axhline(0,color='black')
+    ax_angular_vel = fig_angular_vel.add_subplot(111)
+    ax_angular_vel.axhline(0,color='black')
+    ax_linear_vel = fig_linear_vel.add_subplot(111)
 
     stim_vel = data['NINE']['stimulus_velocity'][1]
     if 1:
@@ -359,45 +370,54 @@ def plot_data(arena, path, smoothstr, data):
     ax_combined.plot( data['NINE']['stimulus_velocity'][0],
                       stim_vel*R2D,'k',
                       lw=0.5, label='stimulus')
-    ax_zzyzz.plot( data['NINE']['stimulus_velocity'][0],
+    ax_angular_vel.plot( data['NINE']['stimulus_velocity'][0],
                   stim_vel*R2D,'k',
                   lw=0.5, label='stimulus')
 
     for gti,gt in enumerate(order):
         ax = fig_ts_all.add_subplot( n_subplots, 1, gti+1, sharey=ax)
-        all_timeseries = np.array(data[gt]['timeseries'])
+        all_angular_vel_timeseries = np.array(data[gt]['timeseries_angular_vel'])
+        all_linear_vel_timeseries = np.array(data[gt]['timeseries_vel'])
         times = data[gt]['save_times']
         ax.axhline(0,color='black')
-        for timeseries in all_timeseries:
+        for timeseries in all_angular_vel_timeseries:
             ax.plot( times, timeseries, lw=0.5, color=COLORS[gt] )
-        mean_timeseries = np.mean( all_timeseries, axis=0 )
-        #error_timeseries = scipy.stats.sem( all_timeseries, axis=0 )
-        error_timeseries = np.std( all_timeseries, axis=0 )
-        ax.plot( times, mean_timeseries, lw=0.5, color=COLORS[gt],
+        mean_angular_timeseries = np.mean( all_angular_vel_timeseries, axis=0 )
+        error_angular_timeseries = np.std( all_angular_vel_timeseries, axis=0 )
+        mean_linear_timeseries = np.mean( all_linear_vel_timeseries, axis=0 )
+        error_linear_timeseries = np.std( all_linear_vel_timeseries, axis=0 )
+        ax.plot( times, mean_angular_timeseries, lw=0.5, color=COLORS[gt],
                  label=gt)
         ax.legend()
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Angular velocity')
 
-        ax_combined.plot( times, mean_timeseries*R2D,
+        ax_combined.plot( times, mean_angular_timeseries*R2D,
                           lw=0.5, color=COLORS[gt],
                           label=gt)
         ax_combined.fill_between( times,
-                                  (mean_timeseries+error_timeseries)*R2D,
-                                  (mean_timeseries-error_timeseries)*R2D,
+                                  (mean_angular_timeseries+error_angular_timeseries)*R2D,
+                                  (mean_angular_timeseries-error_angular_timeseries)*R2D,
                                   edgecolor='none',
                                   facecolor=COLORS[gt],
                                   alpha=ALPHAS[gt],
                                   )
-        this_data_zzyzz = {'xaxis':times,
-                          'value':mean_timeseries*R2D,
-                          'std':error_timeseries*R2D,
+        this_data_angular_vel = {'xaxis':times,
+                          'value':mean_angular_timeseries*R2D,
+                          'std':error_angular_timeseries*R2D,
+                          'label':gt,
+                          }
+        this_data_linear_vel = {'xaxis':times,
+                          'value':mean_linear_timeseries,
+                          'std':error_linear_timeseries,
                           'label':gt,
                           }
         if gt=='NINE':
-            exp = this_data_zzyzz
+            exp_angular = this_data_angular_vel
+            exp_linear = this_data_linear_vel
         elif gt=='pooled controls':
-            ctrl = this_data_zzyzz
+            ctrl_angular = this_data_angular_vel
+            ctrl_linear = this_data_linear_vel
         else:
             1/0
 
@@ -406,24 +426,50 @@ def plot_data(arena, path, smoothstr, data):
     laser_power_times = data['pooled controls']['save_times']
 
     from flymad.flymad_plot import plot_timeseries_with_activation
-    plot_timeseries_with_activation( ax_zzyzz, exp, ctrl, targetbetween=laser_power_cond)
-    ax_zzyzz.set_xticks([0,180,360])
-    ax_zzyzz.set_yticks([-200,0,200])
-    ax_zzyzz.set_ylim(-200,200)
-    ax_zzyzz.spines['left'].set_bounds(-200,200.0)
-    ax_zzyzz.spines['bottom'].set_bounds(0,360.0)
-    ax_zzyzz.spines['bottom'].set_linewidth(0.3)
-    ax_zzyzz.spines['left'].set_linewidth(0.3)
-    ax_zzyzz.set_xlabel('Time (s)')
-    ax_zzyzz.set_ylabel('Angular velocity (deg/s)')
-    fig_zzyzz.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
-    fig_fname = 'fig_ts_zzyzz.png'
-    fig_zzyzz.savefig(fig_fname)
+    plot_timeseries_with_activation( ax_angular_vel, exp_angular, ctrl_angular,
+                                     targetbetween=laser_power_cond)
+    ax_angular_vel.set_xticks([0,180,360])
+    ax_angular_vel.set_yticks([-200,0,200])
+    ax_angular_vel.set_ylim(-200,200)
+    ax_angular_vel.spines['left'].set_bounds(-200,200.0)
+    ax_angular_vel.spines['bottom'].set_bounds(0,360.0)
+    ax_angular_vel.spines['bottom'].set_linewidth(0.3)
+    ax_angular_vel.spines['left'].set_linewidth(0.3)
+    ax_angular_vel.set_xlabel('Time (s)')
+    ax_angular_vel.set_ylabel('Angular velocity (deg/s)')
+    fig_angular_vel.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
+    fig_fname = 'fig_ts_angular_vel.png'
+    fig_angular_vel.savefig(fig_fname)
     print 'saved',fig_fname
-    fig_fname = 'fig_ts_zzyzz.svg'
-    fig_zzyzz.savefig(fig_fname)
+    fig_fname = 'fig_ts_angular_vel.svg'
+    fig_angular_vel.savefig(fig_fname)
     print 'saved',fig_fname
 
+
+
+    plot_timeseries_with_activation( ax_linear_vel, exp_linear, ctrl_linear,
+                                     targetbetween=laser_power_cond,
+                                     downsample=1,
+                                     )
+    ax_linear_vel.set_xticks([0,180,360])
+    ax_linear_vel.set_yticks([0,20,40])
+    ax_linear_vel.set_ylim([0,40])
+    ax_linear_vel.spines['bottom'].set_bounds(0,360.0)
+    ax_linear_vel.spines['bottom'].set_linewidth(0.3)
+    ax_linear_vel.spines['left'].set_linewidth(0.3)
+    ax_linear_vel.set_xlabel('Time (s)')
+    ax_linear_vel.set_ylabel('Velocity (mm/s)')
+    fig_linear_vel.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
+    fig_fname = 'fig_ts_linear_vel.png'
+    fig_linear_vel.savefig(fig_fname)
+    print 'saved',fig_fname
+    fig_fname = 'fig_ts_linear_vel.svg'
+    fig_linear_vel.savefig(fig_fname)
+    print 'saved',fig_fname
+
+
+    if 1:
+        return
     trans = mtransforms.blended_transform_factory(ax_combined.transData,
                                                   ax_combined.transAxes)
     ax_combined.fill_between(laser_power_times, 0, 1,
