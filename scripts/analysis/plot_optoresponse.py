@@ -24,7 +24,7 @@ import scipy.stats
 import scipy.interpolate
 
 R2D = 180/np.pi
-PLOT_DURATION = 360.0
+PLOT_DURATION=135.0
 CACHE_FNAME = 'optodata.pkl'
 
 def setup_defaults():
@@ -211,6 +211,9 @@ def prepare_data(arena, path, smoothstr, smooth):
     import matplotlib.pyplot as plt
     import madplot
 
+    path = os.path.abspath(path)
+    print 'opening bag files in %r'%path
+
     GENOTYPES = {"NINE":"*.bag",
                  "CSSHITS":"ctrl/CSSHITS/*.bag",
                  "NINGal4":"ctrl/NINGal4/*.bag"}
@@ -331,7 +334,6 @@ def plot_data(arena, path, smoothstr, data):
 
     # ---- pool controls ------------
     data['pooled controls'] = copy.deepcopy(data['CSSHITS'])
-    print data['pooled controls'].keys()
     assert np.allclose(data['NINGal4']['save_times'], data['pooled controls']['save_times'])
 
     for row in data['NINGal4']['timeseries_angular_vel']:
