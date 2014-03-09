@@ -1,6 +1,8 @@
 import math
 import glob
 import os.path
+import datetime
+
 import numpy as np
 import pandas as pd
 import shapely.geometry as sg
@@ -198,7 +200,7 @@ class Arena:
         #(xlim, ylim)
         return self.xlim, self.ylim
 
-def courtship_combine_csvs_to_dataframe(path, globpattern=None):
+def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_state=True):
     filelist = []
 
     if globpattern is None:
@@ -252,17 +254,27 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None):
         df['zx'][df['zx'] == 'x'] = 0
         df['cv'][df['cv'] == 'v'] = 0
         df['as'][df['as'] == 's'] = 0
-        
-        #MATCH COLUMN NAMES (OLD VS NEW flymad_score_movie)
-        datenum = int(date)
-        if datenum >= 20130827:
-            df = df.drop('as',axis=1)
-            df = df.rename(columns={'tracked_t':'t', 'laser_state':'as'}) #, inplace=False
-            df['as'] = df['as'].fillna(value=0)
-        else:
-            pass           
 
-        df[['t','theta','v','vx','vy','x','y','zx','as','cv']] = df[['t','theta','v','vx','vy','x','y','zx','as','cv']].astype(float)
+        cols = ['t','theta','v','vx','vy','x','y','zx','as','cv']
+        if  as_is_laser_state:
+            #backwards compatibility...
+            #MATCH COLUMN NAMES (OLD VS NEW flymad_score_movie)
+            datenum = int(date)
+            if datenum >= 20130827:
+                df = df.drop('as',axis=1)
+                df = df.rename(columns={'tracked_t':'t', 'laser_state':'as'}) #, inplace=False
+                df['as'] = df['as'].fillna(value=0)
+
+        else:
+            df = df.rename(columns={'tracked_t':'t'})
+            cols.append('laser_state')
+
+        df[cols] = df[cols].astype(float)
+
+        #git the dateframe a proper datetime index for resampling
+        #first remove rows with NaN t values
+        df = df[np.isfinite(df['t'])]
+        df.index = [datetime.datetime.fromtimestamp(t) for t in df['t']]
 
         yield df, (csvfilefn,experimentID,date,time,genotype,laser,repID)
         
