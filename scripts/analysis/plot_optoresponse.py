@@ -265,6 +265,7 @@ def prepare_data(arena, path, smoothstr, smooth):
             good = ~np.isnan(df['time_since_start'])
 
             if 'timeseries_angular_vel' not in data[gt]:
+                data[gt]['bag_fname'] = []
                 data[gt]['timeseries_angular_vel'] = []
                 data[gt]['timeseries_vel'] = []
                 data[gt]['save_times'] = save_times
@@ -289,6 +290,7 @@ def prepare_data(arena, path, smoothstr, smooth):
                                                  )
             save_angular_vel = interp(save_times)
             data[gt]['timeseries_angular_vel'].append( save_angular_vel )
+            data[gt]['bag_fname'].append( bag )
 
             interp = scipy.interpolate.interp1d( df['time_since_start'][good],
                                                  df['v'][good],
@@ -474,41 +476,76 @@ def plot_data(arena, path, smoothstr, data):
     fig_linear_vel.savefig(fig_fname)
     print 'saved',fig_fname
 
+    # if 1:
+    #     return
+    # trans = mtransforms.blended_transform_factory(ax_combined.transData,
+    #                                               ax_combined.transAxes)
+    # ax_combined.fill_between(laser_power_times, 0, 1,
+    #                          where=laser_power_cond,
+    #                          edgecolor='none',
+    #                          facecolor='#ffff00', alpha=38.0/255,
+    #                          transform=trans)
 
-    if 1:
-        return
-    trans = mtransforms.blended_transform_factory(ax_combined.transData,
-                                                  ax_combined.transAxes)
-    ax_combined.fill_between(laser_power_times, 0, 1,
-                             where=laser_power_cond,
-                             edgecolor='none',
-                             facecolor='#ffff00', alpha=38.0/255,
-                             transform=trans)
+    # ax_combined.legend()
 
-    ax_combined.legend()
+    # spine_placer(ax_combined, location='left,bottom' )
+    # ax_combined.set_xticks([0,180,360])
+    # ax_combined.set_yticks([-200,0,200])
+    # ax_combined.spines['bottom'].set_bounds(0,360.0)
+    # ax_combined.spines['bottom'].set_linewidth(0.3)
+    # ax_combined.spines['left'].set_linewidth(0.3)
+    # ax_combined.set_xlabel('Time (s)')
+    # ax_combined.set_ylabel('Angular velocity (deg/s)')
 
-    spine_placer(ax_combined, location='left,bottom' )
-    ax_combined.set_xticks([0,180,360])
-    ax_combined.set_yticks([-200,0,200])
-    ax_combined.spines['bottom'].set_bounds(0,360.0)
-    ax_combined.spines['bottom'].set_linewidth(0.3)
-    ax_combined.spines['left'].set_linewidth(0.3)
-    ax_combined.set_xlabel('Time (s)')
-    ax_combined.set_ylabel('Angular velocity (deg/s)')
+    # fig_ts_combined.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
 
-    fig_ts_combined.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
+    # fig_fname = 'fig_ts_all.png'
+    # fig_ts_all.savefig(fig_fname)
+    # print 'saved',fig_fname
 
-    fig_fname = 'fig_ts_all.png'
-    fig_ts_all.savefig(fig_fname)
-    print 'saved',fig_fname
+    # fig_fname = 'fig_ts_combined.png'
+    # fig_ts_combined.savefig(fig_fname)
+    # print 'saved',fig_fname
 
-    fig_fname = 'fig_ts_combined.png'
-    fig_ts_combined.savefig(fig_fname)
-    print 'saved',fig_fname
+    # fig_fname = 'fig_ts_combined.svg'
+    # fig_ts_combined.savefig(fig_fname,bbox_inches='tight')
+    # print 'saved',fig_fname
 
-    fig_fname = 'fig_ts_combined.svg'
-    fig_ts_combined.savefig(fig_fname,bbox_inches='tight')
-    print 'saved',fig_fname
+    # -----------------------
+
+    # plot individual timeseries
+
+    for gti,gt in enumerate(order):
+        fig_gt = plt.figure('indiv_timeseries_'+gt)
+        n_rows = len(data[gt]['timeseries_vel'])
+        n_cols = 2 # linear and angular
+        save_times = data[gt]['save_times']
+        ax_lin = None
+        ax_ang = None
+        for i in range(n_rows):
+            angular_vel = data[gt]['timeseries_angular_vel'][i]
+            linear_vel = data[gt]['timeseries_vel'][i]
+
+            ax_lin = fig_gt.add_subplot( n_rows, 2, i*2+1, sharex=ax_lin, sharey=ax_lin )
+            ax_ang = fig_gt.add_subplot( n_rows, 2, i*2+2, sharex=ax_ang, sharey=ax_ang )
+            ax_ang.axhline(0,color='black')
+
+            ax_lin.plot( save_times, linear_vel )
+            ax_ang.plot( save_times, angular_vel*R2D )
+
+            bag = os.path.basename(data[gt]['bag_fname'][i])
+            ax_lin.text(50,50,'lin '+bag)
+            ax_ang.text(50,3*R2D,'ang '+bag)
+
+            ax_lin.set_ylim(0,50)
+            ax_ang.set_ylim(-300,300)
+
+        plt.figtext(0.05, 0.05, gt)
+        fname = 'individual_%s.pdf'%gt
+        fig_gt.savefig(fname)
+        print 'saved',fname
+
+    # -----------------------
 
     if 1:
         return
