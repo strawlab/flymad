@@ -12,15 +12,11 @@
   <depend package="rospy"/>
   <depend package="geometry_msgs"/>
   <depend package="sensor_msgs"/>
-  <depend package="rosgobject"/>
 
   <rosdep name="python-serial"/>
   <rosdep name="python-adskalman"/>
   <rosdep name="python-benu"/>
   <rosdep name="python-motmot-trackem"/>
-  <rosdep name="python-motmot-flytrax"/>
-  <rosdep name="python-motmot-fview-draw-geom"/>
-  <rosdep name="python-motmot-fview-head-track"/>
 
 <!-- for data analysis and movie scoring -->
   <rosdep name="gocr"/>
