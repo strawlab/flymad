@@ -362,10 +362,15 @@ def plot_data(arena, path, smoothstr, data):
 
     stim_vel = data['NINE']['stimulus_velocity'][1]
     if 1:
-        # FIXME: measure converstion from steps/second to rad/second
-        print '*'*1000,'WARNING: HACKED STIMULUS VELOCITY'
-        steps_per_radian = 1000.0
-        stim_vel = stim_vel/steps_per_radian
+        '''
+        # 10 revolutions take 25 seconds at standard speed
+        real_stim_vel = 10*2*np.pi/25.0 # 10 revolutions/second
+        print 'real_stim_vel',real_stim_vel
+        print 'gain[0]',real_stim_vel/stim_vel[100]
+        print 'gain[1]',real_stim_vel/stim_vel[1001]
+        '''
+        gain = 0.00083775 # found using above
+        stim_vel = gain*stim_vel
 
     ax_combined.plot( data['NINE']['stimulus_velocity'][0],
                       stim_vel*R2D,'k',
