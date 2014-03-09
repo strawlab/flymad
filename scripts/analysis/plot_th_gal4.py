@@ -226,7 +226,10 @@ NAMES = OrderedDict([('th1stim_head',('head','TH>trpA1')),
 
 def prepare_data( arena, dirname, bag_dirname, smooth ):
     dfs = defaultdict(list)
+    dirname = os.path.abspath(dirname)
     csv_files = glob.glob( os.path.join(dirname,'csvs','*.csv') )
+    if len(csv_files)==0:
+        raise ValueError('%r matched no .csv files'%csv_files)
     for csv_filename in csv_files:
         matchobj = DOROTHEA_NAME_REGEXP.match(os.path.basename(csv_filename))
         if matchobj is None:
