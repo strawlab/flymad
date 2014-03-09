@@ -268,7 +268,7 @@ def plot_data(path, laser, gts, dfs):
     ax.set_ylabel('Wing Ext. Index, +/- SEM')
     ax.set_title('Wing Extension (%s)' % laser, size=12)
     ax.set_ylim([-0.1,0.6])
-    ax.set_xlim([-120,480])
+    ax.set_xlim([-60,480])
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
@@ -303,7 +303,7 @@ def plot_data(path, laser, gts, dfs):
         ax.set_ylabel('Distance (pixels), +/- SEM')
         ax.set_title('Distance to Nearest Target (%s)' % laser, size=12)
         #ax.set_ylim([20,120])
-        ax.set_xlim([-120,480])
+        ax.set_xlim([-60,480])
 
         fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
@@ -353,8 +353,8 @@ if __name__ == "__main__":
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('Wing Ext. Index, +/- SEM')
             ax.set_title('Wing Extension (%s)' % laser, size=12)
-            ax.set_ylim([-0.1,0.6])
-            ax.set_xlim([-120,480])
+            #ax.set_ylim([-0.1,0.6])
+            ax.set_xlim([-60,120])
             figname = laser + '_' + '_' + EXP_GENOTYPE
             fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
             fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
