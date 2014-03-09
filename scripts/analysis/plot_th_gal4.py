@@ -333,8 +333,20 @@ def plot_data(arena, dirname, smooth, dfs):
                     if len(selected_df)==0:
                         this_latency = np.inf
                     else:
+                        '''
+                        # assume any behavior is caused by laser
                         first_behavior_time = selected_df.index[0]
                         this_latency = (first_behavior_time - laser_on).total_seconds()
+                        '''
+                        # assume temporal causality in latency measurement
+                        behavior_times = selected_df.index
+                        for this_bt in behavior_times:
+                            this_latency = (this_bt - laser_on).total_seconds()
+                            if this_latency >= 0:
+                                break
+                        if this_latency < 0:
+                            this_latency = np.inf
+
                     latency_values[condition].append( this_latency )
                     df['latency'].append( this_latency )
                     df_pooled['latency'].append( this_latency )
