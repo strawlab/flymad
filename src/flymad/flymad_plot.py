@@ -25,6 +25,9 @@ GREEN       = '#1A9641'
 LIGHT_BLUE  = '#92C5DE'
 LIGHT_GREEN = '#A6D96A'
 
+EXP_COLORS = [RED, ORANGE, BLUE, GREEN, LIGHT_BLUE, LIGHT_GREEN]
+CTRL_COLORS = [BLACK, DARK_GRAY]
+
 TS_DEFAULTS = {
     'many': dict(lw=0.2, color='k', alpha=0.6 ),
     'spread': dict(alpha=0.4, facecolor='red', edgecolor='none'),
