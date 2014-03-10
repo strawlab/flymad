@@ -342,11 +342,10 @@ def plot_data(arena, path, smoothstr, data):
     # copy 'NINGal4' data into pooled controls
     for dname in data['NINGal4']:
         for row in data['NINGal4'][dname]:
-            print 'dname',dname
             if dname in ['save_times','stimulus_velocity']:
                 continue
             elif dname=='chunk':
-                print 'warning: not updating chunk data for pooled controls'
+                warnings.warn('not updating old chunk data for pooled controls')
             else:
                 data['pooled controls'][dname].append(row)
     # for row in data['NINGal4']['chunk']:
