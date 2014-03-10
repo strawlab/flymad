@@ -19,6 +19,10 @@ import madplot
 assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.version.version in ("0.11.0", "0.12.0")
 
+HEAD    = +100
+THORAX  = -100
+OFF     = 0
+
 def prepare_data(path, gts):
     data = {}
 
@@ -26,21 +30,42 @@ def prepare_data(path, gts):
     if not os.path.exists(path_out):
         os.makedirs(path_out)
 
+    LASER_THORAX_MAP = {True:THORAX,False:HEAD}
+
     #PROCESS SCORE FILES:
     pooldf = pd.DataFrame()
     for df,metadata in flymad_analysis.courtship_combine_csvs_to_dataframe(path, as_is_laser_state=False):
         csvfilefn,experimentID,date,time,genotype,laser,repID = metadata
-        #ALIGN BY LASER OFF TIME (=t0)
-        if (df['laser_state']==1).any():
-            lasermask = df[df['laser_state']==1]
-            df['t'] = df['t'] - np.min(lasermask['t'].values)#laser off time =0               
-        else:  
-            print "No laser detected!!!!!!!!!! NOT PLOTTING THIS TRIAL"
+
+        #don't do any alignment other than starting time at zero. other
+        df['t'] = df['t'].values - df['t'].values[0]
+
+        dlaser = np.gradient(df['laser_state'].values)
+        num_on_periods = (dlaser == 0.5).sum()
+        if num_on_periods != 12:
+            print "\tskipping file %s (%d laser on periods)" % (csvfilefn, num_on_periods/2)
             continue
 
         if genotype not in gts:
             print "\tskipping genotype", genotype
             continue
+
+        #make new columns that indicates HEAD/THORAX targeting
+        thorax = True
+        laser_state = False
+
+        trg = []
+        for i0,i1 in madplot.pairwise(df.iterrows()):
+            t0idx,t0row = i0
+            t1idx,t1row = i1
+            if t1row['laser_state'] >= 0.5 and t0row['laser_state'] == 0:
+                thorax ^= True
+                laser_state = True
+            elif t0row['laser_state'] >= 0.5 and t1row['laser_state'] == 0:
+                laser_state = False
+            trg.append(OFF if not laser_state else LASER_THORAX_MAP[thorax])
+        trg.append(OFF)
+        df['ttm'] = trg
 
         #bin to  5 second bins:
         #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
@@ -55,18 +80,23 @@ def prepare_data(path, gts):
         df['lasergroup'] = laser
         df['RepID'] = repID
 
-        pooldf = pd.concat([pooldf, df[['Genotype','lasergroup', 't','zx', 'laser_state']]])  
+        pooldf = pd.concat([pooldf, df]) 
 
     data = {}
     for gt in gts:
         gtdf = pooldf[pooldf['Genotype'] == gt]
-        print gt,gtdf
 
-        assert len(gtdf['lasergroup'].unique()) == 1, "only one lasergroup handled, see --laser"
+        lgs = gtdf['lasergroup'].unique()
+        if len(lgs) != 1:
+            raise Exception("only one lasergroup handled for gt %s: not %s" % (
+                             gt, lgs))
 
-        data[gt] = dict(mean=gtdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float),
-                        std=gtdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float),
-                        n=gtdf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float))
+        grouped = gtdf.groupby(['t'], as_index=False)
+        data[gt] = dict(mean=grouped.mean().astype(float),
+                        std=grouped.std().astype(float),
+                        n=grouped.count().astype(float),
+                        first=grouped.first(),
+                        df=gtdf)
 
     return data
 
@@ -162,12 +192,16 @@ def plot_data(path, data):
                                 n=gtdf['n']['zx'].values,
                                 color=COLORS[gt])
 
-        #all experiments were identical, so take activation times from the last one
-        targetbetween = dict(xaxis=data[exp_name]['wtrp']['mean']['t'].values,
-                             where=data[exp_name]['wtrp']['mean']['laser_state'].values>0)
+        #all experiments used identical activation times
+        headtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
+                                 where=data['pIP10']['wtrpmyc']['first']['ttm'].values > 0,
+                                 facecolor=flymad_plot.LIGHT_GRAY)
+        thoraxtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
+                                   where=data['pIP10']['wtrpmyc']['first']['ttm'].values < 0,
+                                   facecolor=flymad_plot.DARK_GRAY)
 
         flymad_plot.plot_timeseries_with_activation(ax,
-                    targetbetween=targetbetween,
+                    targetbetween=[headtargetbetween,thoraxtargetbetween],
                     sem=True,
                     **datasets
         )
@@ -176,23 +210,23 @@ def plot_data(path, data):
         #ax.set_ylabel('Wing Ext. Index, +/- SEM')
         #ax.set_title('Wing Extension (%s)' % laser, size=12)
         ax.set_ylim([-0.1,1.0])
-        #ax.set_xlim([-60,480])
+        ax.set_xlim([0,210])
 
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.svg" % figname), bbox_inches='tight')
 
 if __name__ == "__main__":
     EXPS = {
-        'dPR1':{'exp':'5534trpmyc',
-               'ctrl':'5534'},
-        'pIP10':{'exp':'40347trpmyc',
-                 'ctrl':'40347'},
-        'P1':{'exp':'wGP',
-              'ctrl':'G323'},
-        'vMS11':{'exp':'43702trp',
-                 'ctrl':'43702'},
-        'vPR6':{'exp':'41688trp',
-                'ctrl':'41688'}
+        'P1':   {'exp':['wGP','G323'],
+                 'ctrl':['wtrpmyc']},
+        'pIP10':{'exp':['40347trpmyc','40347'],
+                 'ctrl':['wtrpmyc']},
+        'vPR6': {'exp':['5534trpmyc','5534'],
+                 'ctrl':['wtrpmyc']},
+        'vMS11':{'exp':['43702trp','43702'],
+                 'ctrl':['wtrp']},
+        'dPR1': {'exp':['41688trp','41688'],
+                 'ctrl':['wtrp']},
     }
 
     CTRLS = ['wtrp','wtrpmyc']
@@ -222,13 +256,14 @@ if __name__ == "__main__":
     if data is None:
         data = {}
         for exp_name in EXPS:
-            data[exp_name] = prepare_data(os.path.join(path, exp_name), EXPS[exp_name].values())
+            data[exp_name] = prepare_data(os.path.join(path, exp_name), EXPS[exp_name]['exp'])
         madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
     #share the controls between experiments
     for exp_name in data:
         for ctrl_name in cdata:
-            data[exp_name][ctrl_name] = cdata[ctrl_name]
+            if ctrl_name in EXPS[exp_name]['ctrl']:
+                data[exp_name][ctrl_name] = cdata[ctrl_name]
 
     plot_data(path, data)
 
