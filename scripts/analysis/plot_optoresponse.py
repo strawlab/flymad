@@ -338,8 +338,17 @@ def plot_data(arena, path, smoothstr, data):
     data['pooled controls'] = copy.deepcopy(data['CSSHITS'])
     assert np.allclose(data['NINGal4']['save_times'], data['pooled controls']['save_times'])
 
-    for row in data['NINGal4']['timeseries_angular_vel']:
-        data['pooled controls']['timeseries_angular_vel'].append(row)
+
+    # copy 'NINGal4' data into pooled controls
+    for dname in data['NINGal4']:
+        for row in data['NINGal4'][dname]:
+            print 'dname',dname
+            if dname in ['save_times','stimulus_velocity']:
+                continue
+            elif dname=='chunk':
+                print 'warning: not updating chunk data for pooled controls'
+            else:
+                data['pooled controls'][dname].append(row)
     # for row in data['NINGal4']['chunk']:
     #     for key in row:
     #         data['pooled controls']['chunk'][key].append(row[key])
