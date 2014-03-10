@@ -24,7 +24,6 @@ import scipy.stats
 import scipy.interpolate
 
 R2D = 180/np.pi
-PLOT_DURATION=5*60.0
 CACHE_FNAME = 'optodata.pkl'
 
 def setup_defaults():
@@ -227,7 +226,7 @@ def prepare_data(arena, path, smoothstr, smooth):
     CHUNKS["6_loff-ve"] = (240,300)
     CHUNKS["7_loff+ve"] = (300,360)
 
-    save_times = np.arange(0, PLOT_DURATION, 1.0 ) # every second
+    save_times = None
 
     data = {gt:dict(chunk={}) for gt in GENOTYPES}
     for gti,gt in enumerate(GENOTYPES):
@@ -263,6 +262,10 @@ def prepare_data(arena, path, smoothstr, smooth):
 
 
             good = ~np.isnan(df['time_since_start'])
+            if save_times is None:
+                save_times = np.arange(0,
+                                       (df['time_since_start'][good].values[-1]+1e-6),
+                                       1.0 ) # every second
 
             if 'timeseries_angular_vel' not in data[gt]:
                 data[gt]['bag_fname'] = []
@@ -444,6 +447,7 @@ def plot_data(arena, path, smoothstr, data):
 
     from flymad.flymad_plot import plot_timeseries_with_activation
     plot_timeseries_with_activation( ax_angular_vel, exp_angular, ctrl_angular,
+                                     downsample=2,
                                      targetbetween=laser_power_cond)
     ax_angular_vel.set_xticks([0,180,360])
     ax_angular_vel.set_yticks([-200,0,200])
@@ -466,7 +470,7 @@ def plot_data(arena, path, smoothstr, data):
 
     plot_timeseries_with_activation( ax_linear_vel, exp_linear, ctrl_linear,
                                      targetbetween=laser_power_cond,
-                                     downsample=1,
+                                     downsample=3,
                                      )
     ax_linear_vel.set_xticks([0,180,360])
     ax_linear_vel.set_yticks([0,20,40])
