@@ -55,7 +55,7 @@ def plot_timeseries_with_activation(ax, exp=dict(), ctrl=dict(), exp2=dict(), ta
         if downsample == 1:
             return a
         else:
-            return scipy.signal.resample(a, (len(a)//downsample) + 1)
+            return scipy.signal.resample(a, len(a[::downsample]))
 
     #zorder = 1 = back
     #FIXME: make controls black, but the other black, not perfect black

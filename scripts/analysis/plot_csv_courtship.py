@@ -84,7 +84,7 @@ def prepare_data(path, only_laser, gts):
 
     #PROCESS SCORE FILES:
     pooldf = pd.DataFrame()
-    for df,metadata in flymad_analysis.courtship_combine_csvs_to_dataframe(path):
+    for df,metadata in flymad_analysis.courtship_combine_csvs_to_dataframe(path, as_is_laser_state=False):
         csvfilefn,experimentID,date,time,genotype,laser,repID = metadata
         if laser != only_laser:
             print "\tskipping laser", laser
@@ -113,37 +113,31 @@ def prepare_data(path, only_laser, gts):
             dist['d3'] = ((dist['x3'])**2 + (dist['y3'])**2)**0.5
             df['dtarget'] = dist.ix[:,'d0':'d3'].min(axis=1)               
         else:
-            df['dtarget'] = 0        
-
-        df = df.sort(columns='t', ascending=True, axis=0)
+            df['dtarget'] = 0
 
         #ALIGN BY LASER OFF TIME (=t0)
-        if (df['as']==1).any():
-            lasermask = df[df['as']==1]
+        if (df['laser_state']==1).any():
+            lasermask = df[df['laser_state']==1]
             df['t'] = df['t'] - np.max(lasermask['t'].values)#laser off time =0               
         else:  
-            print "No laser detected. Default start time = -120."
-            df['t'] = df['t'] - np.min(df['t'].values) - 120
-            continue  # throw out for now !!!!
-             
+            print "No laser detected!!!!!!!!!! NOT PLOTTING THIS TRIAL"
+            continue
+
         #bin to  5 second bins:
-        df = df[np.isfinite(df['t'])]
+        #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
+        #df = df.resample('5S')
+
         df['t'] = df['t'] /5
         df['t'] = df['t'].astype(int)
         df['t'] = df['t'].astype(float)
         df['t'] = df['t'] *5
         df = df.groupby(df['t'], axis=0).mean() 
-        df['r'] = range(0,len(df))
-        df['as'][df['as'] > 0] = 1
-        df = df.set_index('r') 
+
         df['Genotype'] = genotype
-        df['Genotype'][df['Genotype'] =='csGP'] = 'wGP'
         df['lasergroup'] = laser
         df['RepID'] = repID
 
-        ##df.to_csv((path_out + experimentID + "_" + date + ".csv"), index=False)
-
-        pooldf = pd.concat([pooldf, df[['Genotype','lasergroup', 't','zx', 'dtarget', 'as']]])   
+        pooldf = pd.concat([pooldf, df[['Genotype','lasergroup', 't','zx', 'dtarget', 'laser_state']]])   
 
     # half-assed, uninformed danno's tired method of grouping for plots:
     expdf = pooldf[pooldf['Genotype'] == exp_genotype]
@@ -155,17 +149,17 @@ def prepare_data(path, only_laser, gts):
     #Also ensure things are floats before plotting can fail, which it does because
     #groupby does not retain types on grouped colums, which seems like a bug to me
 
-    expmean = expdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].mean().astype(float)
-    exp2mean = exp2df.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].mean().astype(float)
-    ctrlmean = ctrldf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].mean().astype(float)
+    expmean = expdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float)
+    exp2mean = exp2df.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float)
+    ctrlmean = ctrldf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float)
     
-    expstd = expdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].std().astype(float)
-    exp2std = exp2df.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].std().astype(float)
-    ctrlstd = ctrldf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'as']].std().astype(float)
+    expstd = expdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float)
+    exp2std = exp2df.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float)
+    ctrlstd = ctrldf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float)
     
-    expn = expdf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'as']].count().astype(float)
-    exp2n = exp2df.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'as']].count().astype(float)
-    ctrln = ctrldf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'as']].count().astype(float)
+    expn = expdf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float)
+    exp2n = exp2df.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float)
+    ctrln = ctrldf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float)
     
     return (expdf, expmean, expstd, expn,
             exp2df, exp2mean, exp2std, exp2n,
@@ -260,7 +254,7 @@ def plot_data(path, laser, gts, dfs):
                              n=exp2n['zx'].values,
                              label='pIP10>TRPA1',
                              ontop=True),
-                    targetbetween=ctrlmean['as'].values>0,
+                    targetbetween=ctrlmean['laser_state'].values>0,
                     sem=True,
     )
 
@@ -268,7 +262,7 @@ def plot_data(path, laser, gts, dfs):
     ax.set_ylabel('Wing Ext. Index, +/- SEM')
     ax.set_title('Wing Extension (%s)' % laser, size=12)
     ax.set_ylim([-0.1,0.6])
-    ax.set_xlim([-120,480])
+    ax.set_xlim([-60,480])
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
@@ -295,7 +289,7 @@ def plot_data(path, laser, gts, dfs):
                                  n=exp2n['dtarget'].values,
                                  label='pIP10>TRPA1',
                                  ontop=True),
-                        targetbetween=ctrlmean['as'].values>0,
+                        targetbetween=ctrlmean['laser_state'].values>0,
                         sem=True,
         )
 
@@ -303,7 +297,7 @@ def plot_data(path, laser, gts, dfs):
         ax.set_ylabel('Distance (pixels), +/- SEM')
         ax.set_title('Distance to Nearest Target (%s)' % laser, size=12)
         #ax.set_ylim([20,120])
-        ax.set_xlim([-120,480])
+        ax.set_xlim([-60,480])
 
         fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
@@ -347,14 +341,14 @@ if __name__ == "__main__":
                                       n=expn['zx'].values,
                                       label='P1>TRPA1',
                                       ontop=True),
-                            targetbetween=expmean['as'].values>0,
+                            targetbetween=expmean['laser_state'].values>0,
                             sem=True,
             )
             ax.set_xlabel('Time (s)')
             ax.set_ylabel('Wing Ext. Index, +/- SEM')
             ax.set_title('Wing Extension (%s)' % laser, size=12)
-            ax.set_ylim([-0.1,0.6])
-            ax.set_xlim([-120,480])
+            #ax.set_ylim([-0.1,0.6])
+            ax.set_xlim([-60,120])
             figname = laser + '_' + '_' + EXP_GENOTYPE
             fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
             fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
