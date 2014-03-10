@@ -49,7 +49,7 @@ def get_plotpath(path, name):
     print "wrote", fig_out
     return fig_out
 
-def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False, **datasets):
+def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False, legend_location='upper right', **datasets):
     DEFAULT_COLORS = {"exp":RED,"ctrl":BLACK}
 
     def _ds(a):
@@ -101,7 +101,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
 
     spine_placer(ax, location='left,bottom' )
 
-    l = ax.legend(loc='upper right')
+    l = ax.legend(loc=legend_location)
     l.set_zorder(1+top_zorder+cur_zorder)
 
 #setup default plotting styles
