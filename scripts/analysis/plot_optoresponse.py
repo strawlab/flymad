@@ -24,7 +24,7 @@ import scipy.stats
 import scipy.interpolate
 
 R2D = 180/np.pi
-PLOT_DURATION=135.0
+PLOT_DURATION=5*60.0
 CACHE_FNAME = 'optodata.pkl'
 
 def setup_defaults():
