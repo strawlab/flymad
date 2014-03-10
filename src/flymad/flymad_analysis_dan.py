@@ -351,4 +351,30 @@ def fixup_index_and_resample(df, t):
 
     return df
 
+def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier, valmap=None):
+    csvfilefn = os.path.basename(csvfile)
+    try:
+        experimentID,date,time = csvfilefn.split("_",2)
+        genotype,laser,repID = experimentID.split("-",2)
+        repID = repID + "_" + date
+        print "processing: ", experimentID
+    except:
+        print "invalid filename:", csvfilefn
+        return None
+
+    df = pd.read_csv(csvfile, index_col=0)
+
+    if not df.index.is_unique:
+        raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
+
+    if valmap is not None:
+        fix_scoring_colums(df, valmap)
+
+    #resample to 10ms (mean) and set a proper time index on the df
+    df = fixup_index_and_resample(df, resample_specifier)
+
+    #smooth the positions, and recalculate the velocitys based on this.
+    dt = kalman_smooth_dataframe(df, arena, smooth)
+
+    return df,dt,experimentID,date,time,genotype,laser,repID
 

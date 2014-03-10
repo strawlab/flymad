@@ -25,30 +25,6 @@ assert pd.version.version in ("0.11.0" ,  "0.12.0")
 
 RESAMPLE_SPECIFIER = '10L'
 
-def _load_and_smooth_csv(csvfile, arena, smooth, resample_specifier):
-    csvfilefn = os.path.basename(csvfile)
-    try:
-        experimentID,date,time = csvfilefn.split("_",2)
-        genotype,laser,repID = experimentID.split("-",2)
-        repID = repID + "_" + date
-        print "processing: ", experimentID
-    except:
-        print "invalid filename:", csvfilefn
-        return None
-
-    df = pd.read_csv(csvfile, index_col=0)
-
-    if not df.index.is_unique:
-        raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
-
-    #resample to 10ms (mean) and set a proper time index on the df
-    df = flymad_analysis.fixup_index_and_resample(df, resample_specifier)
-
-    #smooth the positions, and recalculate the velocitys based on this.
-    dt = flymad_analysis.kalman_smooth_dataframe(df, arena, smooth)
-
-    return df,dt,experimentID,date,time,genotype,laser,repID
-
 def prepare_data(path, arena, smoothstr, smooth, exp_genotype, ctrl_genotype, exp2_genotype):
 
     df2 = DataFrame()
@@ -60,7 +36,7 @@ def prepare_data(path, arena, smoothstr, smooth, exp_genotype, ctrl_genotype, ex
 
         results = madplot.load_bagfile_cache(cache_args, cache_fname)
         if results is None:
-            results = _load_and_smooth_csv(csvfile, arena, smooth, RESAMPLE_SPECIFIER)
+            results = flymad_analysis.load_and_smooth_csv(csvfile, arena, smooth, RESAMPLE_SPECIFIER)
             if results is not None:
                 #update the cache
                 madplot.save_bagfile_cache(results, cache_args, cache_fname)
