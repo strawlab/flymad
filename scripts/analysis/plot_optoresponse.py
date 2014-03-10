@@ -357,9 +357,6 @@ def plot_data(arena, path, smoothstr, data):
 
     # ----- raw timeseries plots ------------
 
-    fig_ts_all = plt.figure()
-    #fig_ts_combined = plt.figure()
-    fig_ts_combined = plt.figure(figsize=(3.5, 2.0))
     fig_angular_vel = plt.figure(figsize=(3.5, 2.0))
     fig_linear_vel = plt.figure(figsize=(3.5, 2.0))
 
@@ -369,8 +366,6 @@ def plot_data(arena, path, smoothstr, data):
     order = ['NINE', 'pooled controls']
     n_subplots = len(order)
     ax = None
-    ax_combined = fig_ts_combined.add_subplot(111)
-    ax_combined.axhline(0,color='black')
     ax_angular_vel = fig_angular_vel.add_subplot(111)
     ax_angular_vel.axhline(0,color='black')
     ax_linear_vel = fig_linear_vel.add_subplot(111)
@@ -387,41 +382,19 @@ def plot_data(arena, path, smoothstr, data):
         gain = 0.00083775 # found using above
         stim_vel = gain*stim_vel
 
-    ax_combined.plot( data['NINE']['stimulus_velocity'][0],
-                      stim_vel*R2D,'k',
-                      lw=0.5, label='stimulus')
     ax_angular_vel.plot( data['NINE']['stimulus_velocity'][0],
                   stim_vel*R2D,'k',
                   lw=0.5, label='stimulus')
 
     for gti,gt in enumerate(order):
-        ax = fig_ts_all.add_subplot( n_subplots, 1, gti+1, sharey=ax)
         all_angular_vel_timeseries = np.array(data[gt]['timeseries_angular_vel'])
         all_linear_vel_timeseries = np.array(data[gt]['timeseries_vel'])
         times = data[gt]['save_times']
-        ax.axhline(0,color='black')
-        for timeseries in all_angular_vel_timeseries:
-            ax.plot( times, timeseries, lw=0.5, color=COLORS[gt] )
         mean_angular_timeseries = np.mean( all_angular_vel_timeseries, axis=0 )
         error_angular_timeseries = np.std( all_angular_vel_timeseries, axis=0 )
         mean_linear_timeseries = np.mean( all_linear_vel_timeseries, axis=0 )
         error_linear_timeseries = np.std( all_linear_vel_timeseries, axis=0 )
-        ax.plot( times, mean_angular_timeseries, lw=0.5, color=COLORS[gt],
-                 label=gt)
-        ax.legend()
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Angular velocity')
 
-        ax_combined.plot( times, mean_angular_timeseries*R2D,
-                          lw=0.5, color=COLORS[gt],
-                          label=gt)
-        ax_combined.fill_between( times,
-                                  (mean_angular_timeseries+error_angular_timeseries)*R2D,
-                                  (mean_angular_timeseries-error_angular_timeseries)*R2D,
-                                  edgecolor='none',
-                                  facecolor=COLORS[gt],
-                                  alpha=ALPHAS[gt],
-                                  )
         this_data_angular_vel = {'xaxis':times,
                           'value':mean_angular_timeseries*R2D,
                           'std':error_angular_timeseries*R2D,
@@ -488,41 +461,6 @@ def plot_data(arena, path, smoothstr, data):
     fig_linear_vel.savefig(fig_fname)
     print 'saved',fig_fname
 
-    # if 1:
-    #     return
-    # trans = mtransforms.blended_transform_factory(ax_combined.transData,
-    #                                               ax_combined.transAxes)
-    # ax_combined.fill_between(laser_power_times, 0, 1,
-    #                          where=laser_power_cond,
-    #                          edgecolor='none',
-    #                          facecolor='#ffff00', alpha=38.0/255,
-    #                          transform=trans)
-
-    # ax_combined.legend()
-
-    # spine_placer(ax_combined, location='left,bottom' )
-    # ax_combined.set_xticks([0,180,360])
-    # ax_combined.set_yticks([-200,0,200])
-    # ax_combined.spines['bottom'].set_bounds(0,360.0)
-    # ax_combined.spines['bottom'].set_linewidth(0.3)
-    # ax_combined.spines['left'].set_linewidth(0.3)
-    # ax_combined.set_xlabel('Time (s)')
-    # ax_combined.set_ylabel('Angular velocity (deg/s)')
-
-    # fig_ts_combined.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
-
-    # fig_fname = 'fig_ts_all.png'
-    # fig_ts_all.savefig(fig_fname)
-    # print 'saved',fig_fname
-
-    # fig_fname = 'fig_ts_combined.png'
-    # fig_ts_combined.savefig(fig_fname)
-    # print 'saved',fig_fname
-
-    # fig_fname = 'fig_ts_combined.svg'
-    # fig_ts_combined.savefig(fig_fname,bbox_inches='tight')
-    # print 'saved',fig_fname
-
     # -----------------------
 
     # plot individual timeseries
@@ -551,7 +489,6 @@ def plot_data(arena, path, smoothstr, data):
 
             ax_lin.set_ylim(0,50)
             ax_ang.set_ylim(-300,300)
-
         plt.figtext(0.05, 0.05, gt)
         fname = 'individual_%s.pdf'%gt
         fig_gt.savefig(fname)
