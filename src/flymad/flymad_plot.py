@@ -49,7 +49,9 @@ def get_plotpath(path, name):
     print "wrote", fig_out
     return fig_out
 
-def plot_timeseries_with_activation(ax, exp=dict(), ctrl=dict(), exp2=dict(), targetbetween=None, downsample=1, sem=False):
+def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False, **datasets):
+    DEFAULT_COLORS = {"exp":RED,"ctrl":BLACK}
+
     def _ds(a):
         if downsample == 1:
             return a
@@ -60,74 +62,47 @@ def plot_timeseries_with_activation(ax, exp=dict(), ctrl=dict(), exp2=dict(), ta
                 tmp.append( np.mean(vals) )
             return np.array(tmp)
 
-    #zorder = 1 = back
-    #FIXME: make controls black, but the other black, not perfect black
-
-    if ctrl:
+    if targetbetween is not None:
         trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+        ax.fill_between(targetbetween['xaxis'], 0, 1, where=targetbetween['where'],
+                        edgecolor='none',
+                        facecolor='Yellow', alpha=0.15, transform=trans,
+                        zorder=1)
 
-        if targetbetween is not None:
-            ax.fill_between(ctrl['xaxis'], 0, 1, where=targetbetween,
-                            edgecolor='none',
-                            facecolor='Yellow', alpha=0.15, transform=trans,
-                            zorder=1)
+    #zorder = 1 = back
+    top_zorder = 60
+    bottom_zorder = 30
 
-    #plot the experiment on top of the control
-    exp_ontop = exp.get('ontop',not ctrl.get('ontop', False))
+    cur_zorder = 2
+    for data in sorted(datasets):
+        exp = datasets[data]
 
-    if exp_ontop:
-        ctrl_zorder = 2
-        exp_zorder = 6
-    else:
-        ctrl_zorder = 6
-        exp_zorder = 2
+        if exp.get('ontop'):
+            this_zorder = top_zorder + cur_zorder
+        else:
+            this_zorder = bottom_zorder + cur_zorder
 
-    if exp:
+        print "plotting", data, "zorder", this_zorder
+
         if sem:
             spread = exp['std'] / np.sqrt(exp['n'])
         else:
             spread = exp['std']
 
         ax.fill_between(exp['xaxis'][::downsample], _ds(exp['value']+spread), _ds(exp['value']-spread),
-                    alpha=0.1, color=RED,
-                    zorder=exp_zorder)
+                    alpha=0.1, color=exp.get('color',DEFAULT_COLORS.get(data,'k')),
+                    zorder=this_zorder)
 
         ax.plot(exp['xaxis'][::downsample], _ds(exp['value']),
-                    color=RED,label=exp.get('label'),lw=2,
-                    zorder=exp_zorder+1)
+                    color=exp.get('color',DEFAULT_COLORS.get(data,'k')),label=exp.get('label',data),lw=2,
+                    zorder=this_zorder+1)
 
-    if ctrl:
-        if sem:
-            spread = ctrl['std'] / np.sqrt(ctrl['n'])
-        else:
-            spread = ctrl['std']
-
-
-        ax.fill_between(ctrl['xaxis'][::downsample], _ds(ctrl['value']+spread), _ds(ctrl['value']-spread),
-                    alpha=0.1, color=BLACK,
-                    zorder=ctrl_zorder)
-        ax.plot(ctrl['xaxis'][::downsample], _ds(ctrl['value']),
-                    color=BLACK,label=ctrl.get('label'),lw=2,
-                    zorder=ctrl_zorder+1)
-
-    if exp2:
-        if sem:
-            spread = exp2['std'] / np.sqrt(exp2['n'])
-        else:
-            spread = exp2['std']
-
-        exp_zorder = exp_zorder + 2
-
-        ax.fill_between(exp2['xaxis'][::downsample], _ds(exp2['value']+spread), _ds(exp2['value']-spread),
-                    alpha=0.1, color=BLUE,
-                    zorder=ctrl_zorder)
-        ax.plot(exp2['xaxis'][::downsample], _ds(exp2['value']),
-                    color=BLUE,label=exp2.get('label'),lw=2,
-                    zorder=ctrl_zorder+1)
+        cur_zorder -= 2
 
     spine_placer(ax, location='left,bottom' )
 
-    ax.legend(loc='upper right')
+    l = ax.legend(loc='upper right')
+    l.set_zorder(1+top_zorder+cur_zorder)
 
 #setup default plotting styles
 smd.setup_defaults()
