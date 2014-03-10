@@ -24,8 +24,6 @@ THORAX  = -100
 OFF     = 0
 
 def prepare_data(path, gts):
-    data = {}
-
     path_out = path + "/outputs/"
     if not os.path.exists(path_out):
         os.makedirs(path_out)
@@ -36,9 +34,6 @@ def prepare_data(path, gts):
     pooldf = pd.DataFrame()
     for df,metadata in flymad_analysis.courtship_combine_csvs_to_dataframe(path, as_is_laser_state=False):
         csvfilefn,experimentID,date,time,genotype,laser,repID = metadata
-
-        #don't do any alignment other than starting time at zero. other
-        df['t'] = df['t'].values - df['t'].values[0]
 
         dlaser = np.gradient(df['laser_state'].values)
         num_on_periods = (dlaser == 0.5).sum()
@@ -66,6 +61,9 @@ def prepare_data(path, gts):
             trg.append(OFF if not laser_state else LASER_THORAX_MAP[thorax])
         trg.append(OFF)
         df['ttm'] = trg
+
+        #don't do any alignment other than starting time at zero. other
+        df['t'] = df['t'].values - df['t'].values[0]
 
         #bin to  5 second bins:
         #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
