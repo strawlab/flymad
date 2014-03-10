@@ -213,25 +213,29 @@ def plot_data(path, arena, smoothstr, dfs):
     ax = fig2.add_subplot(1,1,1)
 
     flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=ctrlmean['align'].values,
+                                       where=ctrlmean['laser_state'].values>0),
+                    downsample=25,
+                    sem=True,
                     exp=dict(xaxis=expmean['align'].values,
                              value=expmean['v'].values,
                              std=expstd['v'].values,
                              n=expn['v'].values,
                              label='OK371>ShibireTS (head)',
+                             color=flymad_plot.RED,
                              ontop=True),
                     ctrl=dict(xaxis=ctrlmean['align'].values,
                               value=ctrlmean['v'].values,
                               std=ctrlstd['v'].values,
                               n=ctrln['v'].values,
+                              color=flymad_plot.BLACK,
                               label='Control'),
                     exp2=dict(xaxis=exp2mean['align'].values,
                              value=exp2mean['v'].values,
                              std=exp2std['v'].values,
                              n=exp2n['v'].values,
-                             label='OK371>ShibireTS (body)'),
-                    targetbetween=ctrlmean['laser_state'].values>0,
-                    downsample=25,
-                    sem=True
+                             label='OK371>ShibireTS (body)',
+                             color=flymad_plot.ORANGE),
     )
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Speed (%s/s) +/- STD' % arena.unit)
