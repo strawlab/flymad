@@ -64,10 +64,12 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
 
     if targetbetween is not None:
         trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-        ax.fill_between(targetbetween['xaxis'], 0, 1, where=targetbetween['where'],
-                        edgecolor='none',
-                        facecolor='Yellow', alpha=0.15, transform=trans,
-                        zorder=1)
+        if not hasattr(targetbetween,'__iter__'):
+            targetbetween = [targetbetween]
+        for tb in targetbetween:
+            ax.fill_between(tb['xaxis'], 0, 1, where=tb['where'],
+                            edgecolor='none', facecolor=tb.get('facecolor','yellow'),
+                            alpha=0.15, transform=trans, zorder=1)
 
     #zorder = 1 = back
     top_zorder = 60
