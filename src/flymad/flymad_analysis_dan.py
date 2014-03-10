@@ -208,7 +208,7 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
 
     globpattern = os.path.join(path,globpattern)
 
-    for posfile in sorted(glob.glob(globpattern)):
+    for obj_id,posfile in enumerate(sorted(glob.glob(globpattern))):
         csvfilefn = os.path.basename(posfile)
         df = pd.read_csv(posfile)
         try:
@@ -255,7 +255,9 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
         df['cv'][df['cv'] == 'v'] = 0
         df['as'][df['as'] == 's'] = 0
 
-        cols = ['t','theta','v','vx','vy','x','y','zx','as','cv']
+        df['obj_id'] = obj_id
+
+        cols = ['t','theta','v','vx','vy','x','y','zx','as','cv', 'obj_id']
         if  as_is_laser_state:
             #backwards compatibility...
             #MATCH COLUMN NAMES (OLD VS NEW flymad_score_movie)
@@ -269,7 +271,11 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
             df = df.rename(columns={'tracked_t':'t'})
             cols.append('laser_state')
 
-        df[cols] = df[cols].astype(float)
+        try:
+            df[cols] = df[cols].astype(float)
+        except KeyError, e:
+            print "INVALID DATAFRAME %s (%s)\n\thas: %s" % (posfile, e, ','.join(df.columns))
+            continue
 
         #git the dateframe a proper datetime index for resampling
         #first remove rows with NaN t values
