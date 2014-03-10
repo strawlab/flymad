@@ -234,11 +234,15 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
             if csvfile2fn in filelist:
                 continue 
             elif repID2 == repID:
-                print "    concatenating:", csvfile2fn
-                filelist.append(csvfile2fn)
-                csv2df = pd.read_csv(csvfile2)
-                csv2df = pd.DataFrame(csv2df)
-                df = pd.concat([df, csv2df])
+                if 'rescore' in csvfile2fn:
+                    print "    rescore:", csvfile2fn, " replaces ", csvfilefn
+                    continue
+                else:
+                    print "    concatenating:", csvfile2fn
+                    filelist.append(csvfile2fn)
+                    csv2df = pd.read_csv(csvfile2)
+                    csv2df = pd.DataFrame(csv2df)
+                    df = pd.concat([df, csv2df])
             else:
                 continue
   
