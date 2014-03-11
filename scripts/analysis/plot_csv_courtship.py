@@ -79,10 +79,6 @@ def _get_targets(path, date):
 def prepare_data(path, only_laser, gts):
     data = {}
 
-    path_out = path + "/outputs/"
-    if not os.path.exists(path_out):
-        os.makedirs(path_out)
-
     #PROCESS SCORE FILES:
     pooldf = pd.DataFrame()
     for df,metadata in flymad_analysis.courtship_combine_csvs_to_dataframe(path, as_is_laser_state=False):
@@ -99,7 +95,6 @@ def prepare_data(path, only_laser, gts):
         assert len(targets) == 4
         targets = pd.DataFrame(targets)
         targets = (targets + 0.5).astype(int)
-        targets.to_csv(path_out+'/targetlocations.csv')
 
         #CALCULATE DISTANCE FROM TARGETs, KEEP MINIMUM AS dtarget
         if targets is not None:
@@ -136,24 +131,30 @@ def prepare_data(path, only_laser, gts):
         df['t'] = df['t'].astype(int)
         df['t'] = df['t'].astype(float)
         df['t'] = df['t'] *5
+
         df = df.groupby(df['t'], axis=0).mean() 
 
         df['Genotype'] = genotype
         df['lasergroup'] = laser
         df['RepID'] = repID
 
-        pooldf = pd.concat([pooldf, df[['Genotype','lasergroup', 't','zx', 'dtarget', 'laser_state']]])   
+        pooldf = pd.concat([pooldf, df])   
 
     data = {}
     for gt in gts:
         gtdf = pooldf[pooldf['Genotype'] == gt]
-        print gt,gtdf
 
-        assert len(gtdf['lasergroup'].unique()) == 1, "only one lasergroup handled, see --laser"
+        lgs = gtdf['lasergroup'].unique()
+        if len(lgs) != 1:
+            raise Exception("only one lasergroup handled for gt %s: not %s" % (
+                             gt, lgs))
 
-        data[gt] = dict(mean=gtdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float),
-                        std=gtdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float),
-                        n=gtdf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float))
+        grouped = gtdf.groupby(['t'], as_index=False)
+        data[gt] = dict(mean=grouped.mean().astype(float),
+                        std=grouped.std().astype(float),
+                        n=grouped.count().astype(float),
+                        first=grouped.first(),
+                        df=gtdf)
 
     return data
 
@@ -220,7 +221,6 @@ def plot_data(path, laser, dfs):
               'G323':flymad_plot.BLUE,
               '40347':flymad_plot.GREEN}
 
-    path_out = path + "/outputs/"
     figname = laser + '_' + '_'.join(dfs)
 
     datasets = {}
