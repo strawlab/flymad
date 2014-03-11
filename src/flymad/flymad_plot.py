@@ -149,7 +149,9 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
     l = ax.legend(loc=legend_location)
     l.set_zorder(1+top_zorder+cur_zorder)
 
-    ax.text(0, 1,note,
+    ax.text(0, 1, #top left
+            note,
+            fontsize=8,
             horizontalalignment='left',
             verticalalignment='top',
             transform=ax.transAxes,
