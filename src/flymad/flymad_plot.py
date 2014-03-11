@@ -53,6 +53,7 @@ def get_plotpath(path, name):
     return fig_out
 
 def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False, legend_location='upper right', note="", **datasets):
+    ORDER_LAST = 100
     DEFAULT_COLORS = {"exp":RED,"ctrl":BLACK}
 
     def _ds(a):
@@ -66,7 +67,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
             return np.array(tmp)
 
     def _sort_by_order(a,b):
-        return cmp(datasets[a].get('order', 0), datasets[b].get('order', 0))
+        return cmp(datasets[a].get('order', ORDER_LAST), datasets[b].get('order', ORDER_LAST))
 
     if targetbetween is not None:
         trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
