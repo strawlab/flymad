@@ -65,6 +65,9 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                 tmp.append( np.mean(vals) )
             return np.array(tmp)
 
+    def _sort_by_order(a,b):
+        return cmp(datasets[a].get('order', 0), datasets[b].get('order', 0))
+
     if targetbetween is not None:
         trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
         if not (isinstance(targetbetween, list) or isinstance(targetbetween, tuple)):
@@ -79,7 +82,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
     bottom_zorder = 30
 
     cur_zorder = 2
-    for data in sorted(datasets):
+    for data in sorted(datasets.keys(), cmp=_sort_by_order):
         exp = datasets[data]
 
         if exp.get('ontop'):
