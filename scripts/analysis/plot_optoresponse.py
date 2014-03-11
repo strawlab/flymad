@@ -16,6 +16,8 @@ import matplotlib.transforms as mtransforms
 import strawlab_mpl.defaults as smd
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
+from pairs2groups import label_homogeneous_groups, label_homogeneous_groups_pandas # github.com/astraw/pairs2groups
+
 import roslib; roslib.load_manifest('flymad')
 import rosbag
 
@@ -333,9 +335,6 @@ def plot_data(arena, path, smoothstr, data):
               "NINGal4":"b",
               'pooled controls':'k'
               }
-    ALPHAS = {"NINE":0.3,
-              'pooled controls':0.1,
-              }
 
     # ---- pool controls ------------
     data['pooled controls'] = copy.deepcopy(data['CSSHITS'])
@@ -360,7 +359,10 @@ def plot_data(arena, path, smoothstr, data):
     fig_angular_vel = plt.figure(figsize=(3.5, 2.0))
     fig_linear_vel = plt.figure(figsize=(3.5, 2.0))
 
-    print data.keys()
+    fig_summary_angular = plt.figure()
+    ax_summary_angular = fig_summary_angular.add_subplot(211)
+    ax_summary_linear = fig_summary_angular.add_subplot(212)
+    pool_stats = collections.defaultdict(list)
 
     #order = ['NINE', 'CSSHITS', 'NINGal4']
     order = ['NINE', 'pooled controls']
@@ -370,23 +372,34 @@ def plot_data(arena, path, smoothstr, data):
     ax_angular_vel.axhline(0,color='black')
     ax_linear_vel = fig_linear_vel.add_subplot(111)
 
-    stim_vel = data['NINE']['stimulus_velocity'][1]
-    if 1:
-        '''
-        # 10 revolutions take 25 seconds at standard speed
-        real_stim_vel = 10*2*np.pi/25.0 # 10 revolutions/second
-        print 'real_stim_vel',real_stim_vel
-        print 'gain[0]',real_stim_vel/stim_vel[100]
-        print 'gain[1]',real_stim_vel/stim_vel[1001]
-        '''
-        gain = 0.00083775 # found using above
-        stim_vel = gain*stim_vel
-
-    ax_angular_vel.plot( data['NINE']['stimulus_velocity'][0],
-                  stim_vel*R2D,'k',
-                  lw=0.5, label='stimulus')
-
+    did_stimulus_plot = False
     for gti,gt in enumerate(order):
+
+        # --- calculate stimulus -----------
+        stim_times, stim_vel = data[gt]['stimulus_velocity']
+        if 1:
+            '''
+            # 10 revolutions take 25 seconds at standard speed
+            real_stim_vel = 10*2*np.pi/25.0 # 10 revolutions/second
+            print 'real_stim_vel',real_stim_vel
+            print 'gain[0]',real_stim_vel/stim_vel[100]
+            print 'gain[1]',real_stim_vel/stim_vel[1001]
+            '''
+            gain = 0.00083775 # found using above
+            stim_vel = gain*stim_vel
+
+        if not did_stimulus_plot:
+            ax_angular_vel.plot( stim_times,
+                                 stim_vel*R2D,'k',
+                                 lw=0.5, label='stimulus')
+            did_stimulus_plot = True
+
+        transition_idxs = np.nonzero(abs(stim_vel[1:]-stim_vel[:-1]))[0]
+        #print 'stim_times[transition_idxs]',stim_times[transition_idxs]
+        n_transitions = len(transition_idxs)
+
+        # ---- done calculating stimulus ---
+
         all_angular_vel_timeseries = np.array(data[gt]['timeseries_angular_vel'])
         all_linear_vel_timeseries = np.array(data[gt]['timeseries_vel'])
         times = data[gt]['save_times']
@@ -394,6 +407,69 @@ def plot_data(arena, path, smoothstr, data):
         error_angular_timeseries = np.std( all_angular_vel_timeseries, axis=0 )
         mean_linear_timeseries = np.mean( all_linear_vel_timeseries, axis=0 )
         error_linear_timeseries = np.std( all_linear_vel_timeseries, axis=0 )
+
+        if 1:
+            bin_data = []
+            ang_means = []
+            ang_stds = []
+            lin_means = []
+            lin_stds = []
+            for i in range(n_transitions-1):
+                this_data = dict(index=i,
+                                 angular_velocity_values=[],
+                                 linear_velocity_values=[],
+                                 )
+                start_time = stim_times[transition_idxs[i]]
+                stop_time = stim_times[transition_idxs[i+1]]
+                print 'start_time, stop_time',start_time, stop_time
+                start_idx = np.argmin(abs(times - start_time))
+                stop_idx =  np.argmin(abs(times - stop_time))
+                print 'times[start_idx], times[stop_idx]',times[start_idx], times[stop_idx]
+                this_data['start_time'] = times[start_idx]
+                this_data['stop_time'] = times[stop_idx]
+                assert len( all_angular_vel_timeseries)== len(all_linear_vel_timeseries)
+                for j in range( len(all_angular_vel_timeseries)):
+                    this_angular_timeseries = all_angular_vel_timeseries[j]
+                    this_linear_timeseries =  all_linear_vel_timeseries[j]
+
+                    ang = np.mean(this_angular_timeseries[start_idx:stop_idx])
+                    lin = np.mean(this_linear_timeseries[start_idx:stop_idx])
+
+                    this_data['angular_velocity_values'].append( ang )
+                    this_data['linear_velocity_values'].append( lin )
+
+                    pool_stats['gt'].append(gt)
+                    pool_stats['bin_number'].append(i)
+                    pool_stats['bin_start'].append( this_data['start_time'] )
+                    pool_stats['bin_stop'].append( this_data['stop_time'] )
+                    pool_stats['nth_fly_of_gt'].append(j)
+                    pool_stats['mean_angular_velocity_during_bin'].append( ang )
+                    pool_stats['mean_linear_velocity_during_bin'].append( lin )
+
+                this_data[ 'ang_mean' ] = np.mean( this_data['angular_velocity_values'] )
+                this_data[ 'ang_std' ] = np.std( this_data['angular_velocity_values'] )
+                this_data[ 'lin_mean' ] = np.mean( this_data['linear_velocity_values'] )
+                this_data[ 'lin_std' ] = np.std( this_data['linear_velocity_values'] )
+                bin_data.append( this_data )
+                ang_means.append( this_data['ang_mean'] )
+                ang_stds.append( this_data['ang_std'] )
+                lin_means.append( this_data['lin_mean'] )
+                lin_stds.append( this_data['lin_std'] )
+
+            ang_means = np.array(ang_means)
+            ang_stds  = np.array(ang_stds)
+            lin_means = np.array(lin_means)
+            lin_stds  = np.array(lin_stds)
+
+            ax_summary_angular.axhline(0,color='black')
+            ax_summary_angular.plot( ang_means*R2D, label=gt, color=COLORS[gt] )
+            ax_summary_angular.plot( (ang_means+ang_stds)*R2D, color=COLORS[gt] )
+            ax_summary_angular.plot( (ang_means-ang_stds)*R2D, color=COLORS[gt] )
+
+            ax_summary_linear.axhline(0,color='black')
+            ax_summary_linear.plot( lin_means, label=gt, color=COLORS[gt] )
+            ax_summary_linear.plot( lin_means+lin_stds, color=COLORS[gt] )
+            ax_summary_linear.plot( lin_means-lin_stds, color=COLORS[gt] )
 
         this_data_angular_vel = {'xaxis':times,
                           'value':mean_angular_timeseries*R2D,
@@ -438,6 +514,9 @@ def plot_data(arena, path, smoothstr, data):
     fig_fname = 'fig_ts_angular_vel.svg'
     fig_angular_vel.savefig(fig_fname)
     print 'saved',fig_fname
+    fig_fname = 'fig_ts_angular_vel.pdf'
+    fig_angular_vel.savefig(fig_fname)
+    print 'saved',fig_fname
 
 
 
@@ -460,6 +539,49 @@ def plot_data(arena, path, smoothstr, data):
     fig_fname = 'fig_ts_linear_vel.svg'
     fig_linear_vel.savefig(fig_fname)
     print 'saved',fig_fname
+    fig_fname = 'fig_ts_linear_vel.pdf'
+    fig_linear_vel.savefig(fig_fname)
+    print 'saved',fig_fname
+
+    if 1:
+
+        def p2star(p):
+            if   p < 0.001:
+                return '***'
+            elif p < 0.01:
+                return '**'
+            elif p < 0.05:
+                return '*'
+            else:
+                return ''
+        # calculate p values
+        pool_stats_df = pd.DataFrame(pool_stats)
+        df_fname = 'optomotor_stats.df'
+        pool_stats_df.to_pickle(df_fname)
+        sig = do_stats( df_fname )
+        for i in range(len(sig['bin_num'])):
+            bin_num = sig['bin_num'][i]
+            p_value = sig['ang'][i]
+            ax_summary_angular.text( bin_num,
+                                     0,
+                                     p2star(p_value))
+            p_value = sig['ang_zero'][i]
+            ax_summary_angular.text( bin_num,
+                                     -100,
+                                     p2star(p_value))
+
+            p_value = sig['lin'][i]
+            ax_summary_linear.text( bin_num,
+                                    0,
+                                    p2star(p_value))
+
+    fig_fname = 'fig_summary.svg'
+    fig_summary_angular.savefig(fig_fname)
+    print 'saved',fig_fname
+    fig_fname = 'fig_summary.pdf'
+    fig_summary_angular.savefig(fig_fname)
+    print 'saved',fig_fname
+
 
     # -----------------------
 
@@ -538,6 +660,47 @@ def plot_data(arena, path, smoothstr, data):
     figpath = os.path.join(path,'v_%s.png' % (smoothstr))
     figv.savefig(figpath)
     print "wrote", figpath
+
+
+def do_stats( df_fname ):
+    df = pd.read_pickle(df_fname)
+
+    assert len(df['gt'].unique())==2
+
+    sig = dict(lin=[], # pvalues for difference between genotypes
+               ang=[], # pvalues for difference between genotypes
+               ang_zero=[], # pvalues for NINE different than zero
+               bin_num=[],
+               )
+
+    for bin_number, group1 in df.groupby("bin_number",sort=True):
+        sig['bin_num'].append(bin_number)
+        print 'bin %d data ------------'%(bin_number,)
+        print '  angular'
+        print group1
+        group_info = label_homogeneous_groups_pandas( group1,
+                                                      groupby_column_name='gt',
+                                                      value_column_name='mean_angular_velocity_during_bin')
+        pprint.pprint(group_info)
+        sig['ang'].append( group_info['p_values'][0,1] )
+
+        if 1:
+            # are the values for the experimental genotype different than zero?
+            df_exp = group1[ group1['gt']=='NINE' ]
+            v = df_exp['mean_angular_velocity_during_bin'].values
+            v.shape = len(v),1 # reshape
+            t,p = scipy.stats.ttest_1samp(v, # test if different than zero
+                                          0.0)
+            print 'p for %s: %.3f'%(group1['mean_angular_velocity_during_bin'].values,p)
+            sig['ang_zero'].append(p)
+
+        print '  linear'
+        group_info = label_homogeneous_groups_pandas( group1,
+                                                      groupby_column_name='gt',
+                                                      value_column_name='mean_linear_velocity_during_bin')
+        pprint.pprint(group_info)
+        sig['lin'].append( group_info['p_values'][0,1] )
+    return sig
 
 
 if __name__ == "__main__":
