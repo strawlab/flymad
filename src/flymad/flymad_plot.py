@@ -64,18 +64,21 @@ def retick_relabel_axis(ax, xticks, yticks, xformat_func=None, yformat_func=None
     if yformat_func is None:
         yformat_func = str
 
-    all_xticks = sorted(list(ax.get_xlim()) + xticks)
-    all_yticks = sorted(list(ax.get_ylim()) + yticks)
+    #set to remove duplicates
+    all_xticks = sorted(set(list(ax.get_xlim()) + xticks))
+    all_yticks = sorted(set(list(ax.get_ylim()) + yticks))
 
     #defined labels
     xlbls = {i:xformat_func(i) for i in xticks}
     ylbls = {i:yformat_func(i) for i in yticks}
 
     #now remove labels on unlabeled ticks ('')
-    ax.xaxis.set_major_formatter(mticker.FixedFormatter([xlbls.get(i,'') for i in all_xticks]))
-    ax.xaxis.set_major_locator(mticker.FixedLocator(all_xticks))
-    ax.yaxis.set_major_formatter(mticker.FixedFormatter([ylbls.get(i,'') for i in all_yticks]))
-    ax.yaxis.set_major_locator(mticker.FixedLocator(all_yticks))
+    if xlbls:
+        ax.xaxis.set_major_formatter(mticker.FixedFormatter([xlbls.get(i,'') for i in all_xticks]))
+        ax.xaxis.set_major_locator(mticker.FixedLocator(all_xticks))
+    if ylbls:
+        ax.yaxis.set_major_formatter(mticker.FixedFormatter([ylbls.get(i,'') for i in all_yticks]))
+        ax.yaxis.set_major_locator(mticker.FixedLocator(all_yticks))
 
 def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False, legend_location='upper right', note="", **datasets):
     ORDER_LAST = 100
