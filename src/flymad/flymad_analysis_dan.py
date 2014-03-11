@@ -389,7 +389,23 @@ def fix_scoring_colums(df, valmap={'zx':{'z':math.pi,'x':0},
     for col in valmap:
         df[col] = df[col].astype(np.float64)
 
-def fixup_index_and_resample(df, t):
+def get_num_rows(desired_seconds, resample_specifier='10L'):
+    if resample_specifier != '10L':
+        print "WARNING: Your code may assume 10ms (100fps)"
+
+    assert resample_specifier[-1] == 'L'
+    ms = float(resample_specifier[:-1])
+
+    return desired_seconds * (1000.0/ms)
+
+def get_resampled_timebase(desired_seconds, resample_specifier='10L'):
+    n = get_num_rows(desired_seconds, resample_specifier)
+    return np.linspace(0, desired_seconds, n, endpoint=False)
+
+def fixup_index_and_resample(df, resample_specifier='10L'):
+    if resample_specifier != '10L':
+        print "WARNING: Your code may assume 10ms (100fps). Are you sure you want to resample to", resample_specifier
+
     #tracked_t was the floating point timestamp, which when roundtripped through csv
     #could lose precision. The index is guarenteed to be unique, so recreate tracked_t
     #from the index (which is seconds since epoch)
@@ -403,11 +419,11 @@ def fixup_index_and_resample(df, t):
     df.set_index(['time'], inplace=True)
     #
     #now resample to 10ms (mean)
-    df = df.resample(t)
+    df = df.resample(resample_specifier)
 
     return df
 
-def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier, valmap=None):
+def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap=None):
     csvfilefn = os.path.basename(csvfile)
     try:
         experimentID,date,time = csvfilefn.split("_",2)
@@ -424,6 +440,7 @@ def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier, valmap=None)
         raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
 
     if valmap is not None:
+        #this must be done before resampling
         fix_scoring_colums(df, valmap)
 
     #resample to 10ms (mean) and set a proper time index on the df
