@@ -373,6 +373,9 @@ def plot_data(arena, path, smoothstr, data):
     ax_linear_vel = fig_linear_vel.add_subplot(111)
 
     did_stimulus_plot = False
+    plot_angular_datasets = collections.OrderedDict()
+    plot_linear_datasets = collections.OrderedDict()
+
     for gti,gt in enumerate(order):
 
         # --- calculate stimulus -----------
@@ -472,32 +475,28 @@ def plot_data(arena, path, smoothstr, data):
             ax_summary_linear.plot( lin_means-lin_stds, color=COLORS[gt] )
 
         this_data_angular_vel = {'xaxis':times,
-                          'value':mean_angular_timeseries*R2D,
-                          'std':error_angular_timeseries*R2D,
-                          'label':gt,
-                          }
+                                 'value':mean_angular_timeseries*R2D,
+                                 'std':error_angular_timeseries*R2D,
+                                 'label':gt,
+                                 'color':COLORS[gt],
+                                 }
         this_data_linear_vel = {'xaxis':times,
-                          'value':mean_linear_timeseries,
-                          'std':error_linear_timeseries,
-                          'label':gt,
-                          }
-        if gt=='NINE':
-            exp_angular = this_data_angular_vel
-            exp_linear = this_data_linear_vel
-        elif gt=='pooled controls':
-            ctrl_angular = this_data_angular_vel
-            ctrl_linear = this_data_linear_vel
-        else:
-            1/0
-
-#    assert np.allclose( data['pooled controls']['laser_power'], ctrl['xaxis'])
-    laser_power_cond = data['pooled controls']['laser_power']>1
-    laser_power_times = data['pooled controls']['save_times']
+                                'value':mean_linear_timeseries,
+                                'std':error_linear_timeseries,
+                                'label':gt,
+                                'color':COLORS[gt],
+                                }
+        plot_angular_datasets[gt]=this_data_angular_vel
+        plot_linear_datasets[gt]=this_data_linear_vel
 
     from flymad.flymad_plot import plot_timeseries_with_activation
-    plot_timeseries_with_activation( ax_angular_vel, exp_angular, ctrl_angular,
+    tb = {'xaxis':data['pooled controls']['save_times'],
+          'where':data['pooled controls']['laser_power']>1,
+          }
+    plot_timeseries_with_activation( ax_angular_vel,
                                      downsample=2,
-                                     targetbetween=laser_power_cond)
+                                     targetbetween=[tb],
+                                     **plot_angular_datasets)
     ax_angular_vel.set_xticks([0,180,360])
     ax_angular_vel.set_yticks([-200,0,200])
     ax_angular_vel.set_ylim(-200,200)
@@ -520,10 +519,10 @@ def plot_data(arena, path, smoothstr, data):
 
 
 
-    plot_timeseries_with_activation( ax_linear_vel, exp_linear, ctrl_linear,
-                                     targetbetween=laser_power_cond,
+    plot_timeseries_with_activation( ax_linear_vel,
+                                     targetbetween=[tb],
                                      downsample=3,
-                                     )
+                                     **plot_linear_datasets)
     ax_linear_vel.set_xticks([0,180,360])
     ax_linear_vel.set_yticks([0,20,40])
     ax_linear_vel.set_ylim([0,40])
