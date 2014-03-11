@@ -8,6 +8,8 @@ import re
 
 import numpy as np
 import pandas as pd
+from pandas.tseries.offsets import DateOffset
+
 import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
@@ -47,25 +49,40 @@ POWER_LABELS = {
     '183iru':'infrared 58mW',
 }
 
-def prepare_data(path, smooth, resample, only_laser, gts):
-    path_out = path + "/outputs/"
-    if not os.path.exists(path_out):
-        os.makedirs(path_out)
+EXPERIMENT_DURATION = 130.0
+
+YLIM = [-20, 40]
+YTICKS = [-20, 0, 20, 40]
+
+XLIM = [-10, 80]
+#XTICKS = [-10, 0, 10]
+
+def prepare_data(path, arena, smooth, only_laser, gts):
 
     LASER_THORAX_MAP = {True:THORAX,False:HEAD}
 
     #PROCESS SCORE FILES:
     pooldf = pd.DataFrame()
     for csvfile in sorted(glob.glob(path + "/*.csv")):
-        csvfilefn = os.path.basename(csvfile)
 
-        cache_args = csvfilefn, arena, smoothstr, RESAMPLE_SPECIFIER
+        #don't waste time smoothing files not in out genotype list
+        _,_,_,_genotype,_laser,_ = flymad_analysis.extract_metadata_from_filename(csvfile)
+        if _laser != only_laser:
+            print "\tskipping laser", _laser, "!=", only_laser
+            continue
+
+        if _genotype not in gts:
+            print "\tskipping genotype", _genotype, "!=", gts
+            continue
+
+        csvfilefn = os.path.basename(csvfile)
+        cache_args = csvfilefn, arena, smoothstr
         cache_fname = csvfile+'.madplot-cache'
 
         results = madplot.load_bagfile_cache(cache_args, cache_fname)
         if results is None:
             results = flymad_analysis.load_and_smooth_csv(
-                            csvfile, arena, smooth, RESAMPLE_SPECIFIER,
+                            csvfile, arena, smooth,
                             valmap={'zx':{'z':math.pi,'x':0},
                                     'as':{'a':1,'s':0}})
             if results is not None:
@@ -77,22 +94,12 @@ def prepare_data(path, smooth, resample, only_laser, gts):
 
         df,dt,experimentID,date,time,genotype,laser,repID = results
 
-        if laser != only_laser:
-            print "\tskipping laser", laser, "!=", only_laser
-            continue
-
-        if genotype not in gts:
-            print "\tskipping genotype", genotype, "!=", gts
-            continue
-
-        #the resampling above, using the default rule of 'mean' will, if the laser
-        #was on any time in that bin, increase the mean > 0.
-        df['laser_state'][df['laser_state'] > 0] = 1
-
-        if len(df) < 13000:
+        duration = (df.index[-1] - df.index[0]).total_seconds()
+        if duration < EXPERIMENT_DURATION:
             print "\tmissing data", csvfilefn
             continue
-        df['t'] = range(0,len(df))
+
+        print "\t%ss experiment" % duration
 
         #ROTATE by pi if orientation is east
         df['orientation'] = df['theta'] + df['zx']
@@ -123,11 +130,24 @@ def prepare_data(path, smooth, resample, only_laser, gts):
         df['Afwd'] = np.gradient(df['Vfwd'].values) / dt
         df['dorientation'] = np.gradient(df['orientation'].values) / dt
 
+        #Here we have a 10ms resampled dataframe at least EXPERIMENT_DURATION seconds long.
+        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION))
+        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION)
+        #find when the laser first came on (argmax returns the first true value if
+        #all values are identical
+        t0idx = np.argmax(np.gradient(df['laser_state'].values > 0))
+        t0 = tb[t0idx]
+        df['t'] = tb - t0
+
+        #groupby on float times is slow. make a special align column 
+        df['t_align'] = np.array(range(0,len(df))) - t0idx
+
+        df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
         df['lasergroup'] = laser
         df['RepID'] = repID
 
-        pooldf = pd.concat([pooldf, df.head(13000)]) 
+        pooldf = pd.concat([pooldf, df]) 
 
     data = {}
     for gt in gts:
@@ -138,7 +158,7 @@ def prepare_data(path, smooth, resample, only_laser, gts):
             raise Exception("only one lasergroup handled for gt %s: not %s" % (
                              gt, lgs))
 
-        grouped = gtdf.groupby(['t'], as_index=False)
+        grouped = gtdf.groupby(['t_align'], as_index=False)
         data[gt] = dict(mean=grouped.mean().astype(float),
                         std=grouped.std().astype(float),
                         n=grouped.count().astype(float),
@@ -147,7 +167,7 @@ def prepare_data(path, smooth, resample, only_laser, gts):
 
     return data
 
-def plot_cross_activation_only(data):
+def plot_cross_activation_only(path, data, arena, note):
 
     LABELS = POWER_LABELS
 
@@ -170,7 +190,8 @@ def plot_cross_activation_only(data):
                               n=adf['n']['Vfwd'].values,
                               label='Activation (%s)' % LABELS[alaser],
                               order=0,
-                              color=flymad_plot.RED),
+                              color=flymad_plot.RED,
+                              N=len(adf['df']['obj_id'].unique())),
             'cross_activation':dict(
                               xaxis=cdf['mean']['t'].values,
                               value=cdf['mean']['Vfwd'].values,
@@ -178,7 +199,8 @@ def plot_cross_activation_only(data):
                               n=cdf['n']['Vfwd'].values,
                               label='Cross Activation (%s)' % LABELS[claser],
                               order=0,
-                              color=flymad_plot.BLACK)
+                              color=flymad_plot.BLACK,
+                              N=len(cdf['df']['obj_id'].unique())),
         }
 
         fig = plt.figure("Moonwalker Thorax Crosstalk %s (%s)" % (gt,figname), figsize=(10,8))
@@ -187,20 +209,20 @@ def plot_cross_activation_only(data):
                     targetbetween=dict(xaxis=adf['mean']['t'].values,
                                        where=adf['mean']['laser_state'].values>0),
                     downsample=25,
+                    note="%s\n%s\n" % (gt,note),
                     **datasets
         )
         ax.axhline(color='k', linestyle='--',alpha=0.8)
-        ax.set_title("%s Velocity" % gt)
-        ax.set_ylim([-10,30])
-        #ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Fwd Velocity (%s/s) +/- STD' % arena.unit)
-        #ax.set_xlim([0, 9])
+        ax.set_ylim(YLIM)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Fwd Velocity (%s/s)' % arena.unit)
+        ax.set_xlim(XLIM)
 
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.png" % (gt, figname)), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.svg" % (gt, figname)), bbox_inches='tight')
 
 
-def plot_all_data(data):
+def plot_all_data(path, data, arena, note):
 
     LABELS = POWER_LABELS
 
@@ -218,13 +240,16 @@ def plot_all_data(data):
                                (re.match('[0-9]+ru$',laser) and gt.endswith('trp'))
 
             gtdf = data[gt][laser][gt]
+
             datasets[laser] = dict(xaxis=gtdf['mean']['t'].values,
                                    value=gtdf['mean']['Vfwd'].values,
                                    std=gtdf['std']['Vfwd'].values,
                                    n=gtdf['n']['Vfwd'].values,
                                    label=LABELS[laser],
                                    order=-1 if cross_activation else laser_powers.index(laser),
-                                   color=color_cycle.next())
+                                   color=color_cycle.next(),
+                                   N=len(gtdf['df']['obj_id'].unique()),
+            )
 
         fig = plt.figure("Moonwalker Thorax %s (%s)" % (gt,smoothstr), figsize=(10,8))
         ax = fig.add_subplot(1,1,1)
@@ -232,22 +257,26 @@ def plot_all_data(data):
                     targetbetween=dict(xaxis=gtdf['mean']['t'].values,
                                        where=gtdf['mean']['laser_state'].values>0),
                     downsample=25,
+                    note="%s\n%s\n" % (gt,note),
                     **datasets
         )
         ax.axhline(color='k', linestyle='--',alpha=0.8)
-        ax.set_title("%s Velocity" % gt)
-        ax.set_ylim([-10,30])
-        #ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Fwd Velocity (%s/s) +/- STD' % arena.unit)
-        #ax.set_xlim([0, 9])
+        ax.set_ylim(YLIM)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Fwd Velocity (%s/s)' % arena.unit)
+        ax.set_xlim(XLIM)
 
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.png" % gt), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.svg" % gt), bbox_inches='tight')
 
 if __name__ == "__main__":
-    RESAMPLE_SPECIFIER = '10L'
 
-    GENOTYPES = ['50660chrim', '50660trp']
+    DAY_1_GENOTYPES = ['50660chrim', '50660trp']
+    DAY_1_CALIBRATION = 'calibration20140205_XXXXXX.filtered.yaml'
+
+    DAY_2_GENOTYPES = ['50660','wtrp']
+    DAY_2_CALIBRATION = 'calibration20140219_064948.filtered.yaml'
+
     LASER_POWERS = ['350ru','033ru','030ru','028ru',
                     '434iru','350iru','266iru','183iru']
 
@@ -256,40 +285,72 @@ if __name__ == "__main__":
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
-    parser.add_argument('--calibration', default=None, help='calibration yaml file')
+    parser.add_argument('--calibration-dir', help='calibration directory containing yaml files', required=True)
 
     args = parser.parse_args()
     path = args.path[0]
 
     smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
 
-    arena = madplot.Arena(
+    all_data = {k:dict() for k in DAY_1_GENOTYPES + DAY_2_GENOTYPES}
+
+    #### BOTH DAYS EXPERIMENTS WERE RUN WITH DIFFERENT CALIBRATIONS
+    #### DAY 1
+    calibration_file = os.path.join(args.calibration_dir, DAY_1_CALIBRATION)
+    d1_arena = madplot.Arena(
                 'mm',
-                **flymad_analysis.get_arena_conf(calibration_file=args.calibration))
-
-    resample = RESAMPLE_SPECIFIER
-
-    cache_fname = os.path.join(path,'moonwalker.madplot-cache')
-    cache_args = (path, GENOTYPES, LASER_POWERS, smoothstr, resample, arena)
-    data = None
+                **flymad_analysis.get_arena_conf(calibration_file=calibration_file))
+    cache_fname = os.path.join(path,'moonwalker_d1.madplot-cache')
+    cache_args = (path, DAY_1_GENOTYPES, LASER_POWERS, smoothstr, d1_arena)
+    d1_data = None
     if args.only_plot:
-        data = madplot.load_bagfile_cache(cache_args, cache_fname)
-    if data is None:
+        d1_data = madplot.load_bagfile_cache(cache_args, cache_fname)
+    if d1_data is None:
         #these loops are braindead inefficient and the wrong way,
         #however, we have limited time, and I cache the intermediate
         #representation anyway...
-        data = {k:dict() for k in GENOTYPES}
-        for gt in GENOTYPES:
+        d1_data = {k:dict() for k in DAY_1_GENOTYPES}
+        for gt in DAY_1_GENOTYPES:
             for lp in LASER_POWERS:
                 try:
-                    data[gt][lp] = prepare_data(path, args.smooth, resample, lp, [gt])
+                    d1_data[gt][lp] = prepare_data(path, d1_arena, args.smooth, lp, [gt])
                 except KeyError:
                     #this laser power and genotype combination was not tested
                     pass
-        madplot.save_bagfile_cache(data, cache_args, cache_fname)
+        madplot.save_bagfile_cache(d1_data, cache_args, cache_fname)
+    all_data.update(d1_data)
+    #### DAY 2
+    calibration_file = os.path.join(args.calibration_dir, DAY_2_CALIBRATION)
+    d2_arena = madplot.Arena(
+                'mm',
+                **flymad_analysis.get_arena_conf(calibration_file=calibration_file))
+    cache_fname = os.path.join(path,'moonwalker_d2.madplot-cache')
+    cache_args = (path, DAY_2_GENOTYPES, LASER_POWERS, smoothstr, d2_arena)
+    d2_data = None
+    if args.only_plot:
+        d2_data = madplot.load_bagfile_cache(cache_args, cache_fname)
+    if d2_data is None:
+        #these loops are braindead inefficient and the wrong way,
+        #however, we have limited time, and I cache the intermediate
+        #representation anyway...
+        d2_data = {k:dict() for k in DAY_2_GENOTYPES}
+        for gt in DAY_2_GENOTYPES:
+            for lp in LASER_POWERS:
+                try:
+                    d2_data[gt][lp] = prepare_data(path, d2_arena, args.smooth, lp, [gt])
+                except KeyError:
+                    #this laser power and genotype combination was not tested
+                    pass
+        madplot.save_bagfile_cache(d2_data, cache_args, cache_fname)
+    all_data.update(d2_data)
 
-    plot_all_data(data)
-    plot_cross_activation_only(data)
+    note = "%s %s\nd1arena:%r\nd2arena:%r" % (d1_arena.unit, smoothstr, d1_arena, d2_arena)
+
+    #from here on, arena is only used for the units
+    assert d1_arena.unit == d2_arena.unit
+
+    plot_all_data(path, all_data, d1_arena, note)
+    plot_cross_activation_only(path, all_data, d1_arena, note)
 
     if args.show:
         plt.show()
