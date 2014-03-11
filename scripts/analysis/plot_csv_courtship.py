@@ -81,7 +81,7 @@ def prepare_data(path, only_laser, gts):
 
     #PROCESS SCORE FILES:
     pooldf = pd.DataFrame()
-    for df,metadata in flymad_analysis.courtship_combine_csvs_to_dataframe(path, as_is_laser_state=False):
+    for df,metadata in flymad_analysis.load_courtship_csv(path):
         csvfilefn,experimentID,date,time,genotype,laser,repID = metadata
         if laser != only_laser:
             print "\tskipping laser", laser
@@ -294,7 +294,7 @@ def plot_data(path, laser, dfs):
     )
 
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Distance (mm)')
+    ax.set_ylabel('Distance (px)')
     #ax.set_ylim([20,120])
     ax.set_xlim([-60,480])
 
@@ -392,7 +392,7 @@ if __name__ == "__main__":
                         sem=True,
                         **laser_dtarget
         )
-        axd.set_ylabel('Distance (mm)')
+        axd.set_ylabel('Distance (px)')
 
         for figname,fig,ax in [("DR_following_and_WingExt",figw,axw), ("DR_following_and_dtarget",figd,axd)]:
             ax.set_xlabel('Time (s)')

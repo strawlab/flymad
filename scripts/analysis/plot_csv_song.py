@@ -30,7 +30,7 @@ def prepare_data(path, gts):
 
     #PROCESS SCORE FILES:
     pooldf = pd.DataFrame()
-    for df,metadata in flymad_analysis.courtship_combine_csvs_to_dataframe(path, as_is_laser_state=False):
+    for df,metadata in flymad_analysis.load_courtship_csv(path):
         csvfilefn,experimentID,date,time,genotype,laser,repID = metadata
 
         dlaser = np.gradient(df['laser_state'].values)

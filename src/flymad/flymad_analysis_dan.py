@@ -472,3 +472,56 @@ def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap
 
     return df,dt,experimentID,date,time,genotype,laser,repID
 
+def load_courtship_csv(path):
+    globpattern = os.path.join(path,"*.csv")
+    for csvfile in sorted(glob.glob(globpattern)):
+        csvfilefn = os.path.basename(csvfile)
+
+        if 'rescore' in csvfilefn:
+            print "ignoring:",csvfilefn
+            continue
+
+        metadata = extract_metadata_from_filename(csvfile)
+        if metadata is None:
+            print "WARNING: invalid filename:", csvfile
+            continue
+
+        experimentID,date,time,genotype,laser,repID = metadata
+        print "processing:", csvfilefn
+
+        df = pd.read_csv(csvfile, index_col=0)
+
+        if not df.index.is_unique:
+            raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
+
+        #remove rows before we have a position
+        q = pd.isnull(df['laser_state']).values
+        first_valid_row = np.argmin(q)
+        df = df.iloc[first_valid_row:]
+        print "\tremove %d empty rows at start of file" % first_valid_row
+
+        #make sure we always have a 't' column (for back compat)
+        df['t'] = df.index.values / SECOND_TO_NANOSEC
+        df['time'] = df.index.values.astype('datetime64[ns]')
+        df.set_index(['time'], inplace=True)
+
+        #convert 'V', 'X' AND 'S' to 1 or 0
+        df['zx'] = df['zx'].astype(object).fillna('x')
+        df['as'] = df['as'].astype(object).fillna('s')
+        df['cv'] = df['cv'].astype(object).fillna('v')
+        df['zx'][df['zx'] == 'z'] = 1
+        df['cv'][df['cv'] == 'c'] = 1
+        df['as'][df['as'] == 'a'] = 1
+        df['zx'][df['zx'] == 'x'] = 0
+        df['cv'][df['cv'] == 'v'] = 0
+        df['as'][df['as'] == 's'] = 0
+
+        #ensure these are floats incase we later resample
+        cols = ['zx','as','cv']
+        df[cols] = df[cols].astype(float)
+
+        #give files a semi-random obj_id
+        df['obj_id'] = create_object_id(date,time)
+
+        yield df, (csvfilefn,experimentID,date,time,genotype,laser,repID)
+
