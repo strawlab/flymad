@@ -287,6 +287,43 @@ def plot_data(arena, dirname, smooth, dfs):
 
     DO_LATENCY_FIGURE = False
     DO_POSITION_FIGURE = True
+    DO_VELOCITY_FIGURE = True
+
+    COLORS = {'th1stim_thorax':'r',
+              'th1stim_head':'b',
+
+              'thcstrpa11stim_thorax':'g',
+              'thgal41stim_head':'k',
+              'thcstrpa11stim_head':'k',
+              'thgal41stim_thorax':'g',
+              }
+
+    if DO_VELOCITY_FIGURE:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        datasets = {}
+        for i, condition in enumerate(conditions):
+            print 'condition %r'%condition
+            all_dfs = []
+            for (df,parsed_data,laser_on) in dfs[condition]:
+                df = df.resample('10L')
+                assert len(df) > 100
+                df['align'] = np.arange(len(df))
+                all_dfs.append(df)
+            all_dfs = pd.concat([d for d in all_dfs])
+            aligned = all_dfs.groupby('align', as_index=False)
+            mean_timeseries = aligned.mean().astype(float)
+            datasets[condition] = dict(xaxis=mean_timeseries['align'].values,
+                                       value=mean_timeseries['v'].values,
+                                       std=aligned.std().astype(float)['v'].values,
+                                       color=COLORS[condition],
+                                       )
+        from flymad.flymad_plot import plot_timeseries_with_activation
+        plot_timeseries_with_activation(ax,
+                                        #targetbetween=[headtargetbetween,thoraxtargetbetween],
+                                        sem=False,
+                                        **datasets
+                                        )
 
     if DO_POSITION_FIGURE:
         fig = plt.figure()
