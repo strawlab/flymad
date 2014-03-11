@@ -37,14 +37,14 @@ CURRENT_LABELS = {
     '183iru':'infrared 183mA',
 }
 POWER_LABELS = {
-    '350ru':'red 460uW',
-    '033ru':'red 341uW',
-    '030ru':'red 163uW',
-    '028ru':'red 50uW',
-    '434iru':'infrared 208uW',
-    '350iru':'infrared 158uW',
-    '266iru':'infrared 107uW',
-    '183iru':'infrared 58uW',
+    '350ru':u'red 460\u00B5W',
+    '033ru':u'red 341\u00B5W',
+    '030ru':u'red 163\u00B5W',
+    '028ru':u'red 50\u00B5W',
+    '434iru':'infrared 208mW',
+    '350iru':'infrared 158mW',
+    '266iru':'infrared 107mW',
+    '183iru':'infrared 58mW',
 }
 
 def prepare_data(path, smooth, resample, only_laser, gts):
@@ -149,7 +149,7 @@ def prepare_data(path, smooth, resample, only_laser, gts):
 
 def plot_cross_activation_only(data):
 
-    LABELS = CURRENT_LABELS
+    LABELS = POWER_LABELS
 
     PLOTS = [('50660chrim',{'activation':'350ru','cross_activation':'350iru'}),
              ('50660trp',{'activation':'434iru','cross_activation':'350ru'}),
@@ -202,7 +202,7 @@ def plot_cross_activation_only(data):
 
 def plot_all_data(data):
 
-    LABELS = CURRENT_LABELS
+    LABELS = POWER_LABELS
 
     for gt in data:
         datasets = {}
