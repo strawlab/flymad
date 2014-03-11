@@ -4,6 +4,7 @@ import os
 import pickle
 import math
 import itertools
+import re
 
 import numpy as np
 import pandas as pd
@@ -24,6 +25,27 @@ assert pd.version.version in ("0.11.0", "0.12.0")
 HEAD    = +100
 THORAX  = -100
 OFF     = 0
+
+CURRENT_LABELS = {
+    '350ru':'red 35mA',
+    '033ru':'red 33mA',
+    '030ru':'red 30mA',
+    '028ru':'red 28mA',
+    '434iru':'infrared 434mA',
+    '350iru':'infrared 350mA',
+    '266iru':'infrared 266mA',
+    '183iru':'infrared 183mA',
+}
+POWER_LABELS = {
+    '350ru':u'red 460\u00B5W',
+    '033ru':u'red 341\u00B5W',
+    '030ru':u'red 163\u00B5W',
+    '028ru':u'red 50\u00B5W',
+    '434iru':'infrared 208mW',
+    '350iru':'infrared 158mW',
+    '266iru':'infrared 107mW',
+    '183iru':'infrared 58mW',
+}
 
 def prepare_data(path, smooth, resample, only_laser, gts):
     path_out = path + "/outputs/"
@@ -125,6 +147,103 @@ def prepare_data(path, smooth, resample, only_laser, gts):
 
     return data
 
+def plot_cross_activation_only(data):
+
+    LABELS = POWER_LABELS
+
+    PLOTS = [('50660chrim',{'activation':'350ru','cross_activation':'350iru'}),
+             ('50660trp',{'activation':'434iru','cross_activation':'350ru'}),
+             ('50660trp',{'activation':'350iru','cross_activation':'350ru'}),
+    ]
+
+    for gt,lasers in PLOTS:
+        figname = 'vs'.join(lasers.values())
+
+        alaser = lasers['activation']
+        adf = data[gt][alaser][gt]
+        claser = lasers['cross_activation']
+        cdf = data[gt][claser][gt]
+        datasets = {
+            'activation':dict(xaxis=adf['mean']['t'].values,
+                              value=adf['mean']['Vfwd'].values,
+                              std=adf['std']['Vfwd'].values,
+                              n=adf['n']['Vfwd'].values,
+                              label='Activation (%s)' % LABELS[alaser],
+                              order=0,
+                              color=flymad_plot.RED),
+            'cross_activation':dict(
+                              xaxis=cdf['mean']['t'].values,
+                              value=cdf['mean']['Vfwd'].values,
+                              std=cdf['std']['Vfwd'].values,
+                              n=cdf['n']['Vfwd'].values,
+                              label='Cross Activation (%s)' % LABELS[claser],
+                              order=0,
+                              color=flymad_plot.BLACK)
+        }
+
+        fig = plt.figure("Moonwalker Thorax Crosstalk %s (%s)" % (gt,figname), figsize=(10,8))
+        ax = fig.add_subplot(1,1,1)
+        flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=adf['mean']['t'].values,
+                                       where=adf['mean']['laser_state'].values>0),
+                    downsample=25,
+                    **datasets
+        )
+        ax.axhline(color='k', linestyle='--',alpha=0.8)
+        ax.set_title("%s Velocity" % gt)
+        ax.set_ylim([-10,30])
+        #ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Fwd Velocity (%s/s) +/- STD' % arena.unit)
+        #ax.set_xlim([0, 9])
+
+        fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.png" % (gt, figname)), bbox_inches='tight')
+        fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.svg" % (gt, figname)), bbox_inches='tight')
+
+
+def plot_all_data(data):
+
+    LABELS = POWER_LABELS
+
+    for gt in data:
+        datasets = {}
+        color_cycle = itertools.cycle(flymad_plot.EXP_COLORS)
+
+        #sort by power but make the odd one out last
+        laser_powers = sorted(data[gt])
+
+        for laser in data[gt]:
+
+            #also sort to make cross-activation first
+            cross_activation = (re.match('[0-9]+iru$',laser) and gt.endswith('chrim')) or \
+                               (re.match('[0-9]+ru$',laser) and gt.endswith('trp'))
+
+            gtdf = data[gt][laser][gt]
+            datasets[laser] = dict(xaxis=gtdf['mean']['t'].values,
+                                   value=gtdf['mean']['Vfwd'].values,
+                                   std=gtdf['std']['Vfwd'].values,
+                                   n=gtdf['n']['Vfwd'].values,
+                                   label=LABELS[laser],
+                                   order=-1 if cross_activation else laser_powers.index(laser),
+                                   color=color_cycle.next())
+
+        fig = plt.figure("Moonwalker Thorax %s (%s)" % (gt,smoothstr), figsize=(10,8))
+        ax = fig.add_subplot(1,1,1)
+        flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=gtdf['mean']['t'].values,
+                                       where=gtdf['mean']['laser_state'].values>0),
+                    downsample=25,
+                    **datasets
+        )
+        ax.axhline(color='k', linestyle='--',alpha=0.8)
+        ax.set_title("%s Velocity" % gt)
+        ax.set_ylim([-10,30])
+        #ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Fwd Velocity (%s/s) +/- STD' % arena.unit)
+        #ax.set_xlim([0, 9])
+
+        fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.png" % gt), bbox_inches='tight')
+        fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.svg" % gt), bbox_inches='tight')
+
 if __name__ == "__main__":
     RESAMPLE_SPECIFIER = '10L'
 
@@ -169,34 +288,8 @@ if __name__ == "__main__":
                     pass
         madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
-    for gt in data:
-        datasets = {}
-        color_cycle = itertools.cycle(flymad_plot.EXP_COLORS)
-        for laser in data[gt]:
-            gtdf = data[gt][laser][gt]
-            datasets[laser] = dict(xaxis=gtdf['mean']['t'].values,
-                                   value=gtdf['mean']['Vfwd'].values,
-                                   std=gtdf['std']['Vfwd'].values,
-                                   n=gtdf['n']['Vfwd'].values,
-                                   color=color_cycle.next())
-
-        fig = plt.figure("Moonwalker Thorax %s (%s)" % (gt,smoothstr), figsize=(10,8))
-        ax = fig.add_subplot(1,1,1)
-        flymad_plot.plot_timeseries_with_activation(ax,
-                    targetbetween=dict(xaxis=gtdf['mean']['t'].values,
-                                       where=gtdf['mean']['laser_state'].values>0),
-                    downsample=25,
-                    **datasets
-        )
-        ax.axhline(color='k', linestyle='--',alpha=0.8)
-        ax.set_title("%s Velocity" % gt)
-        ax.set_ylim([-10,30])      
-        #ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Fwd Velocity (%s/s) +/- STD' % arena.unit)
-        #ax.set_xlim([0, 9])
-
-        fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.png" % gt), bbox_inches='tight')
-        fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.svg" % gt), bbox_inches='tight')
+    plot_all_data(data)
+    plot_cross_activation_only(data)
 
     if args.show:
         plt.show()

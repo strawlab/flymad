@@ -2,6 +2,7 @@ import argparse
 import glob
 import os
 import pickle
+import re
 
 import numpy as np
 import pandas as pd
@@ -22,6 +23,20 @@ assert pd.version.version in ("0.11.0", "0.12.0")
 HEAD    = +100
 THORAX  = -100
 OFF     = 0
+
+GENOTYPE_LABELS = {
+    "wtrpmyc":"+/TRPA1","wtrp":"+/TRPA1",
+    "G323":"P1/+","wGP":"P1/TRPA1",
+    "40347":"pIP10/+","40347trpmyc":"pIP10/TRPA1",
+    "5534":"vPR6/+","5534trpmyc":"vPR6/TRPA1",
+    "43702":"vMS11/+","43702trp":"vMS11/TRPA1",
+    "41688":"dPR1/+","41688trp":"dPR1/TRPA1",
+}
+#P1:     G323    vs wtrpmyc  vs wGP              (P1/+    vs +/TRPA1     vs P1/TRPA1)
+#pIP10:  40347   vs wtrpmyc  vs 40347trpmyc      (pIP10/+ vs +/TRPA1     vs pIP10/TRPA1)
+#vPR6:   5534    vs wtrpmyc  vs 5534trpmyc       (vPR6/+  vs +/TRPA1     vs vPR6/TRPA1)
+#vMS11:  43702   vs wtrp     vs 43702trp         (vMS11/+ vs +/TRPA1     vs vMS11/TRPA1)
+#dPR1:   41688   vs wtrp     vs 41688trp         (dPR1/+  vs +/TRPA1     vs dPR1/TRPA1)
 
 def prepare_data(path, gts):
     path_out = path + "/outputs/"
@@ -183,12 +198,30 @@ def plot_data(path, data):
 
         datasets = {}
         for gt in gts:
+
+            gt_human_name = GENOTYPE_LABELS[gt]
+
+            if re.match('\w+/\w+$', gt_human_name):
+                color = flymad_plot.RED
+                order = 1
+            elif re.match('\w+/\+$', gt_human_name):
+                color = flymad_plot.BLACK
+                order = 2
+            elif re.match('\+/\w+$', gt_human_name):
+                order = 3
+                color = flymad_plot.BLUE
+            else:
+                color = 'cyan'
+                order = 0
+
             gtdf = data[exp_name][gt]
             datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
                                 value=gtdf['mean']['zx'].values,
                                 std=gtdf['std']['zx'].values,
                                 n=gtdf['n']['zx'].values,
-                                color=COLORS[gt])
+                                order=order,
+                                label=gt_human_name,
+                                color=color)
 
         #all experiments used identical activation times
         headtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
