@@ -24,24 +24,7 @@ HEAD    = +100
 THORAX  = -100
 OFF     = 0
 
-GENOTYPE_LABELS = {
-    "wtrpmyc":"+/TRPA1","wtrp":"+/TRPA1",
-    "G323":"P1/+","wGP":"P1/TRPA1",
-    "40347":"pIP10/+","40347trpmyc":"pIP10/TRPA1",
-    "5534":"vPR6/+","5534trpmyc":"vPR6/TRPA1",
-    "43702":"vMS11/+","43702trp":"vMS11/TRPA1",
-    "41688":"dPR1/+","41688trp":"dPR1/TRPA1",
-}
-#P1:     G323    vs wtrpmyc  vs wGP              (P1/+    vs +/TRPA1     vs P1/TRPA1)
-#pIP10:  40347   vs wtrpmyc  vs 40347trpmyc      (pIP10/+ vs +/TRPA1     vs pIP10/TRPA1)
-#vPR6:   5534    vs wtrpmyc  vs 5534trpmyc       (vPR6/+  vs +/TRPA1     vs vPR6/TRPA1)
-#vMS11:  43702   vs wtrp     vs 43702trp         (vMS11/+ vs +/TRPA1     vs vMS11/TRPA1)
-#dPR1:   41688   vs wtrp     vs 41688trp         (dPR1/+  vs +/TRPA1     vs dPR1/TRPA1)
-
 def prepare_data(path, gts):
-    path_out = path + "/outputs/"
-    if not os.path.exists(path_out):
-        os.makedirs(path_out)
 
     LASER_THORAX_MAP = {True:THORAX,False:HEAD}
 
@@ -89,6 +72,7 @@ def prepare_data(path, gts):
         df['t'] = df['t'] *5
         df = df.groupby(df['t'], axis=0).mean() 
 
+        df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
         df['lasergroup'] = laser
         df['RepID'] = repID
@@ -171,22 +155,6 @@ def fit_to_curve ( p_values ):
 
 def plot_data(path, data):
 
-    COLORS = {'5534trpmyc':flymad_plot.RED,
-              '5534':flymad_plot.BLACK,
-              '40347trpmyc':flymad_plot.RED,
-              '40347':flymad_plot.BLACK,
-              'wGP':flymad_plot.RED,
-              'G323':flymad_plot.BLACK,
-              '43702trp':flymad_plot.RED,
-              '43702':flymad_plot.BLACK,
-              '41688trp':flymad_plot.RED,
-              '41688':flymad_plot.BLACK,
-              'wtrp':flymad_plot.GREEN,
-              'wtrpmyc':flymad_plot.BLUE,
-    }
-
-    path_out = path + "/outputs/"
-
     for exp_name in data:
         gts = data[exp_name].keys()
 
@@ -199,15 +167,13 @@ def plot_data(path, data):
         datasets = {}
         for gt in gts:
 
-            gt_human_name = GENOTYPE_LABELS[gt]
-
-            if re.match('\w+/\w+$', gt_human_name):
+            if flymad_analysis.genotype_is_exp(gt):
                 color = flymad_plot.RED
                 order = 1
-            elif re.match('\w+/\+$', gt_human_name):
+            elif flymad_analysis.genotype_is_ctrl(gt):
                 color = flymad_plot.BLACK
                 order = 2
-            elif re.match('\+/\w+$', gt_human_name):
+            elif flymad_analysis.genotype_is_trp_ctrl(gt):
                 order = 3
                 color = flymad_plot.BLUE
             else:
@@ -220,8 +186,9 @@ def plot_data(path, data):
                                 std=gtdf['std']['zx'].values,
                                 n=gtdf['n']['zx'].values,
                                 order=order,
-                                label=gt_human_name,
-                                color=color)
+                                label=flymad_analysis.human_label(gt),
+                                color=color,
+                                N=len(gtdf['df']['obj_id'].unique()))
 
         #all experiments used identical activation times
         headtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
@@ -238,7 +205,7 @@ def plot_data(path, data):
         )
 
         ax.set_xlabel('Time (s)')
-        #ax.set_ylabel('Wing Ext. Index, +/- SEM')
+        ax.set_ylabel('Wing Ext. Index')
         #ax.set_title('Wing Extension (%s)' % laser, size=12)
         ax.set_ylim([-0.1,1.0])
         ax.set_xlim([0,210])
