@@ -134,6 +134,7 @@ def prepare_data(path, only_laser, gts):
 
         df = df.groupby(df['t'], axis=0).mean() 
 
+        df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
         df['lasergroup'] = laser
         df['RepID'] = repID
@@ -225,12 +226,21 @@ def plot_data(path, laser, dfs):
 
     datasets = {}
     for gt in dfs:
+        if flymad_analysis.genotype_is_exp(gt):
+            order = 1
+        elif flymad_analysis.genotype_is_ctrl(gt):
+            order = 2
+        else:
+            order = 3
         gtdf = dfs[gt]
         datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
                             value=gtdf['mean']['zx'].values,
                             std=gtdf['std']['zx'].values,
                             n=gtdf['n']['zx'].values,
-                            color=COLORS[gt])
+                            label=flymad_analysis.human_label(gt),
+                            order=order,
+                            color=COLORS[gt],
+                            N=len(gtdf['df']['obj_id'].unique()))
     ctrlmean = dfs['wtrpmyc']['mean']
 
     fig = plt.figure("Courtship Wingext 10min (%s)" % laser)
@@ -240,12 +250,12 @@ def plot_data(path, laser, dfs):
                     targetbetween=dict(xaxis=ctrlmean['t'].values,
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
+                    note="laser %s\n" % laser,
                     **datasets
     )
 
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Wing Ext. Index, +/- SEM')
-    ax.set_title('Wing Extension (%s)' % laser, size=12)
+    ax.set_ylabel('Wing Ext. Index')
     ax.set_ylim([-0.1,0.6])
     ax.set_xlim([-60,480])
 
@@ -254,12 +264,21 @@ def plot_data(path, laser, dfs):
 
     datasets = {}
     for gt in dfs:
+        if flymad_analysis.genotype_is_exp(gt):
+            order = 1
+        elif flymad_analysis.genotype_is_ctrl(gt):
+            order = 2
+        else:
+            order = 3
         gtdf = dfs[gt]
         datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
                             value=gtdf['mean']['dtarget'].values,
                             std=gtdf['std']['dtarget'].values,
                             n=gtdf['n']['dtarget'].values,
-                            color=COLORS[gt])
+                            label=flymad_analysis.human_label(gt),
+                            order=order,
+                            color=COLORS[gt],
+                            N=len(gtdf['df']['obj_id'].unique()))
     ctrlmean = dfs['wtrpmyc']['mean']
 
     fig = plt.figure("Courtship Dtarget 10min (%s)" % laser)
@@ -270,12 +289,12 @@ def plot_data(path, laser, dfs):
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
                     legend_location='lower right',
+                    note="laser %s\n" % laser,
                     **datasets
     )
 
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Distance (mm), +/- SEM')
-    ax.set_title('Distance to Nearest Target (%s)' % laser, size=12)
+    ax.set_ylabel('Distance (mm)')
     #ax.set_ylim([20,120])
     ax.set_xlim([-60,480])
 
@@ -343,12 +362,14 @@ if __name__ == "__main__":
                                       value=expdf['mean']['zx'].values,
                                       std=expdf['std']['zx'].values,
                                       n=expdf['n']['zx'].values,
-                                      color=COLORS[laser])
+                                      color=COLORS[laser],
+                                      N=len(expdf['df']['obj_id'].unique()))
             laser_dtarget[laser] = dict(xaxis=expdf['mean']['t'].values,
                                         value=expdf['mean']['dtarget'].values,
                                         std=expdf['std']['dtarget'].values,
                                         n=expdf['n']['dtarget'].values,
-                                        color=COLORS[laser])
+                                        color=COLORS[laser],
+                                        N=len(expdf['df']['obj_id'].unique()))
 
         #all D/R experiments were identical, so take activation times from the
         #last one
@@ -362,8 +383,7 @@ if __name__ == "__main__":
                         sem=True,
                         **laser_court
         )
-        axw.set_title('Wing Extension', size=12)
-        axw.set_ylabel('Wing Ext. Index, +/- SEM')
+        axw.set_ylabel('Wing Ext. Index')
 
         figd = plt.figure("Courtship Dtarget 10min D/R")
         axd = figd.add_subplot(1,1,1)
@@ -372,8 +392,7 @@ if __name__ == "__main__":
                         sem=True,
                         **laser_dtarget
         )
-        axd.set_ylabel('Distance (mm), +/- SEM')
-        axd.set_title('Distance to Nearest Target', size=12)
+        axd.set_ylabel('Distance (mm)')
 
         for figname,fig,ax in [("DR_following_and_WingExt",figw,axw), ("DR_following_and_dtarget",figd,axd)]:
             ax.set_xlabel('Time (s)')
