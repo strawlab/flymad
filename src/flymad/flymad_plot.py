@@ -52,7 +52,7 @@ def get_plotpath(path, name):
     print "wrote", fig_out
     return fig_out
 
-def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False, legend_location='upper right', **datasets):
+def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False, legend_location='upper right', note="", **datasets):
     DEFAULT_COLORS = {"exp":RED,"ctrl":BLACK}
 
     def _ds(a):
@@ -77,6 +77,10 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                             edgecolor='none', facecolor=tb.get('facecolor','yellow'),
                             alpha=0.15, transform=trans, zorder=1)
 
+    note += "+/- SEM" if sem else "+/- STD"
+    note += "\n"
+    note += "" if downsample == 1 else ("downsample x %d\n" % downsample)
+
     #zorder = 1 = back
     top_zorder = 60
     bottom_zorder = 30
@@ -85,12 +89,16 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
     for data in sorted(datasets.keys(), cmp=_sort_by_order):
         exp = datasets[data]
 
+        label = exp.get('label',data)
+
+        note += "N(%s)=%s\n" % (label,exp.get('N','??'))
+
         if exp.get('ontop'):
             this_zorder = top_zorder + cur_zorder
         else:
             this_zorder = bottom_zorder + cur_zorder
 
-        print "plotting", data, "zorder", this_zorder
+        print "plotting %s (%s) zorder %s" % (label,data,this_zorder)
 
         if sem:
             spread = exp['std'] / np.sqrt(exp['n'])
@@ -102,7 +110,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                     zorder=this_zorder)
 
         ax.plot(exp['xaxis'][::downsample], _ds(exp['value']),
-                    color=exp.get('color',DEFAULT_COLORS.get(data,'k')),label=exp.get('label',data),lw=2,
+                    color=exp.get('color',DEFAULT_COLORS.get(data,'k')),label=label,lw=2,
                     zorder=this_zorder+1)
 
         cur_zorder -= 2
@@ -111,6 +119,12 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
 
     l = ax.legend(loc=legend_location)
     l.set_zorder(1+top_zorder+cur_zorder)
+
+    ax.text(0, 1,note,
+            horizontalalignment='left',
+            verticalalignment='top',
+            transform=ax.transAxes,
+            zorder=0)
 
 #setup default plotting styles
 smd.setup_defaults()
