@@ -206,9 +206,10 @@ def plot_data(path, data):
 
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Wing Ext. Index')
-        #ax.set_title('Wing Extension (%s)' % laser, size=12)
-        ax.set_ylim([-0.1,1.0])
+        ax.set_ylim([-0.05,1.0])
         ax.set_xlim([0,210])
+
+        flymad_plot.retick_relabel_axis(ax, [20, 30, 50, 200], [0, 0.5, 1])
 
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.svg" % figname), bbox_inches='tight')
