@@ -85,7 +85,7 @@ def prepare_data(path, arena, smoothstr, smooth, gts):
         df['t'] = tb - t0
 
         #groupby on float times is slow. make a special align column 
-        df['align'] = np.array(range(0,len(df))) - t0idx
+        df['t_align'] = np.array(range(0,len(df))) - t0idx
 
         df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
@@ -102,7 +102,7 @@ def prepare_data(path, arena, smoothstr, smooth, gts):
             raise Exception("only one lasergroup handled for gt %s: not %s" % (
                              gt, lgs))
 
-        grouped = gtdf.groupby(['align'], as_index=False)
+        grouped = gtdf.groupby(['t_align'], as_index=False)
         data[gt] = dict(mean=grouped.mean().astype(float),
                         std=grouped.std().astype(float),
                         n=grouped.count().astype(float),
