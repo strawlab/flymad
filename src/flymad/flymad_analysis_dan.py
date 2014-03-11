@@ -2,6 +2,7 @@ import math
 import glob
 import os.path
 import datetime
+import re
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,40 @@ import matplotlib.patches
 SECOND_TO_NANOSEC = 1e9
 
 from trackingparams import Kalman
+
+GENOTYPE_LABELS = {
+    "wtrpmyc":"+/TRPA1","wtrp":"+/TRPA1",
+    "G323":"P1/+","wGP":"P1/TRPA1",
+    "40347":"pIP10/+","40347trpmyc":"pIP10/TRPA1",
+    "5534":"vPR6/+","5534trpmyc":"vPR6/TRPA1",
+    "43702":"vMS11/+","43702trp":"vMS11/TRPA1",
+    "41688":"dPR1/+","41688trp":"dPR1/TRPA1",
+}
+
+HUMAN_LABELS = {
+    "wtrpmyc":"UAS-control","wtrp":"UAS-control",
+    "G323":"Gal4 control","wGP":"P1>TRPA1",
+    "40347":"Gal4 control","40347trpmyc":"pIP10>TRPA1",
+    "5534":"Gal4 control","5534trpmyc":"vPR6>TRPA1",
+    "43702":"Gal4 control","43702trp":"vMS11>TRPA1",
+    "41688":"Gal4 control","41688trp":"dPR1>TRPA1",
+}
+
+def human_label(gt):
+    return HUMAN_LABELS.get(gt,gt)
+
+def genotype_label(gt):
+    return GENOTYPE_LABELS.get(gt,gt)
+
+def genotype_is_exp(gt):
+    return re.match('\w+/\w+$', genotype_label(gt)) is not None
+
+def genotype_is_ctrl(gt):
+    return re.match('\w+/\+$', genotype_label(gt)) is not None
+
+def genotype_is_trp_ctrl(gt):
+    return re.match('\+/\w+$', genotype_label(gt)) is not None
+
 
 def get_arena_conf(calibration_file=None):
     #DEFAULTS FROM THE FIRST NMETH SUBMISSION - AS USED FOR DANS
