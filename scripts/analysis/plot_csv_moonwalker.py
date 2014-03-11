@@ -26,6 +26,27 @@ HEAD    = +100
 THORAX  = -100
 OFF     = 0
 
+CURRENT_LABELS = {
+    '350ru':'red 35mA',
+    '033ru':'red 33mA',
+    '030ru':'red 30mA',
+    '028ru':'red 28mA',
+    '434iru':'infrared 434mA',
+    '350iru':'infrared 350mA',
+    '266iru':'infrared 266mA',
+    '183iru':'infrared 183mA',
+}
+POWER_LABELS = {
+    '350ru':'red 460uW',
+    '033ru':'red 341uW',
+    '030ru':'red 163uW',
+    '028ru':'red 50uW',
+    '434iru':'infrared 208uW',
+    '350iru':'infrared 158uW',
+    '266iru':'infrared 107uW',
+    '183iru':'infrared 58uW',
+}
+
 def prepare_data(path, smooth, resample, only_laser, gts):
     path_out = path + "/outputs/"
     if not os.path.exists(path_out):
@@ -126,28 +147,60 @@ def prepare_data(path, smooth, resample, only_laser, gts):
 
     return data
 
-def plot_data(data):
+def plot_cross_activation_only(data):
 
-    CURRENT_LABELS = {
-        '350ru':'red 35mA',
-        '033ru':'red 33mA',
-        '030ru':'red 30mA',
-        '028ru':'red 28mA',
-        '434iru':'infrared 434mA',
-        '350iru':'infrared 350mA',
-        '266iru':'infrared 266mA',
-        '183iru':'infrared 183mA',
-    }
-    POWER_LABELS = {
-        '350ru':'red 460uW',
-        '033ru':'red 341uW',
-        '030ru':'red 163uW',
-        '028ru':'red 50uW',
-        '434iru':'infrared 208uW',
-        '350iru':'infrared 158uW',
-        '266iru':'infrared 107uW',
-        '183iru':'infrared 58uW',
-    }
+    LABELS = CURRENT_LABELS
+
+    PLOTS = [('50660chrim',{'activation':'350ru','cross_activation':'350iru'}),
+             ('50660trp',{'activation':'434iru','cross_activation':'350ru'}),
+             ('50660trp',{'activation':'350iru','cross_activation':'350ru'}),
+    ]
+
+    for gt,lasers in PLOTS:
+        figname = 'vs'.join(lasers.values())
+
+        alaser = lasers['activation']
+        adf = data[gt][alaser][gt]
+        claser = lasers['cross_activation']
+        cdf = data[gt][claser][gt]
+        datasets = {
+            'activation':dict(xaxis=adf['mean']['t'].values,
+                              value=adf['mean']['Vfwd'].values,
+                              std=adf['std']['Vfwd'].values,
+                              n=adf['n']['Vfwd'].values,
+                              label='Activation (%s)' % LABELS[alaser],
+                              order=0,
+                              color=flymad_plot.RED),
+            'cross_activation':dict(
+                              xaxis=cdf['mean']['t'].values,
+                              value=cdf['mean']['Vfwd'].values,
+                              std=cdf['std']['Vfwd'].values,
+                              n=cdf['n']['Vfwd'].values,
+                              label='Cross Activation (%s)' % LABELS[claser],
+                              order=0,
+                              color=flymad_plot.BLACK)
+        }
+
+        fig = plt.figure("Moonwalker Thorax Crosstalk %s (%s)" % (gt,figname), figsize=(10,8))
+        ax = fig.add_subplot(1,1,1)
+        flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=adf['mean']['t'].values,
+                                       where=adf['mean']['laser_state'].values>0),
+                    downsample=25,
+                    **datasets
+        )
+        ax.axhline(color='k', linestyle='--',alpha=0.8)
+        ax.set_title("%s Velocity" % gt)
+        ax.set_ylim([-10,30])
+        #ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Fwd Velocity (%s/s) +/- STD' % arena.unit)
+        #ax.set_xlim([0, 9])
+
+        fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.png" % (gt, figname)), bbox_inches='tight')
+        fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.svg" % (gt, figname)), bbox_inches='tight')
+
+
+def plot_all_data(data):
 
     LABELS = CURRENT_LABELS
 
@@ -235,7 +288,8 @@ if __name__ == "__main__":
                     pass
         madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
-    plot_data(data)
+    plot_all_data(data)
+    plot_cross_activation_only(data)
 
     if args.show:
         plt.show()
