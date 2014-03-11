@@ -448,6 +448,12 @@ def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap
     if not df.index.is_unique:
         raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
 
+    #remove rows before we have a position
+    q = pd.isnull(df['x']).values
+    first_valid_row = np.argmin(q)
+    df = df.iloc[first_valid_row:]
+    print "\tremove %d invalid rows at start of file" % first_valid_row
+
     if valmap is not None:
         #this must be done before resampling
         fix_scoring_colums(df, valmap)
