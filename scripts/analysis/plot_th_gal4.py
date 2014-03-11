@@ -303,7 +303,6 @@ def plot_data(arena, dirname, smooth, dfs):
         ax = fig.add_subplot(111)
         datasets = {}
         for i, condition in enumerate(conditions):
-            print 'condition %r'%condition
             all_dfs = []
             for (df,parsed_data,laser_on) in dfs[condition]:
                 df = df.resample('10L')
