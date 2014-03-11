@@ -2,6 +2,8 @@
 import strawlab_mpl.defaults as smd
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 import matplotlib
+import cPickle as pickle
+import datetime
 
 def setup_defaults():
     rcParams = matplotlib.rcParams
@@ -23,7 +25,7 @@ import matplotlib.pyplot as plt
 import time
 from collections import namedtuple, OrderedDict, defaultdict
 import argparse
-import pprint
+
 
 import madplot
 
@@ -224,6 +226,11 @@ NAMES = OrderedDict([('th1stim_head',('head','TH>trpA1')),
                      ('thgal41stim_thorax',('thorax','TH')),
                      ])
 
+def make_cache_fname( arena, dirname, bag_dirname, smooth ):
+    d = os.path.basename(dirname)
+    b = os.path.basename(bag_dirname)
+    return 'cache_%s_%s_%s_%s.pkl'%(arena.unit,d,b,smooth)
+
 def prepare_data( arena, dirname, bag_dirname, smooth ):
     dfs = defaultdict(list)
     dirname = os.path.abspath(dirname)
@@ -268,11 +275,45 @@ def prepare_data( arena, dirname, bag_dirname, smooth ):
         # plt.plot(x,y,label='%s'%(parsed_data['condition'],))
         dfs[parsed_data['condition']].append( (t_df, parsed_data, laser_on) )
 
+
+    cache_fname = make_cache_fname( arena, dirname, bag_dirname, smooth )
+    print 'saveing cache',cache_fname
+    pickle.dump(dfs, open(cache_fname,'wb'), -1)
     return dfs
 
 def plot_data(arena, dirname, smooth, dfs):
     conditions = dfs.keys()
     n_conditions = len(conditions)
+
+    DO_LATENCY_FIGURE = False
+    DO_POSITION_FIGURE = True
+
+    if DO_POSITION_FIGURE:
+        fig = plt.figure()
+        max_trials = 0
+        for i, condition in enumerate(conditions):
+            n_trials = len(dfs[condition])
+            max_trials = max( max_trials, n_trials )
+
+        ax = None
+        for i, condition in enumerate(conditions):
+            for j in range(max_trials):
+                if j>=len(dfs[condition]):
+                    break
+                ax = fig.add_subplot(n_conditions, max_trials, i*max_trials+j+1,
+                                     sharex=ax, sharey=ax)
+                (t_df,parsed_data,laser_on) = dfs[condition][j]
+                post_laser_df = t_df[ t_df.index > (laser_on)]# + datetime.timedelta(seconds=2.0)) ]
+                ax.plot( post_laser_df['x'],
+                         post_laser_df['y'],
+                         'r.'
+                         )
+                pre_laser_df = t_df[ t_df.index <= (laser_on)]# + datetime.timedelta(seconds=2.0)) ]
+                ax.plot( pre_laser_df['x'],
+                         pre_laser_df['y'],
+                         'k.'
+                         )
+
 
     # how many trials do we want to analyze?
     condition = conditions[0]
@@ -294,8 +335,9 @@ def plot_data(arena, dirname, smooth, dfs):
             counts = {}
             latency_values = defaultdict(list)
 
-            fig = plt.figure('timeseries %s, trial %d'%(measurement,trial_num))
             n_rows, n_cols = my_subplot( n_conditions )
+            if DO_LATENCY_FIGURE:
+                fig = plt.figure('timeseries %s, trial %d'%(measurement,trial_num))
             df = {'latency':[],
                   'name_key':[],
                   }
@@ -304,7 +346,8 @@ def plot_data(arena, dirname, smooth, dfs):
                          }
             for i, condition in enumerate(conditions):
                 target_location, genotype = NAMES[condition]
-                ax = fig.add_subplot(n_rows, n_cols, i+1 )
+                if DO_LATENCY_FIGURE:
+                    ax = fig.add_subplot(n_rows, n_cols, i+1 )
                 arrs = []
                 total_trials = 0
                 action_trials = 0
@@ -323,11 +366,12 @@ def plot_data(arena, dirname, smooth, dfs):
                     mean_v_mm = np.mean(v_mm)
                     mean_vels.append( mean_v_mm )
 
-                    ax.plot(t_df[measurement],
-                            label='%s (fly %s, trial %s)'%(parsed_data['condition'],
-                                                           parsed_data['condition_flynum'],
-                                                           parsed_data['trialnum'],
-                                                           ))
+                    if DO_LATENCY_FIGURE:
+                        ax.plot(t_df[measurement],
+                                label='%s (fly %s, trial %s)'%(parsed_data['condition'],
+                                                               parsed_data['condition_flynum'],
+                                                               parsed_data['trialnum'],
+                                                               ))
                     arrs.append( t_df['proboscis'] )
                     selected_df = t_df[ t_df[measurement] > 0.5 ]
                     if len(selected_df)==0:
@@ -364,10 +408,12 @@ def plot_data(arena, dirname, smooth, dfs):
                 counts[condition] = (action_trials,total_trials, np.mean(mean_vels))
                 all_arrs = np.array( arrs )
                 mean_arr = np.mean( all_arrs, axis=0 )
-                ax.plot( mean_arr, color='k', lw=2 )
-                ax.set_title('%s (n=%d)'%(condition, counts[condition][1]))
-                #ax.legend()
-            fig.subplots_adjust(hspace=0.39)
+                if DO_LATENCY_FIGURE:
+                    ax.plot( mean_arr, color='k', lw=2 )
+                    ax.set_title('%s (n=%d)'%(condition, counts[condition][1]))
+                    ax.legend()
+            if DO_LATENCY_FIGURE:
+                fig.subplots_adjust(hspace=0.39)
 
             df = pd.DataFrame(df)
             df_fname = '%s_notpooled.df'%(measurement,)
@@ -378,9 +424,6 @@ def plot_data(arena, dirname, smooth, dfs):
             df_fname = '%s_pooled.df'%(measurement,)
             df_pooled.to_pickle(df_fname)
             print 'saved',df_fname
-            print '_'*30, '%s, trial %d'%(measurement, trial_num), '_'*30
-            pprint.pprint(counts)
-            print '_'*80
 
         print '='*80
 
@@ -399,7 +442,13 @@ if __name__=='__main__':
 
     arena = madplot.Arena('mm')
 
-    data = prepare_data(arena, dirname, args.bagdir, smooth=args.smooth)
+    if args.only_plot:
+        cache_fname = make_cache_fname(arena, dirname, args.bagdir, smooth=args.smooth)
+        print 'loading cache',cache_fname
+        with open(cache_fname,mode='rb') as f:
+            data = pickle.load(f)
+    else:
+        data = prepare_data(arena, dirname, args.bagdir, smooth=args.smooth)
 
     plot_data( arena, dirname, args.smooth, data)
 
