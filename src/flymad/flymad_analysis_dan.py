@@ -449,5 +449,11 @@ def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap
     #smooth the positions, and recalculate the velocitys based on this.
     dt = kalman_smooth_dataframe(df, arena, smooth)
 
+    if 'laser_state' in df.columns:
+        df['laser_state'] = df['laser_state'].fillna(value=0)
+        #the resampling above, using the default rule of 'mean' will, if the laser
+        #was on any time in that bin, increase the mean > 0.
+        df['laser_state'][df['laser_state'] > 0] = 1
+
     return df,dt,experimentID,date,time,genotype,laser,repID
 
