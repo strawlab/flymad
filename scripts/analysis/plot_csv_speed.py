@@ -236,23 +236,25 @@ if __name__ == "__main__":
     EXP_GENOTYPE = 'OK371shits-130h'
     CTRL_GENOTYPE = 'OK371shits-nolaser'
     EXP2_GENOTYPE = 'OK371shits-130t'
+    CALIBRATION_FILE = 'calibration20140219_064948.filtered.yaml'
 
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
-    parser.add_argument('--calibration', default=None, help='calibration yaml file')
+    parser.add_argument('--calibration-dir', help='calibration directory containing yaml files', required=True)
 
     args = parser.parse_args()
     path = args.path[0]
 
     smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
 
+    calibration_file = os.path.join(args.calibration_dir, CALIBRATION_FILE)
     arena = madplot.Arena(
                 'mm',
-                **flymad_analysis.get_arena_conf(calibration_file=args.calibration))
+                **flymad_analysis.get_arena_conf(calibration_file=calibration_file))
 
-    note = "%s %s" % (arena.unit, smoothstr)
+    note = "%s %s\n%r" % (arena.unit, smoothstr, arena)
 
     data = prepare_data(path, arena, smoothstr, args.smooth, [EXP_GENOTYPE, CTRL_GENOTYPE, EXP2_GENOTYPE])
 
