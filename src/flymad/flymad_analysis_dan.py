@@ -2,6 +2,8 @@ import math
 import glob
 import os.path
 import datetime
+import calendar
+import time
 import re
 
 import numpy as np
@@ -235,6 +237,24 @@ class Arena:
         #(xlim, ylim)
         return self.xlim, self.ylim
 
+def create_object_id(datestr=None, timestr=None):
+    #date = 20140216
+    #time = 174913.mp4.csv
+
+    ts = None
+    if datestr and timestr:
+        try:
+            dt = datetime.datetime.strptime("%s_%s" % (datestr,timestr.split('.')[0]),
+                                           "%Y%m%d_%H%M%S")
+            ts = calendar.timegm(dt.timetuple())
+        except ValueError:
+            print "invalid date/time", datestr, timestr
+
+    if ts is None:
+        ts = int(time.time()*1e9)
+
+    return ts
+
 def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_state=True):
     filelist = []
 
@@ -294,7 +314,8 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
         df['cv'][df['cv'] == 'v'] = 0
         df['as'][df['as'] == 's'] = 0
 
-        df['obj_id'] = obj_id
+        #give files a semi-random obj_id
+        df['obj_id'] = create_object_id(date,time)
 
         cols = ['t','theta','v','vx','vy','x','y','zx','as','cv', 'obj_id']
         if  as_is_laser_state:
