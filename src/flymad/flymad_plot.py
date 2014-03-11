@@ -151,7 +151,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
 
     ax.text(0, 1, #top left
             note,
-            fontsize=8,
+            fontsize=10,
             horizontalalignment='left',
             verticalalignment='top',
             transform=ax.transAxes,
