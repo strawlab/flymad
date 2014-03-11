@@ -25,42 +25,16 @@ assert pd.version.version in ("0.11.0" ,  "0.12.0")
 
 RESAMPLE_SPECIFIER = '10L'
 
-def _load_and_smooth_csv(csvfile, arena, smooth, resample_specifier):
-    csvfilefn = os.path.basename(csvfile)
-    try:
-        experimentID,date,time = csvfilefn.split("_",2)
-        genotype,laser,repID = experimentID.split("-",2)
-        repID = repID + "_" + date
-        print "processing: ", experimentID
-    except:
-        print "invalid filename:", csvfilefn
-        return None
+def prepare_data(path, arena, smoothstr, smooth, gts):
 
-    df = pd.read_csv(csvfile, index_col=0)
-
-    if not df.index.is_unique:
-        raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
-
-    #resample to 10ms (mean) and set a proper time index on the df
-    df = flymad_analysis.fixup_index_and_resample(df, resample_specifier)
-
-    #smooth the positions, and recalculate the velocitys based on this.
-    dt = flymad_analysis.kalman_smooth_dataframe(df, arena, smooth)
-
-    return df,dt,experimentID,date,time,genotype,laser,repID
-
-def prepare_data(path, arena, smoothstr, smooth, exp_genotype, ctrl_genotype, exp2_genotype):
-
-    df2 = DataFrame()
-    if not os.path.exists(path + "/Speed_calculations/"):
-        os.makedirs(path + "/Speed_calculations/")
+    pooldf = DataFrame()
     for csvfile in sorted(glob.glob(path + "/*.csv")):
         cache_args = os.path.basename(csvfile), arena, smoothstr, RESAMPLE_SPECIFIER
         cache_fname = csvfile+'.madplot-cache'
 
         results = madplot.load_bagfile_cache(cache_args, cache_fname)
         if results is None:
-            results = _load_and_smooth_csv(csvfile, arena, smooth, RESAMPLE_SPECIFIER)
+            results = flymad_analysis.load_and_smooth_csv(csvfile, arena, smooth, RESAMPLE_SPECIFIER)
             if results is not None:
                 #update the cache
                 madplot.save_bagfile_cache(results, cache_args, cache_fname)
@@ -73,6 +47,10 @@ def prepare_data(path, arena, smoothstr, smooth, exp_genotype, ctrl_genotype, ex
         #we plot head v thorax v nolaser (so for the same of plotting, consider
         #these the genotypes
         genotype = genotype + '-' + laser
+
+        if genotype not in gts:
+            print "\tskipping genotype", genotype
+            continue
 
         if 0:
             fig = plt.figure()
@@ -111,25 +89,19 @@ def prepare_data(path, arena, smoothstr, smooth, exp_genotype, ctrl_genotype, ex
 
         assert len(dftemp) == 5001
 
-        df2 = pd.concat([df2, dftemp])
+        pooldf = pd.concat([pooldf, dftemp])
 
-    expdf = df2[df2['Genotype'] == exp_genotype]
-    ctrldf = df2[df2['Genotype']== ctrl_genotype]
-    exp2df = df2[df2['Genotype']== exp2_genotype]
+    data = {}
+    for gt in gts:
+        gtdf = pooldf[pooldf['Genotype'] == gt]
+        grouped = gtdf.groupby(['align'], as_index=False)
+        data[gt] = dict(mean=grouped.mean().astype(float),
+                        std=grouped.std().astype(float),
+                        n=grouped.count().astype(float),
+                        first=grouped.first(),
+                        df=gtdf)
 
-    expmean = expdf.groupby(['align'], as_index=False).mean().astype(float)
-    ctrlmean = ctrldf.groupby(['align'], as_index=False).mean().astype(float)
-    exp2mean = exp2df.groupby(['align'], as_index=False).mean().astype(float)
-
-    expstd = expdf.groupby(['align'], as_index=False).mean().astype(float)
-    ctrlstd = ctrldf.groupby(['align'], as_index=False).mean().astype(float)
-    exp2std = exp2df.groupby(['align'], as_index=False).mean().astype(float)
-
-    expn = expdf.groupby(['align'], as_index=False).count().astype(float)
-    ctrln = ctrldf.groupby(['align'], as_index=False).count().astype(float)
-    exp2n = exp2df.groupby(['align'], as_index=False).count().astype(float)
-
-    return expmean, ctrlmean, exp2mean, expstd, ctrlstd, exp2std, expn, ctrln, exp2n, df2
+    return data
 
 def get_stats(group):
     return {'mean': group.mean(),
@@ -205,34 +177,41 @@ def fit_to_curve (path, arena, smoothstr, p_values):
     ax.set_ylim([0, 25])
     ax.set_xlim([5, 40])
 
-def plot_data(path, arena, smoothstr, dfs):
+def plot_data(path, arena, smoothstr, data):
 
-    expmean, ctrlmean, exp2mean, expstd, ctrlstd, exp2std, expn, ctrln, exp2n, df2 = dfs
+    LABELS = {'OK371shits-130h':'OK371>ShibireTS (head)',
+              'OK371shits-nolaser':'Control',
+              'OK371shits-130t':'OK371>ShibireTS (thorax)',
+    }
+
+    COLORS = {'OK371shits-130h':flymad_plot.RED,
+              'OK371shits-nolaser':flymad_plot.BLACK,
+              'OK371shits-130t':flymad_plot.ORANGE,
+    }
 
     fig2 = plt.figure("Speed Multiplot %s" % smoothstr)
     ax = fig2.add_subplot(1,1,1)
 
+    datasets = {}
+    for gt in data:
+        gtdf = data[gt]
+        datasets[gt] = dict(xaxis=gtdf['mean']['align'].values,
+                            value=gtdf['mean']['v'].values,
+                            std=gtdf['std']['v'].values,
+                            n=gtdf['n']['v'].values,
+                            label=LABELS[gt],
+                            color=COLORS[gt])
+
+    ctrlmean = data['OK371shits-nolaser']['mean']
+
     flymad_plot.plot_timeseries_with_activation(ax,
-                    exp=dict(xaxis=expmean['align'].values,
-                             value=expmean['v'].values,
-                             std=expstd['v'].values,
-                             n=expn['v'].values,
-                             label='OK371>ShibireTS (head)',
-                             ontop=True),
-                    ctrl=dict(xaxis=ctrlmean['align'].values,
-                              value=ctrlmean['v'].values,
-                              std=ctrlstd['v'].values,
-                              n=ctrln['v'].values,
-                              label='Control'),
-                    exp2=dict(xaxis=exp2mean['align'].values,
-                             value=exp2mean['v'].values,
-                             std=exp2std['v'].values,
-                             n=exp2n['v'].values,
-                             label='OK371>ShibireTS (body)'),
-                    targetbetween=ctrlmean['laser_state'].values>0,
-                    downsample=25,
-                    sem=True
+                targetbetween=dict(xaxis=ctrlmean['align'].values,
+                                   where=ctrlmean['laser_state'].values>0),
+                downsample=25,
+                sem=True,
+                **datasets
     )
+
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Speed (%s/s) +/- STD' % arena.unit)
     ax.set_xlim([0, 50])
@@ -263,7 +242,7 @@ if __name__ == "__main__":
                 'mm',
                 **flymad_analysis.get_arena_conf(calibration_file=args.calibration))
 
-    data = prepare_data(path, arena, smoothstr, args.smooth, EXP_GENOTYPE, CTRL_GENOTYPE, EXP2_GENOTYPE)
+    data = prepare_data(path, arena, smoothstr, args.smooth, [EXP_GENOTYPE, CTRL_GENOTYPE, EXP2_GENOTYPE])
 
     #p_values = run_stats(path, arena, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
     #fit_to_curve(path, arena, smoothstr, p_values)

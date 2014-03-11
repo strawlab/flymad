@@ -2,7 +2,7 @@ import argparse
 import glob
 import os
 import subprocess
-import pickle
+import cPickle as pickle
 
 import numpy as np
 import pandas as pd
@@ -14,6 +14,7 @@ from scipy.stats import ttest_ind
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
+import madplot
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
@@ -76,7 +77,7 @@ def _get_targets(path, date):
     return []
 
 def prepare_data(path, only_laser, gts):
-    exp_genotype, exp2_genotype, ctrl_genotype = gts
+    data = {}
 
     path_out = path + "/outputs/"
     if not os.path.exists(path_out):
@@ -88,6 +89,10 @@ def prepare_data(path, only_laser, gts):
         csvfilefn,experimentID,date,time,genotype,laser,repID = metadata
         if laser != only_laser:
             print "\tskipping laser", laser
+            continue
+
+        if genotype not in gts:
+            print "\tskipping genotype", genotype
             continue
 
         targets = _get_targets(path, date)
@@ -139,32 +144,18 @@ def prepare_data(path, only_laser, gts):
 
         pooldf = pd.concat([pooldf, df[['Genotype','lasergroup', 't','zx', 'dtarget', 'laser_state']]])   
 
-    # half-assed, uninformed danno's tired method of grouping for plots:
-    expdf = pooldf[pooldf['Genotype'] == exp_genotype]
-    exp2df = pooldf[pooldf['Genotype'] == exp2_genotype]
-    ctrldf = pooldf[pooldf['Genotype']== ctrl_genotype]
+    data = {}
+    for gt in gts:
+        gtdf = pooldf[pooldf['Genotype'] == gt]
+        print gt,gtdf
 
-    assert len(expdf['lasergroup'].unique()) == 1, "only one lasergroup handled, see --laser"
+        assert len(gtdf['lasergroup'].unique()) == 1, "only one lasergroup handled, see --laser"
 
-    #Also ensure things are floats before plotting can fail, which it does because
-    #groupby does not retain types on grouped colums, which seems like a bug to me
+        data[gt] = dict(mean=gtdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float),
+                        std=gtdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float),
+                        n=gtdf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float))
 
-    expmean = expdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float)
-    exp2mean = exp2df.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float)
-    ctrlmean = ctrldf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float)
-    
-    expstd = expdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float)
-    exp2std = exp2df.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float)
-    ctrlstd = ctrldf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float)
-    
-    expn = expdf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float)
-    exp2n = exp2df.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float)
-    ctrln = ctrldf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float)
-    
-    return (expdf, expmean, expstd, expn,
-            exp2df, exp2mean, exp2std, exp2n,
-            ctrldf, ctrlmean, ctrlstd, ctrln,
-            pooldf)
+    return data
 
 def run_stats (path, dfs):
 
@@ -221,41 +212,35 @@ def fit_to_curve ( p_values ):
     print polynom #lazy dan can't use python to solve polynomial eqns. boo.
     return (x, y, xPoly, yPoly, polynom)
 
+def plot_data(path, laser, dfs):
 
-def plot_data(path, laser, gts, dfs):
-
-    (expdf, expmean, expstd, expn,
-            exp2df, exp2mean, exp2std, exp2n,
-            ctrldf, ctrlmean, ctrlstd, ctrln,
-            pooldf) = dfs
+    COLORS = {'wtrpmyc':flymad_plot.BLACK,
+              'wGP':flymad_plot.RED,
+              '40347trpmyc':flymad_plot.ORANGE,
+              'G323':flymad_plot.BLUE,
+              '40347':flymad_plot.GREEN}
 
     path_out = path + "/outputs/"
+    figname = laser + '_' + '_'.join(dfs)
 
-    figname = laser + '_' + '_'.join(gts)
+    datasets = {}
+    for gt in dfs:
+        gtdf = dfs[gt]
+        datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
+                            value=gtdf['mean']['zx'].values,
+                            std=gtdf['std']['zx'].values,
+                            n=gtdf['n']['zx'].values,
+                            color=COLORS[gt])
+    ctrlmean = dfs['wtrpmyc']['mean']
 
     fig = plt.figure("Courtship Wingext 10min (%s)" % laser)
     ax = fig.add_subplot(1,1,1)
 
     flymad_plot.plot_timeseries_with_activation(ax,
-                    exp=dict(xaxis=expmean['t'].values,
-                             value=expmean['zx'].values,
-                             std=expstd['zx'].values,
-                             n=expn['zx'].values,
-                             label='P1>TRPA1',
-                             ontop=True),
-                    ctrl=dict(xaxis=ctrlmean['t'].values,
-                              value=ctrlmean['zx'].values,
-                              std=ctrlstd['zx'].values,
-                              n=ctrln['zx'].values,
-                              label='Control'),
-                    exp2=dict(xaxis=exp2mean['t'].values,
-                             value=exp2mean['zx'].values,
-                             std=exp2std['zx'].values,
-                             n=exp2n['zx'].values,
-                             label='pIP10>TRPA1',
-                             ontop=True),
-                    targetbetween=ctrlmean['laser_state'].values>0,
+                    targetbetween=dict(xaxis=ctrlmean['t'].values,
+                                       where=ctrlmean['laser_state'].values>0),
                     sem=True,
+                    **datasets
     )
 
     ax.set_xlabel('Time (s)')
@@ -267,47 +252,44 @@ def plot_data(path, laser, gts, dfs):
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
 
-    if 1:
-        fig = plt.figure("Courtship Dtarget 10min (%s)" % laser)
-        ax = fig.add_subplot(1,1,1)
+    datasets = {}
+    for gt in dfs:
+        gtdf = dfs[gt]
+        datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
+                            value=gtdf['mean']['dtarget'].values,
+                            std=gtdf['std']['dtarget'].values,
+                            n=gtdf['n']['dtarget'].values,
+                            color=COLORS[gt])
+    ctrlmean = dfs['wtrpmyc']['mean']
 
-        flymad_plot.plot_timeseries_with_activation(ax,
-                        exp=dict(xaxis=expmean['t'].values,
-                                 value=expmean['zx'].values,
-                                 std=expstd['zx'].values,
-                                 n=expn['zx'].values,
-                                 label='P1>TRPA1',
-                                 ontop=True),
-                        ctrl=dict(xaxis=ctrlmean['t'].values,
-                                  value=ctrlmean['dtarget'].values,
-                                  std=ctrlstd['dtarget'].values,
-                                  n=ctrln['dtarget'].values,
-                                  label='Control'),
-                        exp2=dict(xaxis=exp2mean['t'].values,
-                                 value=exp2mean['dtarget'].values,
-                                 std=exp2std['dtarget'].values,
-                                 n=exp2n['dtarget'].values,
-                                 label='pIP10>TRPA1',
-                                 ontop=True),
-                        targetbetween=ctrlmean['laser_state'].values>0,
-                        sem=True,
-        )
+    fig = plt.figure("Courtship Dtarget 10min (%s)" % laser)
+    ax = fig.add_subplot(1,1,1)
 
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Distance (pixels), +/- SEM')
-        ax.set_title('Distance to Nearest Target (%s)' % laser, size=12)
-        #ax.set_ylim([20,120])
-        ax.set_xlim([-60,480])
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=ctrlmean['t'].values,
+                                       where=ctrlmean['laser_state'].values>0),
+                    sem=True,
+                    legend_location='lower right',
+                    **datasets
+    )
 
-        fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
-        fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Distance (mm), +/- SEM')
+    ax.set_title('Distance to Nearest Target (%s)' % laser, size=12)
+    #ax.set_ylim([20,120])
+    ax.set_xlim([-60,480])
+
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
 
 if __name__ == "__main__":
-    CTRL_GENOTYPE = 'wtrpmyc' #black
-    EXP_GENOTYPE = 'wGP' #blue
-    EXP_GENOTYPE2 = '40347trpmyc' #purple
+    CTRL_GENOTYPE = 'wtrpmyc'
+    EXP_GENOTYPE = 'wGP'
+    EXP2_GENOTYPE = '40347trpmyc'
+    CTRL2_GENOTYPE = 'G323'
+    CTRL3_GENOTYPE = '40347'
 
-    gts = EXP_GENOTYPE, EXP_GENOTYPE2, CTRL_GENOTYPE
+    gts = EXP_GENOTYPE, EXP2_GENOTYPE, CTRL_GENOTYPE, CTRL2_GENOTYPE, CTRL3_GENOTYPE
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('path', nargs=1, help='path to csv files')
@@ -320,38 +302,84 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
-    dfs = prepare_data(path, args.laser, gts)
+    cache_fname = os.path.join(path,'courtship.madplot-cache')
+    cache_args = (args.laser, gts)
+    dfs = None
+    if args.only_plot:
+        dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
+    if dfs is None:
+        dfs = prepare_data(path, args.laser, gts)
+        madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
+
+    plot_data(path, args.laser, dfs)
+
     #p_values1, p_values2 = run_stats(path, dfs)
     #fit_to_curve( p_values1 )
     #fit_to_curve( p_values2 )
-    plot_data(path, args.laser, gts, dfs)
 
     if args.dose_response:
+        COLORS = {'100hpc':flymad_plot.BLACK,
+                  '120hpc':flymad_plot.GREEN,
+                  '140hpc':flymad_plot.RED,
+                  '160hpc':flymad_plot.BLUE}
+
+        laser_court = {}
+        laser_dtarget = {}
         for laser in [100,120,140,160]:
             laser = '%dhpc' % laser
-            dfs = prepare_data(path, laser, [EXP_GENOTYPE,'',''])
-            expdf, expmean, expstd, expn = dfs[0:4]
 
-            fig = plt.figure("Courtship Wingext 10min D/R (%s)" % laser)
-            ax = fig.add_subplot(1,1,1)
-            flymad_plot.plot_timeseries_with_activation(ax,
-                            ctrl=dict(xaxis=expmean['t'].values,
-                                      value=expmean['zx'].values,
-                                      std=expstd['zx'].values,
-                                      n=expn['zx'].values,
-                                      label='P1>TRPA1',
-                                      ontop=True),
-                            targetbetween=expmean['laser_state'].values>0,
-                            sem=True,
-            )
+            cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % laser)
+            cache_args = None
+            dfs = None
+
+            if args.only_plot:
+                dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
+            if dfs is None:
+                dfs = prepare_data(path, laser, [EXP_GENOTYPE])
+                madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
+
+            expdf = dfs[EXP_GENOTYPE]
+            laser_court[laser] = dict(xaxis=expdf['mean']['t'].values,
+                                      value=expdf['mean']['zx'].values,
+                                      std=expdf['std']['zx'].values,
+                                      n=expdf['n']['zx'].values,
+                                      color=COLORS[laser])
+            laser_dtarget[laser] = dict(xaxis=expdf['mean']['t'].values,
+                                        value=expdf['mean']['dtarget'].values,
+                                        std=expdf['std']['dtarget'].values,
+                                        n=expdf['n']['dtarget'].values,
+                                        color=COLORS[laser])
+
+        #all D/R experiments were identical, so take activation times from the
+        #last one
+        targetbetween = dict(xaxis=expdf['mean']['t'].values,
+                             where=expdf['mean']['laser_state'].values>0)
+
+        figw = plt.figure("Courtship Wingext 10min D/R")
+        axw = figw.add_subplot(1,1,1)
+        flymad_plot.plot_timeseries_with_activation(axw,
+                        targetbetween=targetbetween,
+                        sem=True,
+                        **laser_court
+        )
+        axw.set_title('Wing Extension', size=12)
+        axw.set_ylabel('Wing Ext. Index, +/- SEM')
+
+        figd = plt.figure("Courtship Dtarget 10min D/R")
+        axd = figd.add_subplot(1,1,1)
+        flymad_plot.plot_timeseries_with_activation(axd,
+                        targetbetween=targetbetween,
+                        sem=True,
+                        **laser_dtarget
+        )
+        axd.set_ylabel('Distance (mm), +/- SEM')
+        axd.set_title('Distance to Nearest Target', size=12)
+
+        for figname,fig,ax in [("DR_following_and_WingExt",figw,axw), ("DR_following_and_dtarget",figd,axd)]:
             ax.set_xlabel('Time (s)')
-            ax.set_ylabel('Wing Ext. Index, +/- SEM')
-            ax.set_title('Wing Extension (%s)' % laser, size=12)
-            #ax.set_ylim([-0.1,0.6])
             ax.set_xlim([-60,120])
-            figname = laser + '_' + '_' + EXP_GENOTYPE
-            fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
-            fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
+            fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+            fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
     if args.show:
         plt.show()

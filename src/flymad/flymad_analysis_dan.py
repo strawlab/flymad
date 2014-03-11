@@ -208,7 +208,7 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
 
     globpattern = os.path.join(path,globpattern)
 
-    for posfile in sorted(glob.glob(globpattern)):
+    for obj_id,posfile in enumerate(sorted(glob.glob(globpattern))):
         csvfilefn = os.path.basename(posfile)
         df = pd.read_csv(posfile)
         try:
@@ -234,11 +234,15 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
             if csvfile2fn in filelist:
                 continue 
             elif repID2 == repID:
-                print "    concatenating:", csvfile2fn
-                filelist.append(csvfile2fn)
-                csv2df = pd.read_csv(csvfile2)
-                csv2df = pd.DataFrame(csv2df)
-                df = pd.concat([df, csv2df])
+                if 'rescore' in csvfile2fn:
+                    print "    rescore:", csvfile2fn, " replaces ", csvfilefn
+                    continue
+                else:
+                    print "    concatenating:", csvfile2fn
+                    filelist.append(csvfile2fn)
+                    csv2df = pd.read_csv(csvfile2)
+                    csv2df = pd.DataFrame(csv2df)
+                    df = pd.concat([df, csv2df])
             else:
                 continue
   
@@ -255,7 +259,9 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
         df['cv'][df['cv'] == 'v'] = 0
         df['as'][df['as'] == 's'] = 0
 
-        cols = ['t','theta','v','vx','vy','x','y','zx','as','cv']
+        df['obj_id'] = obj_id
+
+        cols = ['t','theta','v','vx','vy','x','y','zx','as','cv', 'obj_id']
         if  as_is_laser_state:
             #backwards compatibility...
             #MATCH COLUMN NAMES (OLD VS NEW flymad_score_movie)
@@ -269,7 +275,11 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
             df = df.rename(columns={'tracked_t':'t'})
             cols.append('laser_state')
 
-        df[cols] = df[cols].astype(float)
+        try:
+            df[cols] = df[cols].astype(float)
+        except KeyError, e:
+            print "INVALID DATAFRAME %s (%s)\n\thas: %s" % (posfile, e, ','.join(df.columns))
+            continue
 
         #git the dateframe a proper datetime index for resampling
         #first remove rows with NaN t values
@@ -341,4 +351,30 @@ def fixup_index_and_resample(df, t):
 
     return df
 
+def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier, valmap=None):
+    csvfilefn = os.path.basename(csvfile)
+    try:
+        experimentID,date,time = csvfilefn.split("_",2)
+        genotype,laser,repID = experimentID.split("-",2)
+        repID = repID + "_" + date
+        print "processing: ", experimentID
+    except:
+        print "invalid filename:", csvfilefn
+        return None
+
+    df = pd.read_csv(csvfile, index_col=0)
+
+    if not df.index.is_unique:
+        raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
+
+    if valmap is not None:
+        fix_scoring_colums(df, valmap)
+
+    #resample to 10ms (mean) and set a proper time index on the df
+    df = fixup_index_and_resample(df, resample_specifier)
+
+    #smooth the positions, and recalculate the velocitys based on this.
+    dt = kalman_smooth_dataframe(df, arena, smooth)
+
+    return df,dt,experimentID,date,time,genotype,laser,repID
 
