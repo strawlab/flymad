@@ -358,7 +358,7 @@ def kalman_smooth_dataframe(df, arena=None, smooth=True):
     dt = np.gradient(df.index.values.astype('float64')/SECOND_TO_NANOSEC)
 
     if smooth:
-        print "smoothing"
+        print "\tsmoothing (%r)" % arena
         #smooth the positions, and recalculate the velocitys based on this.
         kf = Kalman()
         smoothed = kf.smooth(df['x'].values, df['y'].values)
@@ -423,16 +423,25 @@ def fixup_index_and_resample(df, resample_specifier='10L'):
 
     return df
 
-def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap=None):
+def extract_metadata_from_filename(csvfile):
     csvfilefn = os.path.basename(csvfile)
     try:
         experimentID,date,time = csvfilefn.split("_",2)
         genotype,laser,repID = experimentID.split("-",2)
         repID = repID + "_" + date
-        print "processing: ", experimentID
     except:
-        print "invalid filename:", csvfilefn
         return None
+
+    return experimentID,date,time,genotype,laser,repID
+
+def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap=None):
+    metadata = extract_metadata_from_filename(csvfile)
+    if metadata is None:
+        print "WARNING: invalid filename:", csvfile
+        return None
+
+    experimentID,date,time,genotype,laser,repID = metadata
+    print "processing:", experimentID
 
     df = pd.read_csv(csvfile, index_col=0)
 
