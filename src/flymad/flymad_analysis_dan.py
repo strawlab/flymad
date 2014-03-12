@@ -446,7 +446,8 @@ def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap
     df = pd.read_csv(csvfile, index_col=0)
 
     if not df.index.is_unique:
-        raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
+        print "\tWARNING: corrupt csv: index (ns since epoch) must be unique"
+        return None
 
     #remove rows before we have a position
     q = pd.isnull(df['x']).values
@@ -492,7 +493,8 @@ def load_courtship_csv(path):
         df = pd.read_csv(csvfile, index_col=0)
 
         if not df.index.is_unique:
-            raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
+            print "\tWARNING: corrupt csv: index (ns since epoch) must be unique"
+            continue
 
         #remove rows before we have a position
         q = pd.isnull(df['laser_state']).values
