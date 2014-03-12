@@ -305,7 +305,7 @@ def plot_data(arena, dirname, smooth, dfs):
         for i, condition in enumerate(conditions):
             all_dfs = []
             for (df,parsed_data,laser_on) in dfs[condition]:
-                df = df.resample('10L')
+                df = df.resample('10L') # 10 msec
                 assert len(df) > 100
                 df['align'] = np.arange(len(df))
                 all_dfs.append(df)
