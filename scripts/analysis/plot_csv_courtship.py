@@ -242,17 +242,21 @@ def plot_data(path, laser, dfs):
                             label=flymad_analysis.human_label(gt),
                             order=order,
                             color=COLORS[gt],
+                            df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
     ctrlmean = dfs['wtrpmyc']['mean']
 
-    fig = plt.figure("Courtship Wingext 10min (%s)" % laser)
+    figure_title = "Courtship Wingext 10min (%s)" % laser
+    fig = plt.figure(figure_title)
     ax = fig.add_subplot(1,1,1)
 
-    flymad_plot.plot_timeseries_with_activation(ax,
+    _,_,figs = flymad_plot.plot_timeseries_with_activation(ax,
                     targetbetween=dict(xaxis=ctrlmean['t'].values,
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
                     note="laser %s\n" % laser,
+                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'zx'} for k in ('wGP','40347trpmyc')},
+                    individual_title=figure_title + ' Individual Traces',
                     **datasets
     )
 
@@ -265,6 +269,9 @@ def plot_data(path, laser, dfs):
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
+
+    for efigname, efig in figs.iteritems():
+        efig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s_individual_%s.png" % (figname, efigname)), bbox_inches='tight')
 
     datasets = {}
     for gt in dfs:
@@ -282,18 +289,22 @@ def plot_data(path, laser, dfs):
                             label=flymad_analysis.human_label(gt),
                             order=order,
                             color=COLORS[gt],
+                            df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
     ctrlmean = dfs['wtrpmyc']['mean']
 
-    fig = plt.figure("Courtship Dtarget 10min (%s)" % laser)
+    figure_title = "Courtship Dtarget 10min (%s)" % laser
+    fig = plt.figure(figure_title)
     ax = fig.add_subplot(1,1,1)
 
-    flymad_plot.plot_timeseries_with_activation(ax,
+    _,_,figs = flymad_plot.plot_timeseries_with_activation(ax,
                     targetbetween=dict(xaxis=ctrlmean['t'].values,
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
                     legend_location='lower right',
                     note="laser %s\n" % laser,
+                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'dtarget'} for k in ('wGP','40347trpmyc')},
+                    individual_title=figure_title + ' Individual Traces',
                     **datasets
     )
 
@@ -306,6 +317,9 @@ def plot_data(path, laser, dfs):
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
+
+    for efigname, efig in figs.iteritems():
+        efig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s_individual_%s.png" % (figname, efigname)), bbox_inches='tight')
 
 if __name__ == "__main__":
     CTRL_GENOTYPE = 'wtrpmyc'
