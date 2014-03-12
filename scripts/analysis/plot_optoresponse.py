@@ -424,10 +424,10 @@ def plot_data(arena, path, smoothstr, data):
                                  )
                 start_time = stim_times[transition_idxs[i]]
                 stop_time = stim_times[transition_idxs[i+1]]
-                print 'start_time, stop_time',start_time, stop_time
+                #print 'start_time, stop_time',start_time, stop_time
                 start_idx = np.argmin(abs(times - start_time))
                 stop_idx =  np.argmin(abs(times - stop_time))
-                print 'times[start_idx], times[stop_idx]',times[start_idx], times[stop_idx]
+                #print 'times[start_idx], times[stop_idx]',times[start_idx], times[stop_idx]
                 this_data['start_time'] = times[start_idx]
                 this_data['stop_time'] = times[stop_idx]
                 assert len( all_angular_vel_timeseries)== len(all_linear_vel_timeseries)
@@ -546,13 +546,15 @@ def plot_data(arena, path, smoothstr, data):
 
         def p2star(p):
             if   p < 0.001:
-                return '***'
+                result =  '***'
             elif p < 0.01:
-                return '**'
+                result =  '**'
             elif p < 0.05:
-                return '*'
+                result =  '*'
             else:
-                return ''
+                result =  ''
+            result += ' %.3g'%p
+            return result
         # calculate p values
         pool_stats_df = pd.DataFrame(pool_stats)
         df_fname = 'optomotor_stats.df'
@@ -564,16 +566,31 @@ def plot_data(arena, path, smoothstr, data):
             ax_summary_angular.text( bin_num,
                                      0,
                                      p2star(p_value))
+
             p_value = sig['ang_zero'][i]
             ax_summary_angular.text( bin_num,
                                      -100,
                                      p2star(p_value))
 
+            ax_summary_angular.text( bin_num,
+                                     140,
+                                     '%s - %s'%(sig['bin_start'][i],
+                                                sig['bin_stop'][i]),
+                                     )
             p_value = sig['lin'][i]
             ax_summary_linear.text( bin_num,
-                                    0,
+                                    5,
                                     p2star(p_value))
 
+
+    ax_summary_angular.set_ylabel('angular velocity (deg/sec)')
+    ax_summary_linear.set_ylabel('velocity (mm/sec)')
+    ax_summary_linear.set_xlabel('bin number')
+
+
+    fig_fname = 'fig_summary.png'
+    fig_summary_angular.savefig(fig_fname)
+    print 'saved',fig_fname
     fig_fname = 'fig_summary.svg'
     fig_summary_angular.savefig(fig_fname)
     print 'saved',fig_fname
@@ -670,18 +687,19 @@ def do_stats( df_fname ):
                ang=[], # pvalues for difference between genotypes
                ang_zero=[], # pvalues for NINE different than zero
                bin_num=[],
+               bin_start=[],
+               bin_stop=[],
                )
 
     for bin_number, group1 in df.groupby("bin_number",sort=True):
         sig['bin_num'].append(bin_number)
-        print 'bin %d data ------------'%(bin_number,)
-        print '  angular'
-        print group1
         group_info = label_homogeneous_groups_pandas( group1,
                                                       groupby_column_name='gt',
                                                       value_column_name='mean_angular_velocity_during_bin')
-        pprint.pprint(group_info)
+        #pprint.pprint(group_info)
         sig['ang'].append( group_info['p_values'][0,1] )
+        sig['bin_start'].append( group1['bin_start'].values[0] )
+        sig['bin_stop'].append(  group1['bin_stop'].values[0] )
 
         if 1:
             # are the values for the experimental genotype different than zero?
@@ -690,14 +708,14 @@ def do_stats( df_fname ):
             v.shape = len(v),1 # reshape
             t,p = scipy.stats.ttest_1samp(v, # test if different than zero
                                           0.0)
-            print 'p for %s: %.3f'%(group1['mean_angular_velocity_during_bin'].values,p)
+            #print 'p for %s: %.3f'%(group1['mean_angular_velocity_during_bin'].values,p)
             sig['ang_zero'].append(p)
 
-        print '  linear'
+        #print '  linear'
         group_info = label_homogeneous_groups_pandas( group1,
                                                       groupby_column_name='gt',
                                                       value_column_name='mean_linear_velocity_during_bin')
-        pprint.pprint(group_info)
+        #pprint.pprint(group_info)
         sig['lin'].append( group_info['p_values'][0,1] )
     return sig
 
