@@ -417,13 +417,17 @@ def plot_data(arena, path, smoothstr, data):
             ang_stds = []
             lin_means = []
             lin_stds = []
-            for i in range(n_transitions-1):
+            for i in range(n_transitions):
                 this_data = dict(index=i,
                                  angular_velocity_values=[],
                                  linear_velocity_values=[],
                                  )
                 start_time = stim_times[transition_idxs[i]]
-                stop_time = stim_times[transition_idxs[i+1]]
+                if (i+1)<n_transitions:
+                    stop_time = stim_times[transition_idxs[i+1]]
+                else:
+                    # final bin
+                    stop_time = stim_times[-1]
                 #print 'start_time, stop_time',start_time, stop_time
                 start_idx = np.argmin(abs(times - start_time))
                 stop_idx =  np.argmin(abs(times - stop_time))
@@ -435,8 +439,9 @@ def plot_data(arena, path, smoothstr, data):
                     this_angular_timeseries = all_angular_vel_timeseries[j]
                     this_linear_timeseries =  all_linear_vel_timeseries[j]
 
-                    ang = np.mean(this_angular_timeseries[start_idx:stop_idx])
-                    lin = np.mean(this_linear_timeseries[start_idx:stop_idx])
+                    good = ~np.isnan(this_angular_timeseries[start_idx:stop_idx])
+                    ang = np.mean(this_angular_timeseries[start_idx:stop_idx][good])
+                    lin = np.mean(this_linear_timeseries[start_idx:stop_idx][good])
 
                     this_data['angular_velocity_values'].append( ang )
                     this_data['linear_velocity_values'].append( lin )
@@ -497,11 +502,11 @@ def plot_data(arena, path, smoothstr, data):
                                      downsample=2,
                                      targetbetween=[tb],
                                      **plot_angular_datasets)
-    ax_angular_vel.set_xticks([0,180,360])
+    ax_angular_vel.set_xticks([0,150,300])
     ax_angular_vel.set_yticks([-200,0,200])
     ax_angular_vel.set_ylim(-200,200)
     ax_angular_vel.spines['left'].set_bounds(-200,200.0)
-    ax_angular_vel.spines['bottom'].set_bounds(0,360.0)
+    ax_angular_vel.spines['bottom'].set_bounds(0,330.0)
     ax_angular_vel.spines['bottom'].set_linewidth(0.3)
     ax_angular_vel.spines['left'].set_linewidth(0.3)
     ax_angular_vel.set_xlabel('Time (s)')
@@ -523,10 +528,10 @@ def plot_data(arena, path, smoothstr, data):
                                      targetbetween=[tb],
                                      downsample=3,
                                      **plot_linear_datasets)
-    ax_linear_vel.set_xticks([0,180,360])
+    ax_linear_vel.set_xticks([0,150,300])
     ax_linear_vel.set_yticks([0,20,40])
     ax_linear_vel.set_ylim([0,40])
-    ax_linear_vel.spines['bottom'].set_bounds(0,360.0)
+    ax_linear_vel.spines['bottom'].set_bounds(0,330.0)
     ax_linear_vel.spines['bottom'].set_linewidth(0.3)
     ax_linear_vel.spines['left'].set_linewidth(0.3)
     ax_linear_vel.set_xlabel('Time (s)')
