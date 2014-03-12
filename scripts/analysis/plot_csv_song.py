@@ -196,11 +196,9 @@ def plot_data(path, data):
 
         #all experiments used identical activation times
         headtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
-                                 where=data['pIP10']['wtrpmyc']['first']['ttm'].values > 0,
-                                 facecolor=flymad_plot.LIGHT_GRAY)
+                                 where=data['pIP10']['wtrpmyc']['first']['ttm'].values > 0)
         thoraxtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
-                                   where=data['pIP10']['wtrpmyc']['first']['ttm'].values < 0,
-                                   facecolor=flymad_plot.DARK_GRAY)
+                                   where=data['pIP10']['wtrpmyc']['first']['ttm'].values < 0)
 
         flymad_plot.plot_timeseries_with_activation(ax,
                     targetbetween=[headtargetbetween,thoraxtargetbetween],

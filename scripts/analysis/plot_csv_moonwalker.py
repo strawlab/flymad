@@ -55,11 +55,11 @@ POWER_LABELS = {
 
 EXPERIMENT_DURATION = 130.0
 
-YLIM = [-20, 40]
+YLIM = [-10, 30]
 YTICKS = [-20, 0, 20, 40]
 
 XLIM = [-10, 80]
-#XTICKS = [-10, 0, 10]
+XTICKS = [0, 2, 24, 48, 72]
 
 def prepare_data(path, arena, smooth, only_laser, gts):
 
@@ -222,6 +222,8 @@ def plot_cross_activation_only(path, data, arena, note):
         ax.set_ylabel('Fwd Velocity (%s/s)' % arena.unit)
         ax.set_xlim(XLIM)
 
+        flymad_plot.retick_relabel_axis(ax, XTICKS, YTICKS)
+
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.png" % (gt, figname)), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.svg" % (gt, figname)), bbox_inches='tight')
 
@@ -269,6 +271,8 @@ def plot_all_data(path, data, arena, note):
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Fwd Velocity (%s/s)' % arena.unit)
         ax.set_xlim(XLIM)
+
+        flymad_plot.retick_relabel_axis(ax, XTICKS, YTICKS)
 
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.png" % gt), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.svg" % gt), bbox_inches='tight')

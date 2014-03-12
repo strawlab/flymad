@@ -258,8 +258,10 @@ def plot_data(path, laser, dfs):
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Wing Ext. Index')
-    ax.set_ylim([-0.1,0.6])
+    ax.set_ylim([0,0.6])
     ax.set_xlim([-60,480])
+
+    flymad_plot.retick_relabel_axis(ax, [-60,0,20,60,120,240,480], [0,0.3,0.6])
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
@@ -297,8 +299,10 @@ def plot_data(path, laser, dfs):
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Distance (px)')
-    #ax.set_ylim([20,120])
+    ax.set_ylim([40,160])
     ax.set_xlim([-60,480])
+
+    flymad_plot.retick_relabel_axis(ax, [-60,0,20,60,120,240,480], [40,0,80,120,160])
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
@@ -385,7 +389,12 @@ if __name__ == "__main__":
                         sem=True,
                         **laser_court
         )
+        axw.set_xlabel('Time (s)')
         axw.set_ylabel('Wing Ext. Index')
+        axw.set_xlim([-20,120])
+        axw.set_ylim([0,1])
+
+        flymad_plot.retick_relabel_axis(axw, [-20,0,20,60,120], [0,0.5,1])
 
         figd = plt.figure("Courtship Dtarget 10min D/R")
         axd = figd.add_subplot(1,1,1)
@@ -394,11 +403,14 @@ if __name__ == "__main__":
                         sem=True,
                         **laser_dtarget
         )
+        axd.set_xlabel('Time (s)')
         axd.set_ylabel('Distance (px)')
+        axd.set_xlim([-20,120])
+        axd.set_ylim([20,150])
+
+        flymad_plot.retick_relabel_axis(axd, [-20,0,20,60,120], [40,80,120])
 
         for figname,fig,ax in [("DR_following_and_WingExt",figw,axw), ("DR_following_and_dtarget",figd,axd)]:
-            ax.set_xlabel('Time (s)')
-            ax.set_xlim([-60,120])
             fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
             fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
