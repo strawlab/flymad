@@ -1,15 +1,19 @@
-import argparse
 import os
+if 'DISPLAY' not in os.environ:
+    import matplotlib
+    matplotlib.use('Agg')
+
+import argparse
 import sys
 import glob
+import datetime
+
 import numpy as np
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame
 from pandas.tseries.offsets import DateOffset
 
-import datetime
-import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 

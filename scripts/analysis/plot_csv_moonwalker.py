@@ -1,6 +1,10 @@
+import os
+if 'DISPLAY' not in os.environ:
+    import matplotlib
+    matplotlib.use('Agg')
+
 import argparse
 import glob
-import os
 import pickle
 import math
 import itertools
