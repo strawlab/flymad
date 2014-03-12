@@ -2,6 +2,9 @@ import math
 import glob
 import os.path
 import datetime
+import calendar
+import time
+import re
 
 import numpy as np
 import pandas as pd
@@ -11,6 +14,40 @@ import matplotlib.patches
 SECOND_TO_NANOSEC = 1e9
 
 from trackingparams import Kalman
+
+GENOTYPE_LABELS = {
+    "wtrpmyc":"+/TRPA1","wtrp":"+/TRPA1",
+    "G323":"P1/+","wGP":"P1/TRPA1",
+    "40347":"pIP10/+","40347trpmyc":"pIP10/TRPA1",
+    "5534":"vPR6/+","5534trpmyc":"vPR6/TRPA1",
+    "43702":"vMS11/+","43702trp":"vMS11/TRPA1",
+    "41688":"dPR1/+","41688trp":"dPR1/TRPA1",
+}
+
+HUMAN_LABELS = {
+    "wtrpmyc":"UAS-control","wtrp":"UAS-control",
+    "G323":"Gal4 control","wGP":"P1>TRPA1",
+    "40347":"Gal4 control","40347trpmyc":"pIP10>TRPA1",
+    "5534":"Gal4 control","5534trpmyc":"vPR6>TRPA1",
+    "43702":"Gal4 control","43702trp":"vMS11>TRPA1",
+    "41688":"Gal4 control","41688trp":"dPR1>TRPA1",
+}
+
+def human_label(gt):
+    return HUMAN_LABELS.get(gt,gt)
+
+def genotype_label(gt):
+    return GENOTYPE_LABELS.get(gt,gt)
+
+def genotype_is_exp(gt):
+    return re.match('\w+/\w+$', genotype_label(gt)) is not None
+
+def genotype_is_ctrl(gt):
+    return re.match('\w+/\+$', genotype_label(gt)) is not None
+
+def genotype_is_trp_ctrl(gt):
+    return re.match('\+/\w+$', genotype_label(gt)) is not None
+
 
 def get_arena_conf(calibration_file=None):
     #DEFAULTS FROM THE FIRST NMETH SUBMISSION - AS USED FOR DANS
@@ -200,6 +237,24 @@ class Arena:
         #(xlim, ylim)
         return self.xlim, self.ylim
 
+def create_object_id(datestr=None, timestr=None):
+    #date = 20140216
+    #time = 174913.mp4.csv
+
+    ts = None
+    if datestr and timestr:
+        try:
+            dt = datetime.datetime.strptime("%s_%s" % (datestr,timestr.split('.')[0]),
+                                           "%Y%m%d_%H%M%S")
+            ts = calendar.timegm(dt.timetuple())
+        except ValueError:
+            print "invalid date/time", datestr, timestr
+
+    if ts is None:
+        ts = int(time.time()*1e9)
+
+    return ts
+
 def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_state=True):
     filelist = []
 
@@ -259,7 +314,8 @@ def courtship_combine_csvs_to_dataframe(path, globpattern=None, as_is_laser_stat
         df['cv'][df['cv'] == 'v'] = 0
         df['as'][df['as'] == 's'] = 0
 
-        df['obj_id'] = obj_id
+        #give files a semi-random obj_id
+        df['obj_id'] = create_object_id(date,time)
 
         cols = ['t','theta','v','vx','vy','x','y','zx','as','cv', 'obj_id']
         if  as_is_laser_state:
@@ -302,7 +358,7 @@ def kalman_smooth_dataframe(df, arena=None, smooth=True):
     dt = np.gradient(df.index.values.astype('float64')/SECOND_TO_NANOSEC)
 
     if smooth:
-        print "smoothing"
+        print "\tsmoothing (%r)" % arena
         #smooth the positions, and recalculate the velocitys based on this.
         kf = Kalman()
         smoothed = kf.smooth(df['x'].values, df['y'].values)
@@ -324,21 +380,29 @@ def kalman_smooth_dataframe(df, arena=None, smooth=True):
 
     return dt
 
-def fix_scoring_colums(df, valmap={'zx':{'z':math.pi,'x':0},
-                                   'as':{'a':1,'s':0}}):
-    for col in valmap:
-        for val,replace in valmap[col].items():
-            df[col][df[col] == val] = replace
+def get_num_rows(desired_seconds, resample_specifier='10L'):
+    if resample_specifier != '10L':
+        print "WARNING: Your code may assume 10ms (100fps)"
 
-    for col in valmap:
-        df[col] = df[col].astype(np.float64)
+    assert resample_specifier[-1] == 'L'
+    ms = float(resample_specifier[:-1])
 
-def fixup_index_and_resample(df, t):
+    return desired_seconds * (1000.0/ms)
+
+def get_resampled_timebase(desired_seconds, resample_specifier='10L'):
+    n = get_num_rows(desired_seconds, resample_specifier)
+    return np.linspace(0, desired_seconds, n, endpoint=False)
+
+def fixup_index_and_resample(df, resample_specifier='10L'):
+    if resample_specifier != '10L':
+        print "WARNING: Your code may assume 10ms (100fps). Are you sure you want to resample to", resample_specifier
+
     #tracked_t was the floating point timestamp, which when roundtripped through csv
     #could lose precision. The index is guarenteed to be unique, so recreate tracked_t
     #from the index (which is seconds since epoch)
     tracked_t = df.index.values.astype(np.float64) / SECOND_TO_NANOSEC
     df['tracked_t'] = tracked_t
+    df['tracked_tns'] = df.index.values
     #but, you should not need to use tracked_t now anyway, because this dataframe
     #has a datetime index...
     #
@@ -347,28 +411,56 @@ def fixup_index_and_resample(df, t):
     df.set_index(['time'], inplace=True)
     #
     #now resample to 10ms (mean)
-    df = df.resample(t)
+    df = df.resample(resample_specifier)
 
     return df
 
-def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier, valmap=None):
+def extract_metadata_from_filename(csvfile):
     csvfilefn = os.path.basename(csvfile)
     try:
         experimentID,date,time = csvfilefn.split("_",2)
         genotype,laser,repID = experimentID.split("-",2)
         repID = repID + "_" + date
-        print "processing: ", experimentID
     except:
-        print "invalid filename:", csvfilefn
         return None
+
+    return experimentID,date,time,genotype,laser,repID
+
+def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L'):
+    metadata = extract_metadata_from_filename(csvfile)
+    if metadata is None:
+        print "WARNING: invalid filename:", csvfile
+        return None
+
+    experimentID,date,time,genotype,laser,repID = metadata
+    print "processing:", experimentID
 
     df = pd.read_csv(csvfile, index_col=0)
 
     if not df.index.is_unique:
-        raise Exception("CORRUPT CSV. INDEX (NANOSECONDS SINCE EPOCH) MUST BE UNIQUE")
+        print "\tWARNING: corrupt csv: index (ns since epoch) must be unique"
+        return None
 
-    if valmap is not None:
-        fix_scoring_colums(df, valmap)
+    #remove rows before we have a position
+    q = pd.isnull(df['x']).values
+    first_valid_row = np.argmin(q)
+    df = df.iloc[first_valid_row:]
+    print "\tremove %d invalid rows at start of file" % first_valid_row
+
+    #convert 'V', 'X' AND 'S' to 1 or 0
+    df['zx'] = df['zx'].astype(object).fillna('x')
+    df['as'] = df['as'].astype(object).fillna('s')
+    df['cv'] = df['cv'].astype(object).fillna('v')
+    df['zx'][df['zx'] == 'z'] = 1
+    df['cv'][df['cv'] == 'c'] = 1
+    df['as'][df['as'] == 'a'] = 1
+    df['zx'][df['zx'] == 'x'] = 0
+    df['cv'][df['cv'] == 'v'] = 0
+    df['as'][df['as'] == 's'] = 0
+
+    #ensure these are floats incase we later resample
+    cols = ['zx','as','cv']
+    df[cols] = df[cols].astype(float)
 
     #resample to 10ms (mean) and set a proper time index on the df
     df = fixup_index_and_resample(df, resample_specifier)
@@ -376,5 +468,65 @@ def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier, valmap=None)
     #smooth the positions, and recalculate the velocitys based on this.
     dt = kalman_smooth_dataframe(df, arena, smooth)
 
+    if 'laser_state' in df.columns:
+        df['laser_state'] = df['laser_state'].fillna(value=0)
+        #the resampling above, using the default rule of 'mean' will, if the laser
+        #was on any time in that bin, increase the mean > 0.
+        df['laser_state'][df['laser_state'] > 0] = 1
+
     return df,dt,experimentID,date,time,genotype,laser,repID
+
+def load_courtship_csv(path):
+    globpattern = os.path.join(path,"*.csv")
+    for csvfile in sorted(glob.glob(globpattern)):
+        csvfilefn = os.path.basename(csvfile)
+
+        if 'rescore' in csvfilefn:
+            print "ignoring:",csvfilefn
+            continue
+
+        metadata = extract_metadata_from_filename(csvfile)
+        if metadata is None:
+            print "WARNING: invalid filename:", csvfile
+            continue
+
+        experimentID,date,time,genotype,laser,repID = metadata
+        print "processing:", csvfilefn
+
+        df = pd.read_csv(csvfile, index_col=0)
+
+        if not df.index.is_unique:
+            print "\tWARNING: corrupt csv: index (ns since epoch) must be unique"
+            continue
+
+        #remove rows before we have a position
+        q = pd.isnull(df['laser_state']).values
+        first_valid_row = np.argmin(q)
+        df = df.iloc[first_valid_row:]
+        print "\tremove %d empty rows at start of file" % first_valid_row
+
+        #make sure we always have a 't' column (for back compat)
+        df['t'] = df.index.values / SECOND_TO_NANOSEC
+        df['time'] = df.index.values.astype('datetime64[ns]')
+        df.set_index(['time'], inplace=True)
+
+        #convert 'V', 'X' AND 'S' to 1 or 0
+        df['zx'] = df['zx'].astype(object).fillna('x')
+        df['as'] = df['as'].astype(object).fillna('s')
+        df['cv'] = df['cv'].astype(object).fillna('v')
+        df['zx'][df['zx'] == 'z'] = 1
+        df['cv'][df['cv'] == 'c'] = 1
+        df['as'][df['as'] == 'a'] = 1
+        df['zx'][df['zx'] == 'x'] = 0
+        df['cv'][df['cv'] == 'v'] = 0
+        df['as'][df['as'] == 's'] = 0
+
+        #ensure these are floats incase we later resample
+        cols = ['zx','as','cv']
+        df[cols] = df[cols].astype(float)
+
+        #give files a semi-random obj_id
+        df['obj_id'] = create_object_id(date,time)
+
+        yield df, (csvfilefn,experimentID,date,time,genotype,laser,repID)
 

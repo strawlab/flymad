@@ -1,15 +1,20 @@
-import argparse
 import os
+if 'DISPLAY' not in os.environ:
+    import matplotlib
+    matplotlib.use('Agg')
+
+import argparse
 import sys
 import glob
+import datetime
+
 import numpy as np
 import pandas as pd
 from pandas import Series
 from pandas import DataFrame
 from pandas.tseries.offsets import DateOffset
 
-import datetime
-import matplotlib
+import scipy.signal
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
@@ -23,18 +28,18 @@ from scipy.stats import kruskal
 assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.version.version in ("0.11.0" ,  "0.12.0")
 
-RESAMPLE_SPECIFIER = '10L'
+EXPERIMENT_DURATION = 70.0
 
-def prepare_data(path, arena, smoothstr, smooth, gts):
+def prepare_data(path, arena, smoothstr, smooth, medfilt, gts):
 
     pooldf = DataFrame()
     for csvfile in sorted(glob.glob(path + "/*.csv")):
-        cache_args = os.path.basename(csvfile), arena, smoothstr, RESAMPLE_SPECIFIER
+        cache_args = os.path.basename(csvfile), arena, smoothstr
         cache_fname = csvfile+'.madplot-cache'
 
         results = madplot.load_bagfile_cache(cache_args, cache_fname)
         if results is None:
-            results = flymad_analysis.load_and_smooth_csv(csvfile, arena, smooth, RESAMPLE_SPECIFIER)
+            results = flymad_analysis.load_and_smooth_csv(csvfile, arena, smooth)
             if results is not None:
                 #update the cache
                 madplot.save_bagfile_cache(results, cache_args, cache_fname)
@@ -64,37 +69,49 @@ def prepare_data(path, arena, smoothstr, smooth, gts):
             )
             ax.add_patch(arena.get_patch(color='k', alpha=0.1))
 
+        duration = (df.index[-1] - df.index[0]).total_seconds()
+        if duration < EXPERIMENT_DURATION:
+            print "\tmissing data", csvfilefn
+            continue
 
-        df['Genotype'] = genotype
-
-        df['laser_state'] = df['laser_state'].fillna(value=0)
+        print "\t%ss experiment" % duration
 
         #MAXIMUM SPEED = 300:
-        df['v'][df['v'] >= 50] = np.nan
+        df['v'][df['v'] >= 300] = np.nan
         df['v'] = df['v'].fillna(method='ffill')
 
-        #find the time of the first laseron. iterating is sloww and ugly, but meh
-        before = after = None
-        for idx,rowdf in df.iterrows():
-            if rowdf['laser_state'] > 0:
-                before = idx - DateOffset(seconds=20)
-                after = idx + DateOffset(seconds=30)
-                break
+        #median filter
+        if medfilt:
+            df['v'] = scipy.signal.medfilt(df['v'].values, medfilt)
 
-        assert before != None
-        assert (after - before).total_seconds() == 50
+        #Here we have a 10ms resampled dataframe at least EXPERIMENT_DURATION seconds long.
+        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION))
+        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION)
+        #find when the laser first came on (argmax returns the first true value if
+        #all values are identical
+        t0idx = np.argmax(np.gradient(df['laser_state'].values > 0))
+        t0 = tb[t0idx]
+        df['t'] = tb - t0
 
-        dftemp = df[before:after][['Genotype', 'v', 'laser_state']]
-        dftemp['align'] = np.linspace(0,(after-before).total_seconds(),len(dftemp))
+        #groupby on float times is slow. make a special align column 
+        df['t_align'] = np.array(range(0,len(df))) - t0idx
 
-        assert len(dftemp) == 5001
+        df['obj_id'] = flymad_analysis.create_object_id(date,time)
+        df['Genotype'] = genotype
+        df['lasergroup'] = laser
 
-        pooldf = pd.concat([pooldf, dftemp])
+        pooldf = pd.concat([pooldf, df])
 
     data = {}
     for gt in gts:
         gtdf = pooldf[pooldf['Genotype'] == gt]
-        grouped = gtdf.groupby(['align'], as_index=False)
+
+        lgs = gtdf['lasergroup'].unique()
+        if len(lgs) != 1:
+            raise Exception("only one lasergroup handled for gt %s: not %s" % (
+                             gt, lgs))
+
+        grouped = gtdf.groupby(['t_align'], as_index=False)
         data[gt] = dict(mean=grouped.mean().astype(float),
                         std=grouped.std().astype(float),
                         n=grouped.count().astype(float),
@@ -177,7 +194,7 @@ def fit_to_curve (path, arena, smoothstr, p_values):
     ax.set_ylim([0, 25])
     ax.set_xlim([5, 40])
 
-def plot_data(path, arena, smoothstr, data):
+def plot_data(path, data, arena, note):
 
     LABELS = {'OK371shits-130h':'OK371>ShibireTS (head)',
               'OK371shits-nolaser':'Control',
@@ -189,37 +206,47 @@ def plot_data(path, arena, smoothstr, data):
               'OK371shits-130t':flymad_plot.ORANGE,
     }
 
-    fig2 = plt.figure("Speed Multiplot %s" % smoothstr)
+
+    fig2 = plt.figure("Speed")
     ax = fig2.add_subplot(1,1,1)
 
     datasets = {}
     for gt in data:
         gtdf = data[gt]
-        datasets[gt] = dict(xaxis=gtdf['mean']['align'].values,
+        datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
                             value=gtdf['mean']['v'].values,
                             std=gtdf['std']['v'].values,
                             n=gtdf['n']['v'].values,
                             label=LABELS[gt],
-                            color=COLORS[gt])
+                            color=COLORS[gt],
+                            df=gtdf['df'],
+                            N=len(gtdf['df']['obj_id'].unique()))
 
     ctrlmean = data['OK371shits-nolaser']['mean']
 
-    flymad_plot.plot_timeseries_with_activation(ax,
-                targetbetween=dict(xaxis=ctrlmean['align'].values,
+    _,_,figs = flymad_plot.plot_timeseries_with_activation(ax,
+                targetbetween=dict(xaxis=ctrlmean['t'].values,
                                    where=ctrlmean['laser_state'].values>0),
-                downsample=25,
+                downsample=5,
                 sem=True,
+                note="OK371shits\n%s\n" % note,
+                individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'v'} for k in datasets},
+                individual_title='Speed Individual Traces',
                 **datasets
     )
 
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Speed (%s/s) +/- STD' % arena.unit)
-    ax.set_xlim([0, 50])
+    ax.set_ylabel('Speed (%s/s)' % arena.unit)
+    ax.set_xlim([-20, 30])
+    ax.set_ylim([0, 18])
 
-    ax.set_title("Speed %s" % smoothstr)
+    flymad_plot.retick_relabel_axis(ax, [-20, 0, 10, 20], [0, 5, 10, 15])
 
-    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot_%s.png" % smoothstr), bbox_inches='tight')
-    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot_%s.svg" % smoothstr), bbox_inches='tight')
+    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.png"), bbox_inches='tight')
+    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.svg"), bbox_inches='tight')
+
+    for efigname, efig in figs.iteritems():
+        efig.savefig(flymad_plot.get_plotpath(path,"speed_plot_individual_%s.png" % efigname), bbox_inches='tight')
 
 
 if __name__ == "__main__":
@@ -227,26 +254,41 @@ if __name__ == "__main__":
     CTRL_GENOTYPE = 'OK371shits-nolaser'
     EXP2_GENOTYPE = 'OK371shits-130t'
 
+    CALIBRATION_FILE = 'calibration20140219_064948.filtered.yaml'
+    GENOTYPES = [EXP_GENOTYPE, CTRL_GENOTYPE, EXP2_GENOTYPE]
+
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
-    parser.add_argument('--calibration', default=None, help='calibration yaml file')
+    parser.add_argument('--calibration-dir', help='calibration directory containing yaml files', required=True)
 
     args = parser.parse_args()
     path = args.path[0]
 
+    medfilt = 51
     smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
 
+    calibration_file = os.path.join(args.calibration_dir, CALIBRATION_FILE)
     arena = madplot.Arena(
                 'mm',
-                **flymad_analysis.get_arena_conf(calibration_file=args.calibration))
+                **flymad_analysis.get_arena_conf(calibration_file=calibration_file))
 
-    data = prepare_data(path, arena, smoothstr, args.smooth, [EXP_GENOTYPE, CTRL_GENOTYPE, EXP2_GENOTYPE])
+    note = "%s %s\n%r\nmedfilt %s" % (arena.unit, smoothstr, arena, medfilt)
+
+    cache_fname = os.path.join(path,'speed.madplot-cache')
+    cache_args = (path, arena, smoothstr, args.smooth, medfilt, GENOTYPES)
+    data = None
+    if args.only_plot:
+        data = madplot.load_bagfile_cache(cache_args, cache_fname)
+    if data is None:
+        data = prepare_data(path, arena, smoothstr, args.smooth, medfilt, GENOTYPES)
+        madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
     #p_values = run_stats(path, arena, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
     #fit_to_curve(path, arena, smoothstr, p_values)
-    plot_data(path, arena, smoothstr, data)
+    plot_data(path, data, arena, note)
 
     if args.show:
         plt.show()

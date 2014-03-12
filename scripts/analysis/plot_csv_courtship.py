@@ -1,6 +1,10 @@
+import os
+if 'DISPLAY' not in os.environ:
+    import matplotlib
+    matplotlib.use('Agg')
+
 import argparse
 import glob
-import os
 import subprocess
 import cPickle as pickle
 
@@ -79,13 +83,9 @@ def _get_targets(path, date):
 def prepare_data(path, only_laser, gts):
     data = {}
 
-    path_out = path + "/outputs/"
-    if not os.path.exists(path_out):
-        os.makedirs(path_out)
-
     #PROCESS SCORE FILES:
     pooldf = pd.DataFrame()
-    for df,metadata in flymad_analysis.courtship_combine_csvs_to_dataframe(path, as_is_laser_state=False):
+    for df,metadata in flymad_analysis.load_courtship_csv(path):
         csvfilefn,experimentID,date,time,genotype,laser,repID = metadata
         if laser != only_laser:
             print "\tskipping laser", laser
@@ -99,7 +99,6 @@ def prepare_data(path, only_laser, gts):
         assert len(targets) == 4
         targets = pd.DataFrame(targets)
         targets = (targets + 0.5).astype(int)
-        targets.to_csv(path_out+'/targetlocations.csv')
 
         #CALCULATE DISTANCE FROM TARGETs, KEEP MINIMUM AS dtarget
         if targets is not None:
@@ -120,13 +119,11 @@ def prepare_data(path, only_laser, gts):
         else:
             df['dtarget'] = 0
 
-        #ALIGN BY LASER OFF TIME (=t0)
-        if (df['laser_state']==1).any():
-            lasermask = df[df['laser_state']==1]
-            df['t'] = df['t'] - np.max(lasermask['t'].values)#laser off time =0               
-        else:  
-            print "No laser detected!!!!!!!!!! NOT PLOTTING THIS TRIAL"
-            continue
+
+        #align by *first* laser on
+        t0idx = np.argmax(np.gradient(df['laser_state'].values > 0))
+        ton = df.iloc[t0idx]['t']
+        df['t'] = df['t'] - ton
 
         #bin to  5 second bins:
         #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
@@ -136,24 +133,31 @@ def prepare_data(path, only_laser, gts):
         df['t'] = df['t'].astype(int)
         df['t'] = df['t'].astype(float)
         df['t'] = df['t'] *5
+
         df = df.groupby(df['t'], axis=0).mean() 
 
+        df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
         df['lasergroup'] = laser
         df['RepID'] = repID
 
-        pooldf = pd.concat([pooldf, df[['Genotype','lasergroup', 't','zx', 'dtarget', 'laser_state']]])   
+        pooldf = pd.concat([pooldf, df])   
 
     data = {}
     for gt in gts:
         gtdf = pooldf[pooldf['Genotype'] == gt]
-        print gt,gtdf
 
-        assert len(gtdf['lasergroup'].unique()) == 1, "only one lasergroup handled, see --laser"
+        lgs = gtdf['lasergroup'].unique()
+        if len(lgs) != 1:
+            raise Exception("only one lasergroup handled for gt %s: not %s" % (
+                             gt, lgs))
 
-        data[gt] = dict(mean=gtdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].mean().astype(float),
-                        std=gtdf.groupby(['t'], as_index=False)[['zx', 'dtarget', 'laser_state']].std().astype(float),
-                        n=gtdf.groupby(['t'],  as_index=False)[['zx', 'dtarget', 'laser_state']].count().astype(float))
+        grouped = gtdf.groupby(['t'], as_index=False)
+        data[gt] = dict(mean=grouped.mean().astype(float),
+                        std=grouped.std().astype(float),
+                        n=grouped.count().astype(float),
+                        first=grouped.first(),
+                        df=gtdf)
 
     return data
 
@@ -220,67 +224,102 @@ def plot_data(path, laser, dfs):
               'G323':flymad_plot.BLUE,
               '40347':flymad_plot.GREEN}
 
-    path_out = path + "/outputs/"
     figname = laser + '_' + '_'.join(dfs)
 
     datasets = {}
     for gt in dfs:
+        if flymad_analysis.genotype_is_exp(gt):
+            order = 1
+        elif flymad_analysis.genotype_is_ctrl(gt):
+            order = 2
+        else:
+            order = 3
         gtdf = dfs[gt]
         datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
                             value=gtdf['mean']['zx'].values,
                             std=gtdf['std']['zx'].values,
                             n=gtdf['n']['zx'].values,
-                            color=COLORS[gt])
+                            label=flymad_analysis.human_label(gt),
+                            order=order,
+                            color=COLORS[gt],
+                            df=gtdf['df'],
+                            N=len(gtdf['df']['obj_id'].unique()))
     ctrlmean = dfs['wtrpmyc']['mean']
 
-    fig = plt.figure("Courtship Wingext 10min (%s)" % laser)
+    figure_title = "Courtship Wingext 10min (%s)" % laser
+    fig = plt.figure(figure_title)
     ax = fig.add_subplot(1,1,1)
 
-    flymad_plot.plot_timeseries_with_activation(ax,
+    _,_,figs = flymad_plot.plot_timeseries_with_activation(ax,
                     targetbetween=dict(xaxis=ctrlmean['t'].values,
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
+                    note="laser %s\n" % laser,
+                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'zx'} for k in ('wGP','40347trpmyc')},
+                    individual_title=figure_title + ' Individual Traces',
                     **datasets
     )
 
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Wing Ext. Index, +/- SEM')
-    ax.set_title('Wing Extension (%s)' % laser, size=12)
-    ax.set_ylim([-0.1,0.6])
+    ax.set_ylabel('Wing Ext. Index')
+    ax.set_ylim([0,0.6])
     ax.set_xlim([-60,480])
+
+    flymad_plot.retick_relabel_axis(ax, [-60,0,20,60,120,240,480], [0,0.3,0.6])
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
 
+    for efigname, efig in figs.iteritems():
+        efig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s_individual_%s.png" % (figname, efigname)), bbox_inches='tight')
+
     datasets = {}
     for gt in dfs:
+        if flymad_analysis.genotype_is_exp(gt):
+            order = 1
+        elif flymad_analysis.genotype_is_ctrl(gt):
+            order = 2
+        else:
+            order = 3
         gtdf = dfs[gt]
         datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
                             value=gtdf['mean']['dtarget'].values,
                             std=gtdf['std']['dtarget'].values,
                             n=gtdf['n']['dtarget'].values,
-                            color=COLORS[gt])
+                            label=flymad_analysis.human_label(gt),
+                            order=order,
+                            color=COLORS[gt],
+                            df=gtdf['df'],
+                            N=len(gtdf['df']['obj_id'].unique()))
     ctrlmean = dfs['wtrpmyc']['mean']
 
-    fig = plt.figure("Courtship Dtarget 10min (%s)" % laser)
+    figure_title = "Courtship Dtarget 10min (%s)" % laser
+    fig = plt.figure(figure_title)
     ax = fig.add_subplot(1,1,1)
 
-    flymad_plot.plot_timeseries_with_activation(ax,
+    _,_,figs = flymad_plot.plot_timeseries_with_activation(ax,
                     targetbetween=dict(xaxis=ctrlmean['t'].values,
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
                     legend_location='lower right',
+                    note="laser %s\n" % laser,
+                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'dtarget'} for k in ('wGP','40347trpmyc')},
+                    individual_title=figure_title + ' Individual Traces',
                     **datasets
     )
 
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Distance (mm), +/- SEM')
-    ax.set_title('Distance to Nearest Target (%s)' % laser, size=12)
-    #ax.set_ylim([20,120])
+    ax.set_ylabel('Distance (px)')
+    ax.set_ylim([40,160])
     ax.set_xlim([-60,480])
+
+    flymad_plot.retick_relabel_axis(ax, [-60,0,20,60,120,240,480], [40,0,80,120,160])
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
+
+    for efigname, efig in figs.iteritems():
+        efig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s_individual_%s.png" % (figname, efigname)), bbox_inches='tight')
 
 if __name__ == "__main__":
     CTRL_GENOTYPE = 'wtrpmyc'
@@ -343,12 +382,14 @@ if __name__ == "__main__":
                                       value=expdf['mean']['zx'].values,
                                       std=expdf['std']['zx'].values,
                                       n=expdf['n']['zx'].values,
-                                      color=COLORS[laser])
+                                      color=COLORS[laser],
+                                      N=len(expdf['df']['obj_id'].unique()))
             laser_dtarget[laser] = dict(xaxis=expdf['mean']['t'].values,
                                         value=expdf['mean']['dtarget'].values,
                                         std=expdf['std']['dtarget'].values,
                                         n=expdf['n']['dtarget'].values,
-                                        color=COLORS[laser])
+                                        color=COLORS[laser],
+                                        N=len(expdf['df']['obj_id'].unique()))
 
         #all D/R experiments were identical, so take activation times from the
         #last one
@@ -362,8 +403,12 @@ if __name__ == "__main__":
                         sem=True,
                         **laser_court
         )
-        axw.set_title('Wing Extension', size=12)
-        axw.set_ylabel('Wing Ext. Index, +/- SEM')
+        axw.set_xlabel('Time (s)')
+        axw.set_ylabel('Wing Ext. Index')
+        axw.set_xlim([-20,120])
+        axw.set_ylim([0,1])
+
+        flymad_plot.retick_relabel_axis(axw, [-20,0,20,60,120], [0,0.5,1])
 
         figd = plt.figure("Courtship Dtarget 10min D/R")
         axd = figd.add_subplot(1,1,1)
@@ -372,12 +417,14 @@ if __name__ == "__main__":
                         sem=True,
                         **laser_dtarget
         )
-        axd.set_ylabel('Distance (mm), +/- SEM')
-        axd.set_title('Distance to Nearest Target', size=12)
+        axd.set_xlabel('Time (s)')
+        axd.set_ylabel('Distance (px)')
+        axd.set_xlim([-20,120])
+        axd.set_ylim([20,150])
+
+        flymad_plot.retick_relabel_axis(axd, [-20,0,20,60,120], [40,80,120])
 
         for figname,fig,ax in [("DR_following_and_WingExt",figw,axw), ("DR_following_and_dtarget",figd,axd)]:
-            ax.set_xlabel('Time (s)')
-            ax.set_xlim([-60,120])
             fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
             fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
