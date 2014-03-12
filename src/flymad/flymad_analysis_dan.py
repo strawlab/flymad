@@ -380,15 +380,6 @@ def kalman_smooth_dataframe(df, arena=None, smooth=True):
 
     return dt
 
-def fix_scoring_colums(df, valmap={'zx':{'z':math.pi,'x':0},
-                                   'as':{'a':1,'s':0}}):
-    for col in valmap:
-        for val,replace in valmap[col].items():
-            df[col][df[col] == val] = replace
-
-    for col in valmap:
-        df[col] = df[col].astype(np.float64)
-
 def get_num_rows(desired_seconds, resample_specifier='10L'):
     if resample_specifier != '10L':
         print "WARNING: Your code may assume 10ms (100fps)"
@@ -411,6 +402,7 @@ def fixup_index_and_resample(df, resample_specifier='10L'):
     #from the index (which is seconds since epoch)
     tracked_t = df.index.values.astype(np.float64) / SECOND_TO_NANOSEC
     df['tracked_t'] = tracked_t
+    df['tracked_tns'] = df.index.values
     #but, you should not need to use tracked_t now anyway, because this dataframe
     #has a datetime index...
     #
@@ -434,7 +426,7 @@ def extract_metadata_from_filename(csvfile):
 
     return experimentID,date,time,genotype,laser,repID
 
-def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap=None):
+def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L'):
     metadata = extract_metadata_from_filename(csvfile)
     if metadata is None:
         print "WARNING: invalid filename:", csvfile
@@ -455,9 +447,20 @@ def load_and_smooth_csv(csvfile, arena, smooth, resample_specifier='10L', valmap
     df = df.iloc[first_valid_row:]
     print "\tremove %d invalid rows at start of file" % first_valid_row
 
-    if valmap is not None:
-        #this must be done before resampling
-        fix_scoring_colums(df, valmap)
+    #convert 'V', 'X' AND 'S' to 1 or 0
+    df['zx'] = df['zx'].astype(object).fillna('x')
+    df['as'] = df['as'].astype(object).fillna('s')
+    df['cv'] = df['cv'].astype(object).fillna('v')
+    df['zx'][df['zx'] == 'z'] = 1
+    df['cv'][df['cv'] == 'c'] = 1
+    df['as'][df['as'] == 'a'] = 1
+    df['zx'][df['zx'] == 'x'] = 0
+    df['cv'][df['cv'] == 'v'] = 0
+    df['as'][df['as'] == 's'] = 0
+
+    #ensure these are floats incase we later resample
+    cols = ['zx','as','cv']
+    df[cols] = df[cols].astype(float)
 
     #resample to 10ms (mean) and set a proper time index on the df
     df = fixup_index_and_resample(df, resample_specifier)

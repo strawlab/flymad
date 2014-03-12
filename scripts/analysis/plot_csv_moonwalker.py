@@ -85,10 +85,7 @@ def prepare_data(path, arena, smooth, only_laser, gts):
 
         results = madplot.load_bagfile_cache(cache_args, cache_fname)
         if results is None:
-            results = flymad_analysis.load_and_smooth_csv(
-                            csvfile, arena, smooth,
-                            valmap={'zx':{'z':math.pi,'x':0},
-                                    'as':{'a':1,'s':0}})
+            results = flymad_analysis.load_and_smooth_csv(csvfile, arena, smooth)
             if results is not None:
                 #update the cache
                 madplot.save_bagfile_cache(results, cache_args, cache_fname)
@@ -104,6 +101,9 @@ def prepare_data(path, arena, smooth, only_laser, gts):
             continue
 
         print "\t%ss experiment" % duration
+
+        #we use zx to rotate by pi
+        df['zx'][df['zx'] > 0] = math.pi
 
         #ROTATE by pi if orientation is east
         df['orientation'] = df['theta'] + df['zx']
