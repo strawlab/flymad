@@ -119,13 +119,11 @@ def prepare_data(path, only_laser, gts):
         else:
             df['dtarget'] = 0
 
-        #ALIGN BY LASER OFF TIME (=t0)
-        if (df['laser_state']==1).any():
-            lasermask = df[df['laser_state']==1]
-            df['t'] = df['t'] - np.max(lasermask['t'].values)#laser off time =0               
-        else:  
-            print "No laser detected!!!!!!!!!! NOT PLOTTING THIS TRIAL"
-            continue
+
+        #align by *first* laser on
+        t0idx = np.argmax(np.gradient(df['laser_state'].values > 0))
+        ton = df.iloc[t0idx]['t']
+        df['t'] = df['t'] - ton
 
         #bin to  5 second bins:
         #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
