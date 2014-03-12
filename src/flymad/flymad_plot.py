@@ -45,7 +45,12 @@ def setup_defaults():
     rcParams['legend.scatterpoints'] = 1
 
 def get_plotpath(path, name):
-    path_out = os.path.join(os.path.dirname(path),'plots')
+    if os.path.isdir(path):
+        default = path
+    else:
+        default = os.path.dirname(path)
+    plotdir = os.environ.get('FLYMAD_PLOT_DIR', default)
+    path_out = os.path.join(plotdir,'plots')
     if not os.path.exists(path_out):
         os.makedirs(path_out)
     fig_out = os.path.join(path_out,name)
