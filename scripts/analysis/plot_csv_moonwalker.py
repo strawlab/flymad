@@ -17,6 +17,7 @@ from pandas.tseries.offsets import DateOffset
 import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
+import scipy.signal
 from scipy.stats import ttest_ind
 
 import roslib; roslib.load_manifest('flymad')
@@ -61,7 +62,7 @@ YTICKS = [-20, 0, 20, 40]
 XLIM = [-10, 80]
 XTICKS = [0, 2, 24, 48, 72]
 
-def prepare_data(path, arena, smooth, only_laser, gts):
+def prepare_data(path, arena, smooth, medfilt, only_laser, gts):
 
     LASER_THORAX_MAP = {True:THORAX,False:HEAD}
 
@@ -146,6 +147,10 @@ def prepare_data(path, arena, smooth, only_laser, gts):
         #groupby on float times is slow. make a special align column 
         df['t_align'] = np.array(range(0,len(df))) - t0idx
 
+        #median filter
+        if medfilt:
+            df['Vfwd'] = scipy.signal.medfilt(df['Vfwd'].values, medfilt)
+
         df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
         df['lasergroup'] = laser
@@ -163,6 +168,7 @@ def prepare_data(path, arena, smooth, only_laser, gts):
                              gt, lgs))
 
         grouped = gtdf.groupby(['t_align'], as_index=False)
+
         data[gt] = dict(mean=grouped.mean().astype(float),
                         std=grouped.std().astype(float),
                         n=grouped.count().astype(float),
@@ -195,7 +201,8 @@ def plot_cross_activation_only(path, data, arena, note):
                               label='Activation (%s)' % LABELS[alaser],
                               order=0,
                               color=flymad_plot.RED,
-                              N=len(adf['df']['obj_id'].unique())),
+                              N=len(adf['df']['obj_id'].unique()),
+                              df=adf['df']),
             'cross_activation':dict(
                               xaxis=cdf['mean']['t'].values,
                               value=cdf['mean']['Vfwd'].values,
@@ -204,18 +211,24 @@ def plot_cross_activation_only(path, data, arena, note):
                               label='Cross Activation (%s)' % LABELS[claser],
                               order=0,
                               color=flymad_plot.BLACK,
-                              N=len(cdf['df']['obj_id'].unique())),
+                              N=len(cdf['df']['obj_id'].unique()),
+                              df=cdf['df']),
         }
 
-        fig = plt.figure("Moonwalker Thorax Crosstalk %s (%s)" % (gt,figname), figsize=(10,8))
+        figure_title = "Moonwalker Thorax Crosstalk %s (%s)" % (gt,figname)
+
+        fig = plt.figure(figure_title, figsize=(10,8))
         ax = fig.add_subplot(1,1,1)
-        flymad_plot.plot_timeseries_with_activation(ax,
+        l,axs, figs = flymad_plot.plot_timeseries_with_activation(ax,
                     targetbetween=dict(xaxis=adf['mean']['t'].values,
                                        where=adf['mean']['laser_state'].values>0),
                     downsample=25,
                     note="%s\n%s\n" % (gt,note),
+                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'Vfwd'} for k in datasets},
+                    individual_title=figure_title + ' Individual Traces',
                     **datasets
         )
+
         ax.axhline(color='k', linestyle='--',alpha=0.8)
         ax.set_ylim(YLIM)
         ax.set_xlabel('Time (s)')
@@ -226,6 +239,9 @@ def plot_cross_activation_only(path, data, arena, note):
 
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.png" % (gt, figname)), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s.svg" % (gt, figname)), bbox_inches='tight')
+
+        for efigname, efig in figs.iteritems():
+            efig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s_individual_%s.png" % (gt, figname, efigname)), bbox_inches='tight')
 
 
 def plot_all_data(path, data, arena, note):
@@ -255,17 +271,23 @@ def plot_all_data(path, data, arena, note):
                                    order=-1 if cross_activation else laser_powers.index(laser),
                                    color=color_cycle.next(),
                                    N=len(gtdf['df']['obj_id'].unique()),
+                                   df=gtdf['df'],
             )
 
-        fig = plt.figure("Moonwalker Thorax %s (%s)" % (gt,smoothstr), figsize=(10,8))
+        figure_title = "Moonwalker Thorax %s (%s)" % (gt,smoothstr)
+
+        fig = plt.figure(figure_title, figsize=(10,8))
         ax = fig.add_subplot(1,1,1)
-        flymad_plot.plot_timeseries_with_activation(ax,
-                    targetbetween=dict(xaxis=gtdf['mean']['t'].values,
-                                       where=gtdf['mean']['laser_state'].values>0),
-                    downsample=25,
-                    note="%s\n%s\n" % (gt,note),
-                    **datasets
+        l, axs, figs = flymad_plot.plot_timeseries_with_activation(ax,
+                            targetbetween=dict(xaxis=gtdf['mean']['t'].values,
+                                               where=gtdf['mean']['laser_state'].values>0),
+                            downsample=25,
+                            note="%s\n%s\n" % (gt,note),
+                            individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'Vfwd'} for k in datasets},
+                            individual_title=figure_title + ' Individual Traces',
+                            **datasets
         )
+
         ax.axhline(color='k', linestyle='--',alpha=0.8)
         ax.set_ylim(YLIM)
         ax.set_xlabel('Time (s)')
@@ -276,6 +298,9 @@ def plot_all_data(path, data, arena, note):
 
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.png" % gt), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s.svg" % gt), bbox_inches='tight')
+
+        for efigname, efig in figs.iteritems():
+            efig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_individual_%s.png" % (gt, efigname)), bbox_inches='tight')
 
 if __name__ == "__main__":
 
@@ -298,6 +323,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
+    medfilt = 51
     smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
 
     all_data = {k:dict() for k in DAY_1_GENOTYPES + DAY_2_GENOTYPES}
@@ -321,7 +347,7 @@ if __name__ == "__main__":
         for gt in DAY_1_GENOTYPES:
             for lp in LASER_POWERS:
                 try:
-                    d1_data[gt][lp] = prepare_data(path, d1_arena, args.smooth, lp, [gt])
+                    d1_data[gt][lp] = prepare_data(path, d1_arena, args.smooth, medfilt, lp, [gt])
                 except KeyError:
                     #this laser power and genotype combination was not tested
                     pass
@@ -345,20 +371,20 @@ if __name__ == "__main__":
         for gt in DAY_2_GENOTYPES:
             for lp in LASER_POWERS:
                 try:
-                    d2_data[gt][lp] = prepare_data(path, d2_arena, args.smooth, lp, [gt])
+                    d2_data[gt][lp] = prepare_data(path, d2_arena, args.smooth, medfilt, lp, [gt])
                 except KeyError:
                     #this laser power and genotype combination was not tested
                     pass
         madplot.save_bagfile_cache(d2_data, cache_args, cache_fname)
     all_data.update(d2_data)
 
-    note = "%s %s\nd1arena:%r\nd2arena:%r" % (d1_arena.unit, smoothstr, d1_arena, d2_arena)
+    note = "%s %s\nd1arena:%r\nd2arena:%r\nmedfilt %s" % (d1_arena.unit, smoothstr, d1_arena, d2_arena, medfilt)
 
     #from here on, arena is only used for the units
     assert d1_arena.unit == d2_arena.unit
 
     plot_all_data(path, all_data, d1_arena, note)
-    plot_cross_activation_only(path, all_data, d1_arena, note)
+    #plot_cross_activation_only(path, all_data, d1_arena, note)
 
     if args.show:
         plt.show()
