@@ -14,6 +14,7 @@ from pandas import Series
 from pandas import DataFrame
 from pandas.tseries.offsets import DateOffset
 
+import scipy.signal
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 
@@ -29,7 +30,7 @@ assert pd.version.version in ("0.11.0" ,  "0.12.0")
 
 EXPERIMENT_DURATION = 70.0
 
-def prepare_data(path, arena, smoothstr, smooth, gts):
+def prepare_data(path, arena, smoothstr, smooth, medfilt, gts):
 
     pooldf = DataFrame()
     for csvfile in sorted(glob.glob(path + "/*.csv")):
@@ -76,8 +77,12 @@ def prepare_data(path, arena, smoothstr, smooth, gts):
         print "\t%ss experiment" % duration
 
         #MAXIMUM SPEED = 300:
-        df['v'][df['v'] >= 50] = np.nan
+        df['v'][df['v'] >= 300] = np.nan
         df['v'] = df['v'].fillna(method='ffill')
+
+        #median filter
+        if medfilt:
+            df['v'] = scipy.signal.medfilt(df['v'].values, medfilt)
 
         #Here we have a 10ms resampled dataframe at least EXPERIMENT_DURATION seconds long.
         df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION))
@@ -201,6 +206,7 @@ def plot_data(path, data, arena, note):
               'OK371shits-130t':flymad_plot.ORANGE,
     }
 
+
     fig2 = plt.figure("Speed")
     ax = fig2.add_subplot(1,1,1)
 
@@ -213,16 +219,19 @@ def plot_data(path, data, arena, note):
                             n=gtdf['n']['v'].values,
                             label=LABELS[gt],
                             color=COLORS[gt],
+                            df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
 
     ctrlmean = data['OK371shits-nolaser']['mean']
 
-    flymad_plot.plot_timeseries_with_activation(ax,
+    _,_,figs = flymad_plot.plot_timeseries_with_activation(ax,
                 targetbetween=dict(xaxis=ctrlmean['t'].values,
                                    where=ctrlmean['laser_state'].values>0),
-                downsample=25,
+                downsample=5,
                 sem=True,
                 note="OK371shits\n%s\n" % note,
+                individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'v'} for k in datasets},
+                individual_title='Speed Individual Traces',
                 **datasets
     )
 
@@ -236,22 +245,29 @@ def plot_data(path, data, arena, note):
     plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.png"), bbox_inches='tight')
     plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.svg"), bbox_inches='tight')
 
+    for efigname, efig in figs.iteritems():
+        efig.savefig(flymad_plot.get_plotpath(path,"speed_plot_individual_%s.png" % efigname), bbox_inches='tight')
+
 
 if __name__ == "__main__":
     EXP_GENOTYPE = 'OK371shits-130h'
     CTRL_GENOTYPE = 'OK371shits-nolaser'
     EXP2_GENOTYPE = 'OK371shits-130t'
+
     CALIBRATION_FILE = 'calibration20140219_064948.filtered.yaml'
+    GENOTYPES = [EXP_GENOTYPE, CTRL_GENOTYPE, EXP2_GENOTYPE]
 
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
     parser.add_argument('--calibration-dir', help='calibration directory containing yaml files', required=True)
 
     args = parser.parse_args()
     path = args.path[0]
 
+    medfilt = 51
     smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
 
     calibration_file = os.path.join(args.calibration_dir, CALIBRATION_FILE)
@@ -259,9 +275,16 @@ if __name__ == "__main__":
                 'mm',
                 **flymad_analysis.get_arena_conf(calibration_file=calibration_file))
 
-    note = "%s %s\n%r" % (arena.unit, smoothstr, arena)
+    note = "%s %s\n%r\nmedfilt %s" % (arena.unit, smoothstr, arena, medfilt)
 
-    data = prepare_data(path, arena, smoothstr, args.smooth, [EXP_GENOTYPE, CTRL_GENOTYPE, EXP2_GENOTYPE])
+    cache_fname = os.path.join(path,'speed.madplot-cache')
+    cache_args = (path, arena, smoothstr, args.smooth, medfilt, GENOTYPES)
+    data = None
+    if args.only_plot:
+        data = madplot.load_bagfile_cache(cache_args, cache_fname)
+    if data is None:
+        data = prepare_data(path, arena, smoothstr, args.smooth, medfilt, GENOTYPES)
+        madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
     #p_values = run_stats(path, arena, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
     #fit_to_curve(path, arena, smoothstr, p_values)
