@@ -80,7 +80,7 @@ def _get_targets(path, date):
 
     return []
 
-def prepare_data(path, only_laser, gts):
+def prepare_data(path, only_laser, resample_bin, gts):
     data = {}
 
     #PROCESS SCORE FILES:
@@ -119,22 +119,29 @@ def prepare_data(path, only_laser, gts):
         else:
             df['dtarget'] = 0
 
+        duration = (df.index[-1] - df.index[0]).total_seconds()
+        if duration < EXPERIMENT_DURATION:
+            print "\tmissing data", csvfilefn
+            continue
 
-        #align by *first* laser on
+        print "\t%ss experiment" % duration
+
+        #resample into 5S bins
+        df = df.resample(resample_bin)
+        #trim dataframe
+        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION, resample_bin))
+        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION, resample_bin)
+
+        #fix laser_state due to resampling
+        df['laser_state'][df['laser_state'] > 0] = 1
+        df['zx_binary'] = (df['zx'] > 0).values.astype(float)
+
         t0idx = np.argmax(np.gradient(df['laser_state'].values > 0))
-        ton = df.iloc[t0idx]['t']
-        df['t'] = df['t'] - ton
+        t0 = tb[t0idx]
+        df['t'] = tb - t0
 
-        #bin to  5 second bins:
-        #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
-        #df = df.resample('5S')
-
-        df['t'] = df['t'] /5
-        df['t'] = df['t'].astype(int)
-        df['t'] = df['t'].astype(float)
-        df['t'] = df['t'] *5
-
-        df = df.groupby(df['t'], axis=0).mean() 
+        #groupby on float times is slow. make a special align column 
+        df['t_align'] = np.array(range(0,len(df))) - t0idx
 
         df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
@@ -152,7 +159,7 @@ def prepare_data(path, only_laser, gts):
             raise Exception("only one lasergroup handled for gt %s: not %s" % (
                              gt, lgs))
 
-        grouped = gtdf.groupby(['t'], as_index=False)
+        grouped = gtdf.groupby(['t_align'], as_index=False)
         data[gt] = dict(mean=grouped.mean().astype(float),
                         std=grouped.std().astype(float),
                         n=grouped.count().astype(float),
