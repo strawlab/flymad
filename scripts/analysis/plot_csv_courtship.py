@@ -72,17 +72,18 @@ def _get_targets(path, date):
         return targets
 
     #cached results
-    mp4pngcache = glob.glob(os.path.join(path,'*%s*.mp4.png.madplot-cache' % date))
+    pata = os.path.join(path,'*%s*.mp4.png.madplot-cache' % date)
+    mp4pngcache = glob.glob(pata)
     if len(mp4pngcache) == 1:
         return pickle.load( open(mp4pngcache[0],'rb') )
 
-    mp4pngcache = os.path.join(path,'*%s*.mp4.png.madplot-cache' % date)
-    
-    mp4png = glob.glob(os.path.join(path,'*%s*.mp4.png' % date))
+    patb = os.path.join(path,'*%s*.mp4.png' % date)
+    mp4png = glob.glob(patb)
     if len(mp4png) == 1:
         return _mp4_click(mp4png[0], mp4png[0] + '.madplot-cache')
 
-    mp4 = glob.glob(os.path.join(path,'*%s*.mp4' % date))
+    patc = os.path.join(path,'*%s*.mp4' % date)
+    mp4 = glob.glob(patc)
     if len(mp4) == 1:
         mp4 = mp4[0]
         mp4png = mp4 + '.png'
@@ -90,6 +91,8 @@ def _get_targets(path, date):
         subprocess.check_call("ffmpeg -i %s -vframes 1 -an -f image2 -y %s" % (mp4,mp4png),
                               shell=True)
         return _mp4_click(mp4png, mp4png + '.madplot-cache')
+
+    print "WARNING: could not find\n\t", "\n\t".join((pata,patb,patc))
 
     return []
 
