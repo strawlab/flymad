@@ -126,50 +126,49 @@ def get_stats(group):
             'n' : group.count()
            }
 
-def add_obj_id(df):
+def add_obj_id(df,align_colname='t_align'):
     results = np.zeros( (len(df),), dtype=np.int )
     obj_id = 0
     for i,(ix,row) in enumerate(df.iterrows()):
-        if row['align']==0.0:
+        if row[align_colname]==0.0:
             obj_id += 1
         results[i] = obj_id
     df['obj_id']=results
     return df
 
-def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_colname='v'):
-    df_ctrl = add_obj_id(df_ctrl)
-    df_exp = add_obj_id(df_exp)
+def calc_kruskal(df_ctrl, df_exp, align_colname='t_align', stat_colname='v'):
+    bin_sizes_in_nsamps = [ 6990//4 ]
 
-    dalign = df_ctrl['align'].max() - df_ctrl['align'].min()
+    df_ctrl = add_obj_id(df_ctrl,align_colname=align_colname)
+    df_exp = add_obj_id(df_exp,align_colname=align_colname)
+
+    dalign = df_ctrl[align_colname].max() - df_ctrl[align_colname].min()
 
     p_values = DataFrame()
-    for binsize in number_of_bins:
+    for binsize in bin_sizes_in_nsamps:
         bins = np.linspace(0,dalign,binsize)
-        binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
-        binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
+        binned_ctrl = pd.cut(df_ctrl[align_colname], bins, labels= bins[:-1])
+        binned_exp = pd.cut(df_exp[align_colname], bins, labels= bins[:-1])
         for x in binned_ctrl.levels:
             test1_all_flies_df = df_ctrl[binned_ctrl == x]
             test1 = []
             for obj_id, fly_group in test1_all_flies_df.groupby('obj_id'):
-                test1.append( np.mean(fly_group['v'].values) )
+                test1.append( np.mean(fly_group[stat_colname].values) )
             test1 = np.array(test1)
 
             test2_all_flies_df = df_exp[binned_exp == x]
             test2 = []
             for obj_id, fly_group in test2_all_flies_df.groupby('obj_id'):
-                test2.append( np.mean(fly_group['v'].values) )
+                test2.append( np.mean(fly_group[stat_colname].values) )
             test2 = np.array(test2)
 
+            if len(test1)<=5 or len(test2)<=5:
+                # reaching end of data - stop
+                break
             hval, pval = kruskal(test1, test2)
             dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
             p_values = pd.concat([p_values, dftemp])
     return p_values
-
-def run_stats (path, arena, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2):
-    number_of_bins = [ 6990//4 ]
-    df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
-    df_exp = df2[df2['Genotype'] == exp_genotype]
-    return calc_kruskal(df_ctrl, df_exp, number_of_bins)
 
 def fit_to_curve (path, arena, smoothstr, p_values):
     x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
@@ -288,7 +287,7 @@ if __name__ == "__main__":
         data = prepare_data(path, arena, smoothstr, args.smooth, medfilt, GENOTYPES)
         madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
-    #p_values = run_stats(path, arena, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
+    p_values = calc_kruskal( data[CTRL_GENOTYPE]['df'], data[EXP_GENOTYPE]['df'] )
     #fit_to_curve(path, arena, smoothstr, p_values)
     plot_data(path, data, arena, note)
 
