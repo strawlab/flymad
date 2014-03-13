@@ -20,9 +20,22 @@ import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
 import madplot
 
+from strawlab_mpl.spines import spine_placer
+
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.version.version in ("0.11.0", "0.12.0")
+
+EXPERIMENT_DURATION = 600
+
+XLIM = [-60,480]
+
+DR_COLORS = {'100hpc':flymad_plot.BLACK,
+            '120hpc':flymad_plot.GREEN,
+            '140hpc':flymad_plot.RED,
+            '160hpc':flymad_plot.BLUE}
+
+DIRECTED_COURTING_DIST = 50
 
 def _get_targets(path, date):
     #first we look for a png file corresponding to the scored MP4 (for
@@ -270,7 +283,7 @@ def plot_data(path, laser, dfs):
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Wing Ext. Index')
     ax.set_ylim([0,0.6])
-    ax.set_xlim([-60,480])
+    ax.set_xlim(XLIM)
 
     flymad_plot.retick_relabel_axis(ax, [-60,0,20,60,120,240,480], [0,0.3,0.6])
 
@@ -318,7 +331,7 @@ def plot_data(path, laser, dfs):
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Distance (px)')
     ax.set_ylim([40,160])
-    ax.set_xlim([-60,480])
+    ax.set_xlim(XLIM)
 
     flymad_plot.retick_relabel_axis(ax, [-60,0,20,60,120,240,480], [40,0,80,120,160])
 
@@ -328,12 +341,266 @@ def plot_data(path, laser, dfs):
     for efigname, efig in figs.iteritems():
         efig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s_individual_%s.png" % (figname, efigname)), bbox_inches='tight')
 
+def plot_dose_response(path, bin_size, exp_gt, data):
+    plots_to_save = []
+
+    note = "%s\nbin %s\n" % (exp_gt, bin_size)
+
+    laser_court = {}
+    laser_dtarget = {}
+    laser_dtarget_we = {}
+    for laser in sorted(data.keys()):
+        expdf = data[laser][exp_gt]
+
+        laser_court[laser] = dict(xaxis=expdf['mean']['t'].values,
+                                  value=expdf['mean']['zx'].values,
+                                  std=expdf['std']['zx'].values,
+                                  n=expdf['n']['zx'].values,
+                                  color=DR_COLORS[laser],
+                                  df=expdf['df'],
+                                  N=len(expdf['df']['obj_id'].unique()))
+        laser_dtarget[laser] = dict(xaxis=expdf['mean']['t'].values,
+                                    value=expdf['mean']['dtarget'].values,
+                                    std=expdf['std']['dtarget'].values,
+                                    n=expdf['n']['dtarget'].values,
+                                    color=DR_COLORS[laser],
+                                    df=expdf['df'],
+                                    N=len(expdf['df']['obj_id'].unique()))
+
+        #keep only values where there was WE
+        non_grouped_df = expdf['df']
+        wedf = non_grouped_df[non_grouped_df['zx'] > 0]
+        laser_dtarget_we[laser] = dict(xaxis=wedf['t'].values,
+                                       value=wedf['dtarget'].values,
+                                       color=DR_COLORS[laser],
+                                       df=wedf,
+                                       N=len(wedf['obj_id'].unique()))
+
+
+    #all D/R experiments were identical, so take activation times from the
+    #last one
+    targetbetween = dict(xaxis=expdf['mean']['t'].values,
+                         where=expdf['mean']['laser_state'].values>0)
+
+    fig = plt.figure("Courtship Wingext 10min D/R")
+    ax = fig.add_subplot(1,1,1)
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=targetbetween,
+                    sem=True,
+                    note=note,
+                    **laser_court
+    )
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Wing Ext. Index')
+    ax.set_xlim(XLIM)
+    ax.set_ylim([0,1])
+    flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [0,0.5,1])
+    plots_to_save.append( ("DR_following_and_WingExt",fig,ax) )
+
+    fig = plt.figure("Courtship Dtarget 10min D/R")
+    ax = fig.add_subplot(1,1,1)
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=targetbetween,
+                    sem=True,
+                    note=note,
+                    **laser_dtarget
+    )
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Distance (px)')
+    ax.set_xlim([-60,480])
+    ax.set_ylim([20,150])
+    flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [40,80,120])
+    plots_to_save.append( ("DR_following_and_dtarget",fig,ax) )
+
+    for figname,fig,ax in plots_to_save:
+        fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+        fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
+
+def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
+
+    plots_to_save = []
+    note = "%s\nbin %s\n" % (exp_gt, bin_size)
+
+    laser_dtarget = {}
+    laser_dtarget_we = {}
+    laser_dtarget_prop = {}
+
+    for laser in sorted(data.keys()):
+        expdf = data[laser][exp_gt]
+        non_grouped_df = expdf['df']
+
+        laser_dtarget[laser] = dict(value=non_grouped_df['dtarget'].values,
+                                    color=DR_COLORS[laser])
+
+        #keep only values where there was WE
+        wedf = non_grouped_df[non_grouped_df['zx_binary'] > 0]
+        gwedf = wedf.groupby('t_align').mean()
+        laser_dtarget_we[laser] = dict(xaxis=gwedf['t'].values,
+                                       value=gwedf['dtarget'].values,
+                                       color=DR_COLORS[laser],
+                                       df=wedf,
+                                       N=len(gwedf['obj_id'].unique()))
+
+        #caculate the proportion
+        proportions = []
+        grouped = non_grouped_df.groupby('t_align')
+        for _t,_rows in grouped:
+            rows = _rows[['zx_binary','dtarget']]
+#            print _t
+#            print rows
+            nwei = rows['zx_binary'].sum()
+            if nwei > 0:
+                nwei_and_close = len(rows[(rows['dtarget'] < DIRECTED_COURTING_DIST) & (rows['zx_binary'] > 0)])
+                proportions.append( float(nwei_and_close) / nwei )
+            else:
+                proportions.append( np.nan )
+
+        laser_dtarget_prop[laser] = dict(xaxis=grouped['t'].mean().values,
+                                        value=np.array(proportions),
+                                        color=DR_COLORS[laser],
+                                        N=len(grouped['obj_id'].unique()))
+
+    #all D/R experiments were identical, so take activation times from the
+    #last one
+    targetbetween = dict(xaxis=expdf['mean']['t'].values,
+                         where=expdf['mean']['laser_state'].values>0)
+
+    fig = plt.figure("Courtship Dtarget 10min D/R When WEI")
+    ax = fig.add_subplot(1,1,1)
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=targetbetween,
+                    downsample=500,
+                    note=note,
+                    linestyle='',marker='o',markersize=8,
+                    **laser_dtarget_we
+    )
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Distance (px)')
+    ax.set_xlim([-60,480])
+    ax.set_ylim([20,110])
+    flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [50,100])
+    plots_to_save.append( ("DR_following_and_dtarget_wei",fig,ax) )
+
+    fig = plt.figure("Courtship Dtarget 10min D/R WEI Proportion")
+    ax = fig.add_subplot(1,1,1)
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=targetbetween,
+                    downsample=500,
+                    note="%sdist < %s\n" % (note, DIRECTED_COURTING_DIST),
+                    linestyle='',marker='o',markersize=8,
+                    **laser_dtarget_prop
+    )
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Proportion')
+    ax.set_xlim([-60,480])
+    ax.set_ylim([0,1])
+    flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [0,0.5,1.0])
+    plots_to_save.append( ("DR_following_and_dtarget_wei_prop",fig,ax) )
+
+    fig = plt.figure("Courtship WEI Hist 10min D/R")
+    ax = fig.add_subplot(1,1,1)
+    vals = []; colors = []; lbls = []
+    for k in laser_dtarget:
+        ds = laser_dtarget[k]
+        #remove nans
+        val = ds['value']
+        vals.append(val[np.isfinite(val)])
+        lbls.append(ds.get('label',k)),
+        colors.append(ds['color'])
+    ax.hist(vals,40,normed=True,color=colors,label=lbls,edgecolor='none')
+    spine_placer(ax, location='left,bottom')
+    ax.legend()
+    ax.set_ylabel('Probability')
+    ax.set_xlabel('Distance (px)')
+    plots_to_save.append( ("DR_following_and_dtarget_wei_hist",fig,ax) )
+
+    for figname,fig,ax in plots_to_save:
+        fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+        fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
+
+def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
+
+    plots_to_save = []
+    note = "%s\nbin %s\n" % (exp_gt, bin_size)
+
+    wei_ext = {}
+    wei_ext_close = {}
+    wei_ext_far = {}
+
+    for laser in sorted(data.keys()):
+        expdf = data[laser][exp_gt]
+        non_grouped_df = expdf['df']
+
+        close = non_grouped_df['dtarget'] < DIRECTED_COURTING_DIST
+        closedf = non_grouped_df[close]
+        fardf = non_grouped_df[~close]
+
+        grp = non_grouped_df.groupby('t_align')
+        gdf = grp.mean()
+        wei_ext[laser] = dict(xaxis=gdf['t'].values,
+                              value=gdf['zx'].values,
+#                              std=grp.std()['zx'].values,
+#                              n=grp.count()['zx'].values,
+                              color=DR_COLORS[laser],
+                              df=non_grouped_df,
+                              N=len(non_grouped_df['obj_id'].unique()))
+
+        grp = closedf.groupby('t_align')
+        cdf = grp.mean()
+        wei_ext_close[laser] = dict(xaxis=cdf['t'].values,
+                                    value=cdf['zx'].values,
+#                                    std=grp.std()['zx'].values,
+#                                    n=grp.count()['zx'].values,
+                                    color=DR_COLORS[laser],
+                                    df=closedf,
+                                    N=len(closedf['obj_id'].unique()))
+
+        grp = fardf.groupby('t_align')
+        fdf = grp.mean()
+        wei_ext_far[laser] = dict(xaxis=fdf['t'].values,
+                                  value=fdf['zx'].values,
+#                                  std=grp.std()['zx'].values,
+#                                  n=grp.count()['zx'].values,
+                                  color=DR_COLORS[laser],
+                                  df=fardf,
+                                  N=len(fardf['obj_id'].unique()))
+
+
+    #all D/R experiments were identical, so take activation times from the
+    #last one
+    targetbetween = dict(xaxis=gdf['t'].values,
+                         where=gdf['laser_state'].values>0)
+
+    for dataseries,name in [(wei_ext, 'all'), (wei_ext_close, 'close'), (wei_ext_far, 'far')]:
+
+        fig = plt.figure("Courtship WEI 10min D/R When %s" % name)
+        ax = fig.add_subplot(1,1,1)
+        flymad_plot.plot_timeseries_with_activation(ax,
+                        targetbetween=targetbetween,
+                        downsample=500,
+                        note="%s (thresh %spx)\n%s" % (name,DIRECTED_COURTING_DIST,note),
+                        sem=True,
+                        **dataseries
+        )
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Wing Ext. Index')
+        ax.set_xlim(XLIM)
+        ax.set_ylim([0,1])
+        flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [0,0.5,1])
+        plots_to_save.append( ("DR_following_and_WingExt_%s" % name,fig,ax) )
+
+    for figname,fig,ax in plots_to_save:
+        fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+        fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
+
+
 if __name__ == "__main__":
     CTRL_GENOTYPE = 'wtrpmyc'
     EXP_GENOTYPE = 'wGP'
     EXP2_GENOTYPE = '40347trpmyc'
     CTRL2_GENOTYPE = 'G323'
     CTRL3_GENOTYPE = '40347'
+    LASERS = [100,120,140]#,160]
 
     gts = EXP_GENOTYPE, EXP2_GENOTYPE, CTRL_GENOTYPE, CTRL2_GENOTYPE, CTRL3_GENOTYPE
 
@@ -342,98 +609,49 @@ if __name__ == "__main__":
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--laser', default='140hpc', help='laser specifier')
-    parser.add_argument('--dose-response', action='store_true', default=False,
-                        help='plot dose response')
 
     args = parser.parse_args()
     path = args.path[0]
 
     cache_fname = os.path.join(path,'courtship.madplot-cache')
-    cache_args = (args.laser, gts)
+    cache_args = (args.laser, gts, '5S')
     dfs = None
     if args.only_plot:
         dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
     if dfs is None:
-        dfs = prepare_data(path, args.laser, gts)
+        dfs = prepare_data(path, args.laser, BIN_SIZE, gts)
         madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
-
     plot_data(path, args.laser, dfs)
 
-    #p_values1, p_values2 = run_stats(path, dfs)
-    #fit_to_curve( p_values1 )
-    #fit_to_curve( p_values2 )
-
-    if args.dose_response:
-        COLORS = {'100hpc':flymad_plot.BLACK,
-                  '120hpc':flymad_plot.GREEN,
-                  '140hpc':flymad_plot.RED,
-                  '160hpc':flymad_plot.BLUE}
-
-        laser_court = {}
-        laser_dtarget = {}
-        for laser in [100,120,140,160]:
+    bin_size = '5S'
+    cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % bin_size)
+    cache_args = bin_size, EXP_GENOTYPE, LASERS
+    data = None
+    if args.only_plot:
+        data = madplot.load_bagfile_cache(cache_args, cache_fname)
+    if data is None:
+        data = {}
+        for laser in LASERS:
             laser = '%dhpc' % laser
+            data[laser] = prepare_data(path, laser, bin_size, [EXP_GENOTYPE])
+        madplot.save_bagfile_cache(data, cache_args, cache_fname)
+    plot_dose_response(path, bin_size, EXP_GENOTYPE, data)
 
-            cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % laser)
-            cache_args = None
-            dfs = None
+    bin_size = '10L'
+    cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % bin_size)
+    cache_args = bin_size, EXP_GENOTYPE, LASERS
+    data = None
+    if args.only_plot:
+        data = madplot.load_bagfile_cache(cache_args, cache_fname)
+    if data is None:
+        data = {}
+        for laser in LASERS:
+            laser = '%dhpc' % laser
+            data[laser] = prepare_data(path, laser, bin_size, [EXP_GENOTYPE])
+        madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
-            if args.only_plot:
-                dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
-            if dfs is None:
-                dfs = prepare_data(path, laser, [EXP_GENOTYPE])
-                madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
-
-            expdf = dfs[EXP_GENOTYPE]
-            laser_court[laser] = dict(xaxis=expdf['mean']['t'].values,
-                                      value=expdf['mean']['zx'].values,
-                                      std=expdf['std']['zx'].values,
-                                      n=expdf['n']['zx'].values,
-                                      color=COLORS[laser],
-                                      N=len(expdf['df']['obj_id'].unique()))
-            laser_dtarget[laser] = dict(xaxis=expdf['mean']['t'].values,
-                                        value=expdf['mean']['dtarget'].values,
-                                        std=expdf['std']['dtarget'].values,
-                                        n=expdf['n']['dtarget'].values,
-                                        color=COLORS[laser],
-                                        N=len(expdf['df']['obj_id'].unique()))
-
-        #all D/R experiments were identical, so take activation times from the
-        #last one
-        targetbetween = dict(xaxis=expdf['mean']['t'].values,
-                             where=expdf['mean']['laser_state'].values>0)
-
-        figw = plt.figure("Courtship Wingext 10min D/R")
-        axw = figw.add_subplot(1,1,1)
-        flymad_plot.plot_timeseries_with_activation(axw,
-                        targetbetween=targetbetween,
-                        sem=True,
-                        **laser_court
-        )
-        axw.set_xlabel('Time (s)')
-        axw.set_ylabel('Wing Ext. Index')
-        axw.set_xlim([-20,120])
-        axw.set_ylim([0,1])
-
-        flymad_plot.retick_relabel_axis(axw, [-20,0,20,60,120], [0,0.5,1])
-
-        figd = plt.figure("Courtship Dtarget 10min D/R")
-        axd = figd.add_subplot(1,1,1)
-        flymad_plot.plot_timeseries_with_activation(axd,
-                        targetbetween=targetbetween,
-                        sem=True,
-                        **laser_dtarget
-        )
-        axd.set_xlabel('Time (s)')
-        axd.set_ylabel('Distance (px)')
-        axd.set_xlim([-20,120])
-        axd.set_ylim([20,150])
-
-        flymad_plot.retick_relabel_axis(axd, [-20,0,20,60,120], [40,80,120])
-
-        for figname,fig,ax in [("DR_following_and_WingExt",figw,axw), ("DR_following_and_dtarget",figd,axd)]:
-            fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
-            fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
+    plot_dose_response_dtarget_by_wei(path, bin_size, EXP_GENOTYPE, data)
+    plot_dose_response_wei_by_proximity(path, bin_size, EXP_GENOTYPE, data)
 
     if args.show:
         plt.show()
