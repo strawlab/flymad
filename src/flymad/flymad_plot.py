@@ -132,7 +132,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         for tb in targetbetween:
             _fill_between(ax, tb['xaxis'], tb['where'], tb.get('facecolor','yellow'))
 
-    if any(['std' in exp for exp in datasets]):
+    if any(['std' in datasets[exp] for exp in datasets]):
         note += "+/- SEM\n" if sem else "+/- STD\n"
     note += "" if downsample == 1 else ("downsample x %d\n" % downsample)
 
