@@ -46,6 +46,7 @@ def setup_defaults():
     rcParams['legend.frameon'] = False
     rcParams['legend.numpoints'] = 1
     rcParams['legend.scatterpoints'] = 1
+    matplotlib.rc('font', size=8)
 
 def get_plotpath(path, name):
     if os.path.isdir(path):
@@ -97,7 +98,8 @@ def get_gridspec_to_fit_nplots(n):
 def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False,
                                     legend_location='upper right', note="",
                                     individual=None, individual_title=None,
-                                    return_dict=False,
+                                    marker=None,linestyle='-',markersize=1,
+									return_dict=False,
                                     **datasets):
 
     ORDER_LAST = 100
@@ -162,8 +164,11 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                     alpha=0.1, color=exp.get('color',DEFAULT_COLORS.get(data,'k')),
                     zorder=this_zorder)
 
+        color = exp.get('color',DEFAULT_COLORS.get(data,'k'))
         ax.plot(exp['xaxis'][::downsample], _ds(exp['value']),
-                    color=exp.get('color',DEFAULT_COLORS.get(data,'k')),label=label,lw=2,
+                    color=color,label=label,
+                    lw=2,linestyle=linestyle,clip_on=False if marker else True,
+                    marker=marker,markerfacecolor=color,markersize=markersize,markeredgecolor='none',
                     zorder=this_zorder+1)
 
         cur_zorder -= 2
