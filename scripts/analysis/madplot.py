@@ -458,6 +458,18 @@ def load_bagfile_cache(cache_args, cache_fname):
                     print '\targs different'
                     print '\tcache:\n\t\t',cache_dict['args']
                     print '\tthis call:\n\t\t',cache_args
+                    if cache_args is None:
+                        all_equal = False
+                    else:
+                        all_equal=True
+                        for i in range(len(cache_args)):
+                            if not cache_dict['args'][i]==cache_args[i]:
+                                all_equal=False
+                                break
+                    if all_equal:
+                        print 'hmm, parts are equal, but whole is not?! returning cache'
+                        results = cache_dict['results']
+                        return results
             else:
                 print 'loading cache failed\n\tcached version %s != %s' % (cache_dict['version'], CACHE_VERSION)
 
