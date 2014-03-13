@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
 from scipy.stats import ttest_ind
+from scipy.stats import kruskal
 
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
@@ -65,7 +66,7 @@ def prepare_data(path, gts):
         df['ttm'] = trg
 
         #don't do any alignment other than starting time at zero. other
-        df['t'] = df['t'].values - df['t'].values[0]
+        df['t'] = df['t'].values - df['t'].values[0] # XXX should align to laser on time?
 
         #bin to  5 second bins:
         #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
@@ -190,9 +191,31 @@ def plot_data(path, data):
                                 std=gtdf['std']['zx'].values,
                                 n=gtdf['n']['zx'].values,
                                 order=order,
+                                df=gtdf,
                                 label=flymad_analysis.human_label(gt),
                                 color=color,
                                 N=len(gtdf['df']['obj_id'].unique()))
+
+        pvalue_buf = ''
+
+        head_times =   [35,  95, 155]
+        thorax_times = [65, 125, 185]
+        for gt in datasets:
+            label=flymad_analysis.human_label(gt)
+            if '>' not in label:
+                continue
+
+            # OK, this is a Gal4 + UAS - do head vs thorax stats
+            gtdf = data[exp_name][gt]['df']
+
+            for i in range(len(head_times)):
+                head_values = gtdf[gtdf['t']==head_times[i]]
+                thorax_values = gtdf[gtdf['t']==thorax_times[i]]
+                test1 = head_values['zx'].values
+                test2 = thorax_values['zx'].values
+                hval, pval = kruskal(test1, test2)
+                pvalue_buf += 'Pulse %d: Head vs thorax WEI p-value: %.3g (n=%d, %d)\n'%(
+                    i+1, pval, len(test1), len(test2) )
 
         #all experiments used identical activation times
         headtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
@@ -203,6 +226,7 @@ def plot_data(path, data):
         flymad_plot.plot_timeseries_with_activation(ax,
                     targetbetween=[headtargetbetween,thoraxtargetbetween],
                     sem=True,
+                                                    note=pvalue_buf,
                     **datasets
         )
 
@@ -273,6 +297,7 @@ if __name__ == "__main__":
                                            fname_prefix,
                                            align_colname='t',
                                            stat_colname='zx',
+                                           layout_title='pvalues: WEI %s'%exp_name,
                                            )
     plot_data(path, data)
 
