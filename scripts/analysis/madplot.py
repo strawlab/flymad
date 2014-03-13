@@ -1481,7 +1481,9 @@ def add_obj_id(df,align_colname='t_align'):
     return df
 
 def calc_p_values(data, gt1_name, gt2_name,
-                  align_colname=None, stat_colname=None):
+                  align_colname=None, stat_colname=None,
+                  binsize=50,
+                  ):
 
     if align_colname is None:
         raise ValueError("you must explicitly set align_colname (try 't_align')")
@@ -1498,7 +1500,6 @@ def calc_p_values(data, gt1_name, gt2_name,
     dalign = df_ctrl[align_colname].max() - align_start
 
     p_values = DataFrame()
-    binsize = 50 # if bins are 10msec, this is 0.5 seconds
 
     bins = np.linspace(0,dalign,binsize) + align_start
     binned_ctrl = pd.cut(df_ctrl[align_colname], bins, labels= bins[:-1])
