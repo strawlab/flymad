@@ -223,7 +223,10 @@ if __name__ == "__main__":
     madplot.view_pairwise_stats_plotly(data, [EXP_GENOTYPE,
                                              CTRL_GENOTYPE,
                                              EXP2_GENOTYPE],
-                                       fname_prefix)
+                                       fname_prefix,
+                                       align_colname='t_align',
+                                       stat_colname='v',
+                                       )
     plot_data(path, data, arena, note)
 
     if args.show:

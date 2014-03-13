@@ -265,7 +265,15 @@ if __name__ == "__main__":
         for ctrl_name in cdata:
             if ctrl_name in EXPS[exp_name]['ctrl']:
                 data[exp_name][ctrl_name] = cdata[ctrl_name]
+    for exp_name in data:
+        gts = data[exp_name].keys()
 
+        fname_prefix = flymad_plot.get_plotpath(path,'csv_song_exp_%s'%exp_name)
+        madplot.view_pairwise_stats_plotly(data[exp_name], gts,
+                                           fname_prefix,
+                                           align_colname='t',
+                                           stat_colname='zx',
+                                           )
     plot_data(path, data)
 
 #    #p_values1, p_values2 = run_stats(path, dfs)

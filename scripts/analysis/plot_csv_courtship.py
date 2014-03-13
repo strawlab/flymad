@@ -350,8 +350,18 @@ if __name__ == "__main__":
         dfs = prepare_data(path, args.laser, gts)
         madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
-    fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship')
-    madplot.view_pairwise_stats_plotly(dfs, gts, fname_prefix)
+    fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_WEI')
+    madplot.view_pairwise_stats_plotly(dfs, gts, fname_prefix,
+                                       align_colname='t',
+                                       stat_colname='zx',
+                                       )
+
+    fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_dtarget')
+    madplot.view_pairwise_stats_plotly(dfs, gts, fname_prefix,
+                                       align_colname='t',
+                                       stat_colname='dtarget',
+                                       )
+
     plot_data(path, args.laser, dfs)
 
     #p_values1, p_values2 = run_stats(path, dfs)

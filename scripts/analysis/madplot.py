@@ -1480,7 +1480,14 @@ def add_obj_id(df,align_colname='t_align'):
     df['obj_id']=results
     return df
 
-def calc_p_values(data, gt1_name, gt2_name, align_colname='t_align', stat_colname='v'):
+def calc_p_values(data, gt1_name, gt2_name,
+                  align_colname=None, stat_colname=None):
+
+    if align_colname is None:
+        raise ValueError("you must explicitly set align_colname (try 't_align')")
+    if stat_colname is None:
+        raise ValueError("you must explicitly set stat_colname (try 'v')")
+
     df_ctrl = data[gt1_name]['df']
     df_exp = data[gt2_name]['df']
 
@@ -1514,23 +1521,33 @@ def calc_p_values(data, gt1_name, gt2_name, align_colname='t_align', stat_colnam
 
         if len(test1)<=5 or len(test2)<=5:
             # reaching end of data - stop
-            break
-        hval, pval = kruskal(test1, test2)
+            continue
+
+        try:
+            hval, pval = kruskal(test1, test2)
+        except ValueError as err:
+            pval = 1.0
+
+        import flymad.flymad_analysis_dan as flymad_analysis
+        name1=flymad_analysis.human_label(gt1_name)
+        name2=flymad_analysis.human_label(gt2_name)
+
         dftemp = DataFrame({'Bin_number': x,
                             'P': pval,
                             'bin_start_time':bin_start_time,
                             'bin_stop_time':bin_stop_time,
-                            'name1':gt1_name,
-                            'name2':gt2_name,
+                            'name1':name1,
+                            'name2':name2,
                             'test1_n':len(test1),
                             'test2_n':len(test2),
                             }, index=[x])
         p_values = pd.concat([p_values, dftemp])
     return p_values
 
-def get_pairwise(data,gt1_name,gt2_name):
-    p_values = calc_p_values(data, gt1_name, gt2_name,
-                             align_colname='t_align', stat_colname='v')
+def get_pairwise(data,gt1_name,gt2_name,**kwargs):
+    p_values = calc_p_values(data, gt1_name, gt2_name,**kwargs)
+    if len(p_values)==0:
+        return None
 
     starts = np.array(p_values['bin_start_time'].values)
     stops = np.array(p_values['bin_stop_time'].values)
@@ -1569,7 +1586,7 @@ def get_pairwise(data,gt1_name,gt2_name):
                }
     return results
 
-def view_pairwise_stats_plotly( data, names, fig_prefix ):
+def view_pairwise_stats_plotly( data, names, fig_prefix, **kwargs):
     pairs = []
     for i,name1 in enumerate(names):
         for j, name2 in enumerate(names):
@@ -1578,10 +1595,13 @@ def view_pairwise_stats_plotly( data, names, fig_prefix ):
             pairs.append( (name1, name2 ) )
 
     graph_data = []
+    layout=None
     for pair in pairs:
         name1, name2 = pair
-        pairwise_data = get_pairwise( data, name1, name2 )
-        graph_data.append( pairwise_data['data'] )
+        pairwise_data = get_pairwise( data, name1, name2, **kwargs)
+        if pairwise_data is not None:
+            graph_data.append( pairwise_data['data'] )
+            layout=pairwise_data['layout']
 
     if len( graph_data )==0:
         return
@@ -1598,10 +1618,10 @@ def view_pairwise_stats_plotly( data, names, fig_prefix ):
         import plotly
         py = plotly.plotly(plotly_username, plotly_api_key)
 
-        result = py.plot( graph_data, layout=pairwise_data['layout'] )
+        result = py.plot( graph_data, layout=layout)
         pprint.pprint( result )
 
-    result2 = fake_plotly.plot( graph_data, layout=pairwise_data['layout'] )
+    result2 = fake_plotly.plot( graph_data, layout=layout)
     pprint.pprint(result2)
     for ext in ['.png','.svg']:
         fig_fname = fig_prefix + '_p_values' + ext
