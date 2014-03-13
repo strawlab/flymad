@@ -28,15 +28,72 @@ GENOTYPE_LABELS = {
 
 HUMAN_LABELS = {
     "wtrpmyc":"UAS-control","wtrp":"UAS-control",
-    "G323":"Gal4 control","wGP":"P1>TRPA1",
-    "40347":"Gal4 control","40347trpmyc":"pIP10>TRPA1",
+    "G323":"Gal4 control","G323_specific":"P1 Gal4 control","wGP":"P1>TRPA1",
+    "40347":"Gal4 control","40347_specific":"pIP10 Gal4 control","40347trpmyc":"pIP10>TRPA1",
     "5534":"Gal4 control","5534trpmyc":"vPR6>TRPA1",
     "43702":"Gal4 control","43702trp":"vMS11>TRPA1",
     "41688":"Gal4 control","41688trp":"dPR1>TRPA1",
 }
 
-def human_label(gt):
-    return HUMAN_LABELS.get(gt,gt)
+UNIT_SPACE = u"\u205F"
+UNIT_SPACE = " "
+
+def laser_power_string(wavelength, current):
+    if wavelength == 808:
+        #Optical Power (mW) = 597.99(current in A) - 51.78
+        mw = 597.99*float(current) - 51.78
+        return u"%.0f%smW" % (mw, UNIT_SPACE)
+    elif wavelength == 635:
+        #Optical Power (uW) = 59278(current in A) - 1615
+        uw = 59278*float(current) - 1615
+        return u"%.0f%sµW" % (uw, UNIT_SPACE)
+    else:
+        return u"%.0f%smA" % current
+
+def laser_wavelength_string(wavelength):
+    return u"%d%snm" % (int(wavelength), UNIT_SPACE)
+
+def laser_desc(specifier=None, wavelength=None, current=None):
+
+    def _laser_desc(w,c):
+        return "%s %s" % (laser_wavelength_string(w),
+                          laser_power_string(w,c))
+
+    #in dans experiments, specifier is
+    #350iru, 350ru
+    #130ht,120h,120t,140hpc
+    #what consistency!!!
+    if not any((specifier, wavelength, current)):
+        raise Exception("You must provide specifier, wavelength or current")
+
+    if all((wavelength, current)):
+        return _laser_desc(wavelength, current)
+    else:
+        label = specifier
+
+        try:
+            match = re.match('([0-9]{2,})([iru]{2,})', specifier)
+            match_ir = re.match('([0-9]{2,})([htpc]{1,})', specifier)
+            if match:
+                current_ma,wavelength = match.groups()
+                wavelength = {'iru':808,'ru':635}[wavelength]
+                if (current_ma == 350) and wavelength == 635:
+                    #fix dan mislabeling 35ma red laser as 350ma
+                    current_ma = 35
+                label = _laser_desc(wavelength, float(current_ma)*1e-3)
+            elif match_ir:
+                current_ma,target = match_ir.groups()
+                label = _laser_desc(808, float(current_ma)*1e-3)
+        except (KeyError, ValueError, TypeError), e:
+            print "WARNING: Error parsing",specifier
+            label += "!!!"
+
+    return label
+            
+
+def human_label(gt,specific=False):
+    gts = gt+"_specific" if specific else gt
+    return HUMAN_LABELS.get(gts,HUMAN_LABELS.get(gt,gt))
 
 def genotype_label(gt):
     return GENOTYPE_LABELS.get(gt,gt)

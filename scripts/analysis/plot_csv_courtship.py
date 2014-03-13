@@ -28,7 +28,8 @@ assert pd.version.version in ("0.11.0", "0.12.0")
 
 EXPERIMENT_DURATION = 600
 
-XLIM = [-60,480]
+XLIM_10MIN = [-60,480]
+XLABEL_10MIN = [0, 120, 240, 360, 480]
 
 DR_COLORS = {'100hpc':flymad_plot.BLACK,
             '120hpc':flymad_plot.GREEN,
@@ -262,7 +263,7 @@ def plot_data(path, laser, dfs):
                             value=gtdf['mean']['zx'].values,
                             std=gtdf['std']['zx'].values,
                             n=gtdf['n']['zx'].values,
-                            label=flymad_analysis.human_label(gt),
+                            label=flymad_analysis.human_label(gt, specific=True),
                             order=order,
                             color=COLORS[gt],
                             df=gtdf['df'],
@@ -277,18 +278,20 @@ def plot_data(path, laser, dfs):
                     targetbetween=dict(xaxis=ctrlmean['t'].values,
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
-                    note="laser %s\n" % laser,
+                    note="laser %s\n" % flymad_analysis.laser_desc(laser),
                     individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'zx'} for k in ('wGP','40347trpmyc')},
                     individual_title=figure_title + ' Individual Traces',
                     **datasets
     )
 
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Wing Ext. Index')
-    ax.set_ylim([0,0.6])
-    ax.set_xlim(XLIM)
+    ax.set_ylabel('Wing extension index')
 
-    flymad_plot.retick_relabel_axis(ax, [-60,0,20,60,120,240,480], [0,0.3,0.6])
+    if not autoscale:
+        ax.set_ylim([0,0.6])
+        ax.set_xlim(XLIM_10MIN)
+
+    flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [0,0.3,0.6])
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
@@ -309,7 +312,7 @@ def plot_data(path, laser, dfs):
                             value=gtdf['mean']['dtarget'].values,
                             std=gtdf['std']['dtarget'].values,
                             n=gtdf['n']['dtarget'].values,
-                            label=flymad_analysis.human_label(gt),
+                            label=flymad_analysis.human_label(gt, specific=True),
                             order=order,
                             color=COLORS[gt],
                             df=gtdf['df'],
@@ -325,7 +328,7 @@ def plot_data(path, laser, dfs):
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
                     legend_location='lower right',
-                    note="laser %s\n" % laser,
+                    note="laser %s\n" % flymad_analysis.laser_desc(laser),
                     individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'dtarget'} for k in ('wGP','40347trpmyc')},
                     individual_title=figure_title + ' Individual Traces',
                     **datasets
@@ -333,13 +336,15 @@ def plot_data(path, laser, dfs):
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Distance (px)')
-    ax.set_ylim([40,160])
-    ax.set_xlim(XLIM)
 
-    flymad_plot.retick_relabel_axis(ax, [-60,0,20,60,120,240,480], [40,0,80,120,160])
+    if not autoscale:
+        ax.set_ylim([40,160])
+        ax.set_xlim(XLIM_10MIN)
+
+    flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [40,0,80,120,160])
 
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
-    fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.png" % figname), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s.svg" % figname), bbox_inches='tight')
 
     for efigname, efig in figs.iteritems():
         efig.savefig(flymad_plot.get_plotpath(path,"following_and_dtarget_%s_individual_%s.png" % (figname, efigname)), bbox_inches='tight')
@@ -362,6 +367,7 @@ def plot_dose_response(path, bin_size, exp_gt, data):
                                   std=expdf['std']['zx'].values,
                                   n=expdf['n']['zx'].values,
                                   color=DR_COLORS[laser],
+                                  label=flymad_analysis.laser_desc(laser),
                                   df=expdf['df'],
                                   N=len(expdf['df']['obj_id'].unique()))
         laser_dtarget[laser] = dict(xaxis=expdf['mean']['t'].values,
@@ -369,6 +375,7 @@ def plot_dose_response(path, bin_size, exp_gt, data):
                                     std=expdf['std']['dtarget'].values,
                                     n=expdf['n']['dtarget'].values,
                                     color=DR_COLORS[laser],
+                                    label=flymad_analysis.laser_desc(laser),
                                     df=expdf['df'],
                                     N=len(expdf['df']['obj_id'].unique()))
 
@@ -378,6 +385,7 @@ def plot_dose_response(path, bin_size, exp_gt, data):
         laser_dtarget_we[laser] = dict(xaxis=wedf['t'].values,
                                        value=wedf['dtarget'].values,
                                        color=DR_COLORS[laser],
+                                       label=flymad_analysis.laser_desc(laser),
                                        df=wedf,
                                        N=len(wedf['obj_id'].unique()))
 
@@ -411,10 +419,10 @@ def plot_dose_response(path, bin_size, exp_gt, data):
                     **laser_court
     )
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Wing Ext. Index')
-    ax.set_xlim(XLIM)
+    ax.set_ylabel('Wing extension index')
+    ax.set_xlim(XLIM_10MIN)
     ax.set_ylim([0,1])
-    flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [0,0.5,1])
+    flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [0,0.5,1])
     plots_to_save.append( ("DR_following_and_WingExt",fig,ax) )
 
     fig = plt.figure("Courtship Dtarget 10min D/R")
@@ -427,9 +435,9 @@ def plot_dose_response(path, bin_size, exp_gt, data):
     )
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Distance (px)')
-    ax.set_xlim([-60,480])
+    ax.set_xlim(XLIM_10MIN)
     ax.set_ylim([20,150])
-    flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [40,80,120])
+    flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [40,80,120])
     plots_to_save.append( ("DR_following_and_dtarget",fig,ax) )
 
     for figname,fig,ax in plots_to_save:
@@ -450,7 +458,8 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
         non_grouped_df = expdf['df']
 
         laser_dtarget[laser] = dict(value=non_grouped_df['dtarget'].values,
-                                    color=DR_COLORS[laser])
+                                    color=DR_COLORS[laser],
+                                    label=flymad_analysis.laser_desc(laser))
 
         #keep only values where there was WE
         wedf = non_grouped_df[non_grouped_df['zx_binary'] > 0]
@@ -458,6 +467,7 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
         laser_dtarget_we[laser] = dict(xaxis=gwedf['t'].values,
                                        value=gwedf['dtarget'].values,
                                        color=DR_COLORS[laser],
+                                       label=flymad_analysis.laser_desc(laser),
                                        df=wedf,
                                        N=len(gwedf['obj_id'].unique()))
 
@@ -478,6 +488,7 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
         laser_dtarget_prop[laser] = dict(xaxis=grouped['t'].mean().values,
                                         value=np.array(proportions),
                                         color=DR_COLORS[laser],
+                                        label=flymad_analysis.laser_desc(laser),
                                         N=len(grouped['obj_id'].unique()))
 
     #all D/R experiments were identical, so take activation times from the
@@ -496,9 +507,9 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
     )
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Distance (px)')
-    ax.set_xlim([-60,480])
+    ax.set_xlim(XLIM_10MIN)
     ax.set_ylim([20,110])
-    flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [50,100])
+    flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [50,100])
     plots_to_save.append( ("DR_following_and_dtarget_wei",fig,ax) )
 
     fig = plt.figure("Courtship Dtarget 10min D/R WEI Proportion")
@@ -512,9 +523,9 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
     )
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Proportion')
-    ax.set_xlim([-60,480])
+    ax.set_xlim(XLIM_10MIN)
     ax.set_ylim([0,1])
-    flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [0,0.5,1.0])
+    flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [0,0.5,1.0])
     plots_to_save.append( ("DR_following_and_dtarget_wei_prop",fig,ax) )
 
     fig = plt.figure("Courtship WEI Hist 10min D/R")
@@ -532,6 +543,9 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
     ax.legend()
     ax.set_ylabel('Probability')
     ax.set_xlabel('Distance (px)')
+    ax.set_ylim([0,0.025])
+    ax.set_xlim([0,172])
+    flymad_plot.retick_relabel_axis(ax, [0,50,100,150], [0,0.01,0.02])
     plots_to_save.append( ("DR_following_and_dtarget_wei_hist",fig,ax) )
 
     for figname,fig,ax in plots_to_save:
@@ -562,6 +576,7 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
 #                              std=grp.std()['zx'].values,
 #                              n=grp.count()['zx'].values,
                               color=DR_COLORS[laser],
+                              label=flymad_analysis.laser_desc(laser),
                               df=non_grouped_df,
                               N=len(non_grouped_df['obj_id'].unique()))
 
@@ -572,6 +587,7 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
 #                                    std=grp.std()['zx'].values,
 #                                    n=grp.count()['zx'].values,
                                     color=DR_COLORS[laser],
+                                    label=flymad_analysis.laser_desc(laser),
                                     df=closedf,
                                     N=len(closedf['obj_id'].unique()))
 
@@ -582,6 +598,7 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
 #                                  std=grp.std()['zx'].values,
 #                                  n=grp.count()['zx'].values,
                                   color=DR_COLORS[laser],
+                                  label=flymad_analysis.laser_desc(laser),
                                   df=fardf,
                                   N=len(fardf['obj_id'].unique()))
 
@@ -603,10 +620,10 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
                         **dataseries
         )
         ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Wing Ext. Index')
-        ax.set_xlim(XLIM)
+        ax.set_ylabel('Wing extension index')
+        ax.set_xlim(XLIM_10MIN)
         ax.set_ylim([0,1])
-        flymad_plot.retick_relabel_axis(ax, [-20,0,20,60,120], [0,0.5,1])
+        flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [0,0.5,1])
         plots_to_save.append( ("DR_following_and_WingExt_%s" % name,fig,ax) )
 
     for figname,fig,ax in plots_to_save:

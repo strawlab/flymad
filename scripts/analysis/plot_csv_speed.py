@@ -170,10 +170,10 @@ def plot_data(path, data, arena, note):
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Speed (%s/s)' % arena.unit)
-    ax.set_xlim([-20, 30])
+    ax.set_xlim([-15, 30])
     ax.set_ylim([0, 18])
 
-    flymad_plot.retick_relabel_axis(ax, [-20, 0, 10, 20], [0, 5, 10, 15])
+    flymad_plot.retick_relabel_axis(ax, [-15, 0, 15, 30], [0, 5, 10, 15])
 
     fig2.savefig(flymad_plot.get_plotpath(path,"speed_plot.png"), bbox_inches='tight')
     fig2.savefig(flymad_plot.get_plotpath(path,"speed_plot.svg"), bbox_inches='tight')
