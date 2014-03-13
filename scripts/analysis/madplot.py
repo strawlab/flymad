@@ -85,6 +85,7 @@ class Arena:
 
     CONVERT_OPTIONS = {
         False:None,
+        "px":1.0,
         "m":1.0,
         "cm":100.0,
         "mm":1000.0,
@@ -108,13 +109,13 @@ class Arena:
         self._sx = float(jsonconf.get('sx',0.045/208)) #scale factor px->m
         self._sy = float(jsonconf.get('sy',0.045/219)) #scale factor px->m
 
-        #cache the simgear object for quick tests if the fly is in the area
-        (sgcx,sgcy),sgr = self.circ
-        self._sg_circ = sg.Point(sgcx,sgcy).buffer(sgr)
-
         self._calibration = None
         if calibration is not None:
             self.update_from_calibration(calibration)
+
+        #cache the simgear object for quick tests if the fly is in the area
+        (sgcx,sgcy),sgr = self.circ
+        self._sg_circ = sg.Point(sgcx,sgcy).buffer(sgr)
 
     def __eq__(self,other):
         if self._x != other._x:
@@ -188,12 +189,17 @@ class Arena:
 
         self._calibration = calibration
 
+        if self._convert == "px":
+            self._sx = self._sy = 1.0
+            self._rw = self._r
+
     @property
     def unit(self):
         if self._convert:
             return self._convert
         else:
             return 'px'
+
     @property
     def circ(self):
         if self._convert:
