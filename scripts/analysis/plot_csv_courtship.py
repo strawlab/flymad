@@ -7,6 +7,7 @@ import argparse
 import glob
 import subprocess
 import cPickle as pickle
+import sys
 
 import numpy as np
 import pandas as pd
@@ -240,7 +241,7 @@ def fit_to_curve ( p_values ):
     print polynom #lazy dan can't use python to solve polynomial eqns. boo.
     return (x, y, xPoly, yPoly, polynom)
 
-def plot_data(path, laser, dfs):
+def plot_data(path, laser, dfs, autoscale=False):
 
     COLORS = {'wtrpmyc':flymad_plot.BLACK,
               'wGP':flymad_plot.RED,
@@ -249,6 +250,8 @@ def plot_data(path, laser, dfs):
               '40347':flymad_plot.GREEN}
 
     figname = laser + '_' + '_'.join(dfs)
+    if autoscale:
+        figname += "_AUTOSCALE"
 
     datasets = {}
     for gt in dfs:
@@ -646,19 +649,22 @@ if __name__ == "__main__":
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--laser', default='140hpc', help='laser specifier')
-    parser.add_argument('--dose-response', action='store_true', default=False,
-                        help='plot dose response')
+    parser.add_argument('--examples', default=False, action='store_true')
 
     args = parser.parse_args()
     path = args.path[0]
 
-    cache_fname = os.path.join(path,'courtship.madplot-cache')
-    cache_args = (args.laser, gts, '5S')
+    if args.examples:
+        bin_size = '1S'
+    else:
+        bin_size = '5S'
+    cache_fname = os.path.join(path,'courtship_%s.madplot-cache' % bin_size)
+    cache_args = (args.laser, gts, bin_size)
     dfs = None
     if args.only_plot:
         dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
     if dfs is None:
-        dfs = prepare_data(path, args.laser, BIN_SIZE, gts)
+        dfs = prepare_data(path, args.laser, bin_size, gts)
         madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
     fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_WEI')
@@ -673,7 +679,11 @@ if __name__ == "__main__":
                                        stat_colname='dtarget',
                                        )
 
-    plot_data(path, args.laser, dfs)
+    plot_data(path, args.laser, dfs, autoscale=args.examples)
+    if args.examples:
+        if args.show:
+            plt.show()
+        sys.exit(0)
 
     bin_size = '5S'
     cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % bin_size)
