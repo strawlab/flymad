@@ -4,6 +4,7 @@ import md5
 
 import numpy as np
 import scipy.signal
+import scipy.stats
 
 import strawlab_mpl.defaults as smd
 from strawlab_mpl.many_timeseries import ManyTimeseries
@@ -111,7 +112,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
             tmp = []
             for i in range(0,len(a),downsample):
                 vals = a[i:i+downsample]
-                tmp.append( np.mean(vals) )
+                tmp.append( scipy.stats.nanmean(vals) )
             return np.array(tmp)
 
     def _sort_by_order(a,b):
