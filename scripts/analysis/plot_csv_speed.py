@@ -242,8 +242,8 @@ def plot_data(path, data, arena, note):
 
     flymad_plot.retick_relabel_axis(ax, [-20, 0, 10, 20], [0, 5, 10, 15])
 
-    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.png"), bbox_inches='tight')
-    plt.savefig(flymad_plot.get_plotpath(path,"speed_plot.svg"), bbox_inches='tight')
+    fig2.savefig(flymad_plot.get_plotpath(path,"speed_plot.png"), bbox_inches='tight')
+    fig2.savefig(flymad_plot.get_plotpath(path,"speed_plot.svg"), bbox_inches='tight')
 
     for efigname, efig in figs.iteritems():
         efig.savefig(flymad_plot.get_plotpath(path,"speed_plot_individual_%s.png" % efigname), bbox_inches='tight')
