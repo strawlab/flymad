@@ -1491,7 +1491,7 @@ def calc_p_values(data, gt1_name, gt2_name, align_colname='t_align', stat_colnam
     dalign = df_ctrl[align_colname].max() - align_start
 
     p_values = DataFrame()
-    binsize = 50 # 1 sec
+    binsize = 50 # if bins are 10msec, this is 0.5 seconds
 
     bins = np.linspace(0,dalign,binsize) + align_start
     binned_ctrl = pd.cut(df_ctrl[align_colname], bins, labels= bins[:-1])
