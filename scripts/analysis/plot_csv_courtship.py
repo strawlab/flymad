@@ -349,8 +349,10 @@ def plot_dose_response(path, bin_size, exp_gt, data):
     laser_court = {}
     laser_dtarget = {}
     laser_dtarget_we = {}
+    stat_groups = []
     for laser in sorted(data.keys()):
         expdf = data[laser][exp_gt]
+        stat_groups.append(laser)
 
         laser_court[laser] = dict(xaxis=expdf['mean']['t'].values,
                                   value=expdf['mean']['zx'].values,
@@ -375,6 +377,21 @@ def plot_dose_response(path, bin_size, exp_gt, data):
                                        color=DR_COLORS[laser],
                                        df=wedf,
                                        N=len(wedf['obj_id'].unique()))
+
+
+    fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_DR_dtarget')
+    madplot.view_pairwise_stats_plotly(laser_dtarget, stat_groups, fname_prefix,
+                                       align_colname='t',
+                                       stat_colname='dtarget',
+                                       layout_title='p-values for Dose-Response of distance',
+                                       )
+
+    fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_DR_wei')
+    madplot.view_pairwise_stats_plotly(laser_court, stat_groups, fname_prefix,
+                                       align_colname='t',
+                                       stat_colname='zx',
+                                       layout_title='p-values for Dose-Response of WEI',
+                                       )
 
 
     #all D/R experiments were identical, so take activation times from the
