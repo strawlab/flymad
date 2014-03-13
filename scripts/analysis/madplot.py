@@ -14,12 +14,16 @@ import cv2
 import pytz
 import numpy as np
 import pandas as pd
+from pandas import DataFrame
 import shapely.geometry as sg
 import matplotlib.pyplot as plt
 import matplotlib.patches
 import matplotlib.colors
 import progressbar
 import adskalman.adskalman
+from scipy.stats import kruskal
+import fake_plotly
+import pprint
 
 import motmot.FlyMovieFormat.FlyMovieFormat
 import benu.benu
@@ -1466,3 +1470,140 @@ if __name__ == "__main__":
 
     print a == c
 
+def add_obj_id(df,align_colname='t_align'):
+    results = np.zeros( (len(df),), dtype=np.int )
+    obj_id = 0
+    for i,(ix,row) in enumerate(df.iterrows()):
+        if row[align_colname]==0.0:
+            obj_id += 1
+        results[i] = obj_id
+    df['obj_id']=results
+    return df
+
+def calc_p_values(data, gt1_name, gt2_name, align_colname='t_align', stat_colname='v'):
+    df_ctrl = data[gt1_name]['df']
+    df_exp = data[gt2_name]['df']
+
+    df_ctrl = add_obj_id(df_ctrl,align_colname=align_colname)
+    df_exp = add_obj_id(df_exp,align_colname=align_colname)
+
+    align_start = df_ctrl[align_colname].min()
+    dalign = df_ctrl[align_colname].max() - align_start
+
+    p_values = DataFrame()
+    binsize = 50 # 1 sec
+
+    bins = np.linspace(0,dalign,binsize) + align_start
+    binned_ctrl = pd.cut(df_ctrl[align_colname], bins, labels= bins[:-1])
+    binned_exp = pd.cut(df_exp[align_colname], bins, labels= bins[:-1])
+    for x in binned_ctrl.levels:
+        test1_all_flies_df = df_ctrl[binned_ctrl == x]
+        bin_start_time = test1_all_flies_df['t'].min()
+        bin_stop_time = test1_all_flies_df['t'].max()
+
+        test1 = []
+        for obj_id, fly_group in test1_all_flies_df.groupby('obj_id'):
+            test1.append( np.mean(fly_group[stat_colname].values) )
+        test1 = np.array(test1)
+
+        test2_all_flies_df = df_exp[binned_exp == x]
+        test2 = []
+        for obj_id, fly_group in test2_all_flies_df.groupby('obj_id'):
+            test2.append( np.mean(fly_group[stat_colname].values) )
+        test2 = np.array(test2)
+
+        if len(test1)<=5 or len(test2)<=5:
+            # reaching end of data - stop
+            break
+        hval, pval = kruskal(test1, test2)
+        dftemp = DataFrame({'Bin_number': x,
+                            'P': pval,
+                            'bin_start_time':bin_start_time,
+                            'bin_stop_time':bin_stop_time,
+                            'name1':gt1_name,
+                            'name2':gt2_name,
+                            'test1_n':len(test1),
+                            'test2_n':len(test2),
+                            }, index=[x])
+        p_values = pd.concat([p_values, dftemp])
+    return p_values
+
+def get_pairwise(data,gt1_name,gt2_name):
+    p_values = calc_p_values(data, gt1_name, gt2_name,
+                             align_colname='t_align', stat_colname='v')
+
+    starts = np.array(p_values['bin_start_time'].values)
+    stops = np.array(p_values['bin_stop_time'].values)
+    pvals = p_values['P'].values
+    n1 = p_values['test1_n'].values
+    n2 = p_values['test2_n'].values
+    logs = -np.log10(pvals)
+
+    xs = []
+    ys = []
+    texts = []
+
+    for i in range(len(logs)):
+        xs.append( starts[i] )
+        ys.append( logs[i] )
+        texts.append( 'p=%.3g, n=%d,%d t=%s to %s'%(
+            pvals[i], n1[i], n2[i], starts[i], stops[i] ) )
+
+        xs.append( stops[i] )
+        ys.append( logs[i] )
+        texts.append( '')
+
+    this_dict = {
+        'name':'%s vs. %s'%(p_values['name1'][0], p_values['name2'][0]),
+        'x':[float(x) for x in xs],
+        'y':[float(y) for y in ys],
+        'text':texts,
+        }
+
+    layout = {
+        'xaxis': {'title': 'Time (s)'},
+        'yaxis': {'title': '-Log10(p)'},
+        }
+    results = {'data':this_dict,
+               'layout':layout,
+               }
+    return results
+
+def view_pairwise_stats_plotly( data, names, fig_prefix ):
+    pairs = []
+    for i,name1 in enumerate(names):
+        for j, name2 in enumerate(names):
+            if j<=i:
+                continue
+            pairs.append( (name1, name2 ) )
+
+    graph_data = []
+    for pair in pairs:
+        name1, name2 = pair
+        pairwise_data = get_pairwise( data, name1, name2 )
+        graph_data.append( pairwise_data['data'] )
+
+    if len( graph_data )==0:
+        return
+
+    # sign up and get from https://plot.ly
+    plotly_username = os.environ.get('PLOTLY_USERNAME',None)
+    plotly_api_key = os.environ.get('PLOTLY_API_KEY',None)
+
+    if plotly_username is None:
+        print 'environment variable PLOTLY_USERNAME not set. Will not use plotly'
+    else:
+        # plotly
+        # developed with plotly 0.5.11
+        import plotly
+        py = plotly.plotly(plotly_username, plotly_api_key)
+
+        result = py.plot( graph_data, layout=pairwise_data['layout'] )
+        pprint.pprint( result )
+
+    result2 = fake_plotly.plot( graph_data, layout=pairwise_data['layout'] )
+    pprint.pprint(result2)
+    for ext in ['.png','.svg']:
+        fig_fname = fig_prefix + '_p_values' + ext
+        result2['fig'].savefig(fig_fname)
+        print 'saved',fig_fname
