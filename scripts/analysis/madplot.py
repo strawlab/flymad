@@ -1546,6 +1546,7 @@ def calc_p_values(data, gt1_name, gt2_name,
     return p_values
 
 def get_pairwise(data,gt1_name,gt2_name,**kwargs):
+    layout_title = kwargs.pop('layout_title',None)
     p_values = calc_p_values(data, gt1_name, gt2_name,**kwargs)
     if len(p_values)==0:
         return None
@@ -1582,6 +1583,8 @@ def get_pairwise(data,gt1_name,gt2_name,**kwargs):
         'xaxis': {'title': 'Time (s)'},
         'yaxis': {'title': '-Log10(p)'},
         }
+    if layout_title is not None:
+        layout['title'] = layout_title
     results = {'data':this_dict,
                'layout':layout,
                }

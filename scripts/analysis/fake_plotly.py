@@ -8,8 +8,12 @@ def plot( graph_data, layout=None ):
                  data_row['y'],
                  label=data_row['name'],
                  )
-    ax.set_xlabel( layout['xaxis']['title'] )
-    ax.set_ylabel( layout['yaxis']['title'] )
+    if 'xaxis' in layout and 'title' in layout['xaxis']:
+        ax.set_xlabel( layout['xaxis']['title'] )
+    if 'yaxis' in layout and 'title' in layout['yaxis']:
+        ax.set_ylabel( layout['yaxis']['title'] )
+    if 'title' in layout:
+        ax.set_title(layout['title'])
     ax.legend()
 
     results = {'fig':fig,
