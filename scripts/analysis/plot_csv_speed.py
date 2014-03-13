@@ -224,7 +224,7 @@ def plot_data(path, data, arena, note):
 
     ctrlmean = data['OK371shits-nolaser']['mean']
 
-    _,_,figs = flymad_plot.plot_timeseries_with_activation(ax,
+    result_d = flymad_plot.plot_timeseries_with_activation(ax,
                 targetbetween=dict(xaxis=ctrlmean['t'].values,
                                    where=ctrlmean['laser_state'].values>0),
                 downsample=5,
@@ -232,8 +232,10 @@ def plot_data(path, data, arena, note):
                 note="OK371shits\n%s\n" % note,
                 individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'v'} for k in datasets},
                 individual_title='Speed Individual Traces',
+                return_dict=True,
                 **datasets
     )
+    figs = result_d['figs']
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Speed (%s/s)' % arena.unit)

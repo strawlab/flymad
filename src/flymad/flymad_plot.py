@@ -96,6 +96,7 @@ def get_gridspec_to_fit_nplots(n):
 def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=False,
                                     legend_location='upper right', note="",
                                     individual=None, individual_title=None,
+                                    return_dict=False,
                                     **datasets):
 
     ORDER_LAST = 100
@@ -236,6 +237,12 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
             except KeyError, e:
                 print "\terror plotting individual timeseries (%s)" % e
 
+    if return_dict:
+        result = dict(legend=l,
+                      axs=axs,
+                      figs=figs,
+                      )
+        return result
     return l, axs, figs
 
 #setup default plotting styles
