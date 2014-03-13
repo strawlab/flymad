@@ -191,7 +191,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
 
     axs = [ax]
     figs = {}
-    if (individual is not None) and isinstance(individual, dict):
+    if (not os.environ.get('FLYMAD_FINAL')) and (individual is not None) and isinstance(individual, dict):
         for data in individual:
             try:
                 #try to avoid creating many duplicate figures
