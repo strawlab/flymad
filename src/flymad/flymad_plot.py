@@ -166,7 +166,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         color = exp.get('color',DEFAULT_COLORS.get(data,'k'))
         ax.plot(exp['xaxis'][::downsample], _ds(exp['value']),
                     color=color,label=label,
-                    lw=2,linestyle=linestyle,clip_on=False if marker else True,
+                    lw=2,linestyle=linestyle,clip_on=True,
                     marker=marker,markerfacecolor=color,markersize=markersize,markeredgecolor='none',
                     zorder=this_zorder+1)
 
