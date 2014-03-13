@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import math
 import glob
 import os.path
@@ -48,6 +50,36 @@ def genotype_is_ctrl(gt):
 def genotype_is_trp_ctrl(gt):
     return re.match('\+/\w+$', genotype_label(gt)) is not None
 
+def to_si(d,space=''):
+    incPrefixes = ['k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
+    decPrefixes = ['m', 'µ', 'n', 'p', 'f', 'a', 'z', 'y']
+
+    degree = int(math.floor(math.log10(math.fabs(d)) / 3))
+
+    prefix = ''
+
+    if degree != 0:
+        ds = degree/math.fabs(degree)
+        if ds == 1:
+            if degree - 1 < len(incPrefixes):
+                prefix = incPrefixes[degree - 1]
+            else:
+                prefix = incPrefixes[-1]
+                degree = len(incPrefixes)
+        elif ds == -1:
+            if -degree - 1 < len(decPrefixes):
+                prefix = decPrefixes[-degree - 1]
+            else:
+                prefix = decPrefixes[-1]
+                degree = -len(decPrefixes)
+
+        scaled = float(d * math.pow(1000, -degree))
+        s = "{scaled}{space}{prefix}".format(scaled=scaled,space=space,prefix=prefix)
+
+    else:
+        s = "{d}".format(d=d)
+
+    return s
 
 def get_arena_conf(calibration_file=None):
     #DEFAULTS FROM THE FIRST NMETH SUBMISSION - AS USED FOR DANS
