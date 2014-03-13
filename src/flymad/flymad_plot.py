@@ -132,8 +132,8 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         for tb in targetbetween:
             _fill_between(ax, tb['xaxis'], tb['where'], tb.get('facecolor','yellow'))
 
-    note += "+/- SEM" if sem else "+/- STD"
-    note += "\n"
+    if any(['std' in exp for exp in datasets]):
+        note += "+/- SEM\n" if sem else "+/- STD\n"
     note += "" if downsample == 1 else ("downsample x %d\n" % downsample)
 
     #zorder = 1 = back
@@ -155,14 +155,18 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
 
         print "plotting %s (%s) zorder %s" % (label,data,this_zorder)
 
-        if sem:
-            spread = exp['std'] / np.sqrt(exp['n'])
+        if 'std' in exp:
+            if sem:
+                spread = exp['std'] / np.sqrt(exp['n'])
+            else:
+                spread = exp['std']
         else:
-            spread = exp['std']
+            spread = None
 
-        ax.fill_between(exp['xaxis'][::downsample], _ds(exp['value']+spread), _ds(exp['value']-spread),
-                    alpha=0.1, color=exp.get('color',DEFAULT_COLORS.get(data,'k')),
-                    zorder=this_zorder)
+        if spread is not None:
+            ax.fill_between(exp['xaxis'][::downsample], _ds(exp['value']+spread), _ds(exp['value']-spread),
+                        alpha=0.1, color=exp.get('color',DEFAULT_COLORS.get(data,'k')),
+                        zorder=this_zorder)
 
         color = exp.get('color',DEFAULT_COLORS.get(data,'k'))
         ax.plot(exp['xaxis'][::downsample], _ds(exp['value']),
