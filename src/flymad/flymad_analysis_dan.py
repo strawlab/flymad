@@ -412,18 +412,28 @@ def kalman_smooth_dataframe(df, arena=None, smooth=True):
 
     return dt
 
+def _resample_freq(resample_specifier):
+    MULTIPLIER = {'L':1000.0,'S':1.0}
+    m = MULTIPLIER[resample_specifier[-1]]
+    v = float(resample_specifier[:-1])
+    return m/v
+
+def  _resample_dt(resample_specifier):
+    return 1.0 / _resample_freq(resample_specifier)
+
 def get_num_rows(desired_seconds, resample_specifier='10L'):
-    if resample_specifier != '10L':
-        print "WARNING: Your code may assume 10ms (100fps)"
-
-    assert resample_specifier[-1] == 'L'
-    ms = float(resample_specifier[:-1])
-
-    return desired_seconds * (1000.0/ms)
+    return desired_seconds * _resample_freq(resample_specifier)
 
 def get_resampled_timebase(desired_seconds, resample_specifier='10L'):
     n = get_num_rows(desired_seconds, resample_specifier)
     return np.linspace(0, desired_seconds, n, endpoint=False)
+
+def get_resampled_timebase_from_df(df, resample_specifier='10L'):
+    #the dataframe has been resampled to X, therefor its true lenght
+    #in real seconds is 
+    f = _resample_freq(resample_specifier)
+    len_s = len(df) / f
+    return np.arange(0, len_s, 1.0/f)
 
 def fixup_index_and_resample(df, resample_specifier='10L'):
     if resample_specifier != '10L':
