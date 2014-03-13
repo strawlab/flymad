@@ -11,6 +11,8 @@ import sys
 
 import numpy as np
 import pandas as pd
+from pandas.tseries.offsets import DateOffset
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
@@ -240,6 +242,88 @@ def fit_to_curve ( p_values ):
     #plt.axhline(y=1.30103, color='k-')
     print polynom #lazy dan can't use python to solve polynomial eqns. boo.
     return (x, y, xPoly, yPoly, polynom)
+
+def plot_single_genotype(path, laser, gt, df, figsize=(4,4)):
+    figure_title = "%s Courtship Wingext 10min (%s)" % (gt,laser)
+    fig = plt.figure(figure_title, figsize=figsize)
+    ax = fig.add_subplot(1,1,1)
+
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=df['mean']['t'].values,
+                                       where=df['mean']['laser_state'].values>0),
+                    sem=True,
+                    note="%s\nlaser %s\n" % (gt,flymad_analysis.laser_desc(laser)),
+                    exp=dict(xaxis=df['mean']['t'].values,
+                             value=df['mean']['zx'].values,
+                             std=df['std']['zx'].values,
+                             n=df['n']['zx'].values,
+                             label=flymad_analysis.human_label(gt, specific=True),
+                             color=flymad_plot.BLACK,
+                             df=df['df'],
+                             N=len(df['df']['obj_id'].unique()))
+    )
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Wing extension index')
+    ax.set_ylim([0,1])
+    ax.set_xlim(XLIM_10MIN)
+
+    flymad_plot.retick_relabel_axis(ax, [0,240,480], [0,0.5,1])
+
+    figname = "%s_%s" % (laser,gt)
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
+
+def _split_df(df):
+    t0 = df[df['t'] == 0].index[0]
+    before = df[t0-DateOffset(seconds=60):t0]
+    during = df[t0:t0+DateOffset(seconds=20)]
+    early = df[t0+DateOffset(seconds=120-100):t0+DateOffset(seconds=120)]
+    late = df[t0+DateOffset(seconds=240):t0+DateOffset(seconds=340)]
+    return (('before',before),('during',during),('early',early),('late',late))
+
+def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
+
+    dt = df.index[0].to_datetime()
+    date = dt.strftime('%Y%m%d')
+    targets = _get_targets(path, date)
+
+    for desc,split in _split_df(df):
+        fig = plt.figure("%s %s Wing Extension (%s)" % (gt,laser,desc), figsize=figsize, frameon=True)
+        ax = fig.add_subplot(1,1,1)
+        ax.set_aspect('equal')
+
+        courting = []
+        traj = []
+        for idx,row in split.iterrows():
+            x = arena.scale_x(row['x']); y = arena.scale_y(row['y'])
+            if row['zx_binary']:
+                courting.append( (x,y) )
+            traj.append( (x,y) )
+
+        if traj:
+            t = np.array(traj)
+            ax.plot(t[:,0], t[:,1], color=flymad_plot.BLACK, zorder=5, lw=1.5)
+        if courting:
+            t = np.array(courting)
+            ax.plot(t[:,0], t[:,1],
+                    color=flymad_plot.RED, marker='o', zorder=6, linestyle='',
+                    markeredgecolor='none', markerfacecolor=flymad_plot.RED)
+
+        for t in targets:
+            x = arena.scale_x(t['x'])
+            y = arena.scale_y(t['y'])
+            ax.add_patch(matplotlib.patches.Circle((x,y), radius=5,
+                         fill=True, color=flymad_plot.GREEN, zorder=7))
+
+        xlim,ylim = arena.get_limits()
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
+
+        ax.add_patch(arena.get_patch(fill=False, color=flymad_plot.DARK_GRAY, lw=3))
+
+        figname = "%s_%s_%s_courting_trajectory" % (gt, laser, desc)
+        fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
 
 def plot_data(path, laser, dfs, autoscale=False):
 
@@ -633,7 +717,6 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
         fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
-
 if __name__ == "__main__":
     CTRL_GENOTYPE = 'wtrpmyc'
     EXP_GENOTYPE = 'wGP'
@@ -649,13 +732,15 @@ if __name__ == "__main__":
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--laser', default='140hpc', help='laser specifier')
-    parser.add_argument('--examples', default=False, action='store_true')
+    parser.add_argument('--trajectories', default=False, action='store_true',
+                        help='plot trajectories per fly (LOTS OF PLOTS)')
+    parser.add_argument('--calibration-file', help='calibration yaml files', required=False, default=None)
 
     args = parser.parse_args()
     path = args.path[0]
 
-    if args.examples:
-        bin_size = '1S'
+    if args.trajectories:
+        bin_size = '100L'
     else:
         bin_size = '5S'
     cache_fname = os.path.join(path,'courtship_%s.madplot-cache' % bin_size)
@@ -679,8 +764,20 @@ if __name__ == "__main__":
                                        stat_colname='dtarget',
                                        )
 
-    plot_data(path, args.laser, dfs, autoscale=args.examples)
-    if args.examples:
+    plot_data(path, args.laser, dfs, autoscale=args.trajectories)
+
+    for gt,gtdf in dfs.iteritems():
+        plot_single_genotype(path, args.laser, gt, gtdf)
+
+    if args.trajectories:
+        arena = madplot.Arena(
+                    'px',
+                    **flymad_analysis.get_arena_conf(calibration_file=args.calibration_file))
+
+        for gt in dfs:
+            df = dfs[gt]['df']
+            plot_trajectories_by_stage(df, arena, args.laser)
+
         if args.show:
             plt.show()
         sys.exit(0)
