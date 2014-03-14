@@ -28,11 +28,11 @@ GENOTYPE_LABELS = {
 
 HUMAN_LABELS = {
     "wtrpmyc":"UAS-control","wtrp":"UAS-control",
-    "G323":"Gal4 control","G323_specific":"P1 Gal4 control","wGP":"P1>TRPA1",
-    "40347":"Gal4 control","40347_specific":"pIP10 Gal4 control","40347trpmyc":"pIP10>TRPA1",
-    "5534":"Gal4 control","5534trpmyc":"vPR6>TRPA1",
-    "43702":"Gal4 control","43702trp":"vMS11>TRPA1",
-    "41688":"Gal4 control","41688trp":"dPR1>TRPA1",
+    "G323":"Gal4-control","G323_specific":"P1 Gal4-control","wGP":"P1>TRPA1",
+    "40347":"Gal4-control","40347_specific":"pIP10 Gal4-control","40347trpmyc":"pIP10>TRPA1",
+    "5534":"Gal4-control","5534trpmyc":"vPR6>TRPA1",
+    "43702":"Gal4-control","43702trp":"vMS11>TRPA1",
+    "41688":"Gal4-control","41688trp":"dPR1>TRPA1",
 }
 
 UNIT_SPACE = u"\u205F"
