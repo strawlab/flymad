@@ -89,7 +89,25 @@ def laser_desc(specifier=None, wavelength=None, current=None):
             label += "!!!"
 
     return label
-            
+
+def cmp_laser_desc(desc_a, desc_b):
+    UNIT_MULT = {"mA":1,"mW":1e-3,u"uW":1e-6}
+
+    def _get_cval(desc):
+        wl,_,pwr,pwr_unit = desc.split(' ')
+        #I could not get dicts with unicode keys to work...
+        if pwr_unit == u"µW":
+            mult = 1e-6
+        elif pwr_unit == "mW":
+            mult = 1e-3
+        else:
+            mult = 1.0
+        pwr = float(pwr) * mult
+        return float(wl) + pwr
+    return cmp(_get_cval(desc_a), _get_cval(desc_b))
+
+def cmp_laser(laser_a, laser_b):
+    return cmp_laser_desc(laser_desc(laser_a), laser_desc(laser_b))
 
 def human_label(gt,specific=False):
     gts = gt+"_specific" if specific else gt
