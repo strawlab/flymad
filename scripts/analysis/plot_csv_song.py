@@ -174,6 +174,25 @@ def fit_to_curve ( p_values ):
     return (x, y, xPoly, yPoly, polynom)
 
 
+def _do_group(df):
+    xvals = []
+    frac = []
+    for tval, tdf in df.groupby(['t'], as_index=False):
+        print 'tval',tval
+        print tdf
+        xvals.append( tval )
+
+        cum_ind = tdf['cum_wei_this_trial'].values
+        cum = np.sum(cum_ind)
+        tot = len(cum_ind)
+        frac.append( float(cum)/tot )
+    return dict(frac=np.array(frac),
+                t=np.array(xvals))
+
+def plot_cum( ax, frac, label=None):
+    ax.plot( frac, label=label )
+
+
 def plot_data(path, data):
 
     for exp_name in data:
@@ -214,9 +233,6 @@ def plot_data(path, data):
 
         pvalue_buf = ''
 
-        #FIXME
-        head_times =   [35,  95, 155]
-        thorax_times = [65, 125, 185]
         for gt in datasets:
             label=flymad_analysis.human_label(gt)
             if '>' not in label:
@@ -224,6 +240,60 @@ def plot_data(path, data):
 
             # OK, this is a Gal4 + UAS - do head vs thorax stats
             gtdf = data[exp_name][gt]['df']
+
+            # Calculate cumulative wing extension since last laser on.
+            # (This is ugly...)
+            gtdf['cum_wei_this_trial'] = 0
+            gtdf['head_trial'] = 0
+            gtdf['thorax_trial'] = 0
+            obj_ids = gtdf['obj_id'].unique()
+            for obj_id in obj_ids:
+                prev_laser_state = 0
+                cur_cum_this_trial = 0
+                cur_head_trial = 0
+                cur_thorax_trial = 0
+                cur_ttm = 0
+                cur_state = 'none'
+                prev_t = -np.inf
+                for rowi in range(len(gtdf)):
+                    row = gtdf.iloc[rowi]
+                    if row['obj_id'] != obj_id:
+                        continue
+                    assert row['t'] > prev_t
+                    prev_t = row['t']
+                    if prev_laser_state == 0 and row['laser_state']:
+                        # new laser pulse, reset cum
+                        cur_cum_this_trial = 0
+                        if row['ttm'] > 0:
+                            cur_head_trial += 1
+                            cur_state = 'head'
+                        elif row['ttm'] < 0:
+                            cur_thorax_trial += 1
+                            cur_state = 'thorax'
+                    prev_laser_state = row['laser_state']
+                    if row['zx'] > 0:
+                        cur_cum_this_trial = 1
+                    #gtdf['cum_wei_this_trial'] = cur_cum_this_trial
+                    row['cum_wei_this_trial'] = cur_cum_this_trial
+                    if cur_state=='head':
+                        row['head_trial'] = cur_head_trial
+                    elif cur_state=='thorax':
+                        row['thorax_trial'] = cur_thorax_trial
+                    gtdf.iloc[rowi] = row
+
+            fig_cum = plt.figure('cum indx: %s'%label)
+            ax_cum = fig_cum.add_subplot(111)
+            pulse_nums = [1,2,3]
+            this_data = {}
+            for pulse_num in pulse_nums:
+                head_pulse_df = gtdf[ gtdf['head_trial']==pulse_num ]
+                thorax_pulse_df = gtdf[ gtdf['thorax_trial']==pulse_num ]
+
+                this_data['head%d'%pulse_num] = _do_group( head_pulse_df )
+                this_data['thorax%d'%pulse_num] = _do_group( thorax_pulse_df )
+                plot_cum( ax_cum, this_data['head%d'%pulse_num]['frac'], label='head %d'%pulse_num )
+                plot_cum( ax_cum, this_data['thorax%d'%pulse_num]['frac'], label='thorax %d'%pulse_num )
+            ax_cum.legend()
 
 #            for i in range(len(head_times)):
 #                head_values = gtdf[gtdf['t']==head_times[i]]
