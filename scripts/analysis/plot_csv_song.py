@@ -7,6 +7,9 @@ import argparse
 import glob
 import pickle
 import re
+import collections
+import lifelines # http://lifelines.readthedocs.org, developed with v 0.2.3.0.7
+from lifelines.statistics import logrank_test, pairwise_logrank_test
 
 import numpy as np
 import pandas as pd
@@ -20,16 +23,31 @@ import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
 import madplot
+from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.version.version in ("0.11.0", "0.12.0")
 
-HEAD    = +100
-THORAX  = -100
+HEAD    = -100
+THORAX  = +100
 OFF     = 0
 
+COLORS = {HEAD:flymad_plot.RED,
+          THORAX:flymad_plot.ORANGE,
+          }
+
 EXPERIMENT_DURATION = 200.0
+
+def p2stars(pval):
+    result = ''
+    if pval < 0.05:
+        result = '*'
+    if pval < 0.01:
+        result = '**'
+    if pval < 0.001:
+        result = '***'
+    return result
 
 def prepare_data(path, resample_bin, gts):
 
@@ -82,8 +100,8 @@ def prepare_data(path, resample_bin, gts):
         #fix cols due to resampling
         df['laser_state'][df['laser_state'] > 0] = 1
         df['zx_binary'] = (df['zx'] > 0).values.astype(float)
-        df['ttm'][df['ttm'] > 0] = HEAD
-        df['ttm'][df['ttm'] < 0] = THORAX
+        df['ttm'][df['ttm'] < 0] = HEAD
+        df['ttm'][df['ttm'] > 0] = THORAX
 
         dlaser = np.gradient( (df['laser_state'].values > 0).astype(int) ) > 0
         t0idx = np.argmax(dlaser)
@@ -118,82 +136,212 @@ def prepare_data(path, resample_bin, gts):
 
     return data
 
-def run_stats (path, dfs):
+def _update_latencies(df, sdx_e, sdx_g, sdx_c, name):
+    # copy inputs
+    sdx_e = sdx_e[:]
+    sdx_g = sdx_g[:]
+    sdx_c = sdx_c[:]
 
-    (expdf, expmean, expstd, expn,
-            ctrldf, ctrlmean, ctrlstd, ctrln,
-            ctrltrpdf, ctrltrpmean, ctrltrpstd, ctrltrpn,
-            pooldf) = dfs
+    VALID = True
+    INVALID = False
 
-    print type(pooldf), pooldf.shape
-    p_values = pd.DataFrame()
-    df_ctrl = pooldf[pooldf['Genotype'] == ctrl_trp_genotype]
-    df_exp1 = pooldf[pooldf['Genotype'] == EXP_GENOTYPE]
-    df_exp2 = pooldf[pooldf['Genotype'] == EXP_GENOTYPE2]
-    df_exp2['Genotype'] = 'VT40347GP'
-    df_ctrl = df_ctrl[df_ctrl['t'] <= 485]
-    df_exp1 = df_exp1[df_exp1['t'] <= 485]
-    df_exp2 = df_exp2[df_exp2['t'] <= 485]
-    df_ctrl = df_ctrl[df_ctrl['t'] >=-120]
-    df_exp1 = df_exp1[df_exp1['t'] >=-120]
-    df_exp2 = df_exp2[df_exp2['t'] >=-120]
-    bins = np.linspace(-120,485,122)  # 5 second bins -120 to 485
-    binned_ctrl = pd.cut(df_ctrl['t'], bins, labels= bins[:-1])
-    binned_exp1 = pd.cut(df_exp1['t'], bins, labels= bins[:-1])
-    binned_exp2 = pd.cut(df_exp2['t'], bins, labels= bins[:-1])
-    for x in binned_ctrl.levels:
-        testctrl = df_ctrl['zx'][binned_ctrl == x]
-        test1 = df_exp1['zx'][binned_exp1 == x]
-        test2 = df_exp2['zx'][binned_exp2 == x]
-        hval1, pval1 = ttest_ind(test1, testctrl)
-        hval2, pval2 = ttest_ind(test2, testctrl) #too many identical values (zeros) in controls, so cannot do Kruskal.
-        dftemp = pd.DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P1': pval1, 'P2':pval2}, index=[x])
-        p_values = pd.concat([p_values, dftemp])
-    p_values1 = p_values[['Total_bins', 'Bin_number', 'P1']]
-    p_values1.columns = ['Total_bins', 'Bin_number', 'P']
-    p_values2 = p_values[['Total_bins', 'Bin_number', 'P2']]
-    p_values2.columns = ['Total_bins', 'Bin_number', 'P']
-    return p_values1, p_values2
-
-def fit_to_curve ( p_values ):
-    x = np.array(p_values['Bin_number'])
-    logs = -1*(np.log(p_values['P']))
-    y = np.array(logs)
-    order = 6 #DEFINE ORDER OF POLYNOMIAL HERE.
-    poly_params = np.polyfit(x,y,order)
-    polynom = np.poly1d(poly_params)
-    xPoly = np.linspace(min(x), max(x), 100)
-    yPoly = polynom(xPoly)
-    fig1 = plt.figure()
-    ax = fig1.add_subplot(1,1,1)
-    ax.plot(x, y, 'o', xPoly, yPoly, '-g')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('-log(p)')
-    #plt.axhline(y=1.30103, color='k-')
-    print polynom #lazy dan can't use python to solve polynomial eqns. boo.
-    return (x, y, xPoly, yPoly, polynom)
-
+    for obj_id, odf in df.groupby(['obj_id']):
+        t0 = None
+        found = False
+        for tval, tdf in odf.groupby(['t']):
+            if t0 is None:
+                t0 = tval
+            pulse_t = tval-t0 # time within current pulse
+            if tdf['zx']>0:
+                found = True
+                sdx_e.append( pulse_t )
+                sdx_g.append( name )
+                sdx_c.append( VALID )
+                break
+        if not found:
+            sdx_e.append( 1000.0 )
+            sdx_g.append( name )
+            sdx_c.append( INVALID )
+    return sdx_e, sdx_g, sdx_c
 
 def _do_group(df):
-    xvals = []
+    t = []
+    pulse_t = []
+    all_cum = []
+    all_n = []
     frac = []
+    t0 = None
     for tval, tdf in df.groupby(['t'], as_index=False):
-        print 'tval',tval
-        print tdf
-        xvals.append( tval )
+        t.append( tval )
+        if t0 is None:
+            t0 = tval
+        pulse_t.append( tval-t0 )
 
         cum_ind = tdf['cum_wei_this_trial'].values
         cum = np.sum(cum_ind)
-        tot = len(cum_ind)
-        frac.append( float(cum)/tot )
+        n = len(cum_ind)
+        all_cum.append( cum )
+        all_n.append( n)
+        frac.append( float(cum)/n )
     return dict(frac=np.array(frac),
-                t=np.array(xvals))
+                pulse_t=np.array(pulse_t),
+                cum=np.array(all_cum),
+                n=np.array(all_n),
+                t=np.array(t))
 
-def plot_cum( ax, frac, label=None):
-    ax.plot( frac, label=label )
+def plot_cum( ax, data, **kw):
+    t = data['pulse_t']
+    frac = data['frac']
 
+    xs = [0]
+    ys = [0]
+    for i in range(len(t)-1):
+        xs.append( t[i] )
+        ys.append( frac[i] )
+
+        xs.append( t[i+1] )
+        ys.append( frac[i] )
+    ax.plot( xs, 100.0*np.array(ys), **kw )
+
+def combine_cum_data(list_of_dicts):
+    cum_by_pulse_t = collections.defaultdict(list)
+    n_by_pulse_t = collections.defaultdict(list)
+    for this_dict in list_of_dicts:
+        pulse_t = this_dict['pulse_t']
+        cum = this_dict['cum']
+        n = this_dict['n']
+        for i in range(len(pulse_t)):
+            pulse_t[i]
+            cum[i]
+            n[i]
+            cum_by_pulse_t[pulse_t[i]].append( cum[i] )
+            n_by_pulse_t[pulse_t[i]].append( n[i] )
+    pulse_ts = cum_by_pulse_t.keys()
+    pulse_ts.sort()
+    cum = []
+    n = []
+    frac = []
+    for i in range(len(pulse_ts)):
+        cum.append( np.sum(cum_by_pulse_t[ pulse_ts[i] ] ))
+        n.append( np.sum(n_by_pulse_t[ pulse_ts[i] ] ))
+        frac.append( float(cum[-1]) / n[-1] )
+    return dict(frac=np.array(frac),
+                pulse_t=np.array(pulse_t),
+                cum=np.array(cum),
+                n=np.array(n))
+
+def do_cum_incidence(gtdf,label):
+    # Calculate cumulative wing extension since last laser on.
+    # (This is ugly...)
+
+    gtdf['cum_wei_this_trial'] = 0
+    gtdf['head_trial'] = 0
+    gtdf['thorax_trial'] = 0
+    obj_ids = gtdf['obj_id'].unique()
+    for obj_id in obj_ids:
+        prev_laser_state = 0
+        cur_cum_this_trial = 0
+        cur_head_trial = 0
+        cur_thorax_trial = 0
+        cur_ttm = 0
+        cur_state = 'none'
+        prev_t = -np.inf
+        for rowi in range(len(gtdf)):
+            row = gtdf.iloc[rowi]
+            if row['obj_id'] != obj_id:
+                continue
+            assert row['t'] > prev_t
+            prev_t = row['t']
+            if prev_laser_state == 0 and row['laser_state']:
+                # new laser pulse, reset cum
+                cur_cum_this_trial = 0
+                if row['ttm'] < 0:
+                    cur_head_trial += 1
+                    cur_state = 'head'
+                elif row['ttm'] > 0:
+                    cur_thorax_trial += 1
+                    cur_state = 'thorax'
+            prev_laser_state = row['laser_state']
+            if row['zx'] > 0:
+                cur_cum_this_trial = 1
+            #gtdf['cum_wei_this_trial'] = cur_cum_this_trial
+            row['cum_wei_this_trial'] = cur_cum_this_trial
+            if cur_state=='head':
+                row['head_trial'] = cur_head_trial
+            elif cur_state=='thorax':
+                row['thorax_trial'] = cur_thorax_trial
+            gtdf.iloc[rowi] = row
+
+    fig_cum = plt.figure('cum indx: %s'%label)
+    ax_cum = fig_cum.add_subplot(111)
+    pulse_nums = [1,2,3]
+    this_data = {}
+    head_data = []
+    thorax_data = []
+
+    sdx_e = []
+    sdx_g = []
+    sdx_c = []
+
+    for pulse_num in pulse_nums:
+        head_pulse_df = gtdf[ gtdf['head_trial']==pulse_num ]
+        thorax_pulse_df = gtdf[ gtdf['thorax_trial']==pulse_num ]
+
+        h = _do_group( head_pulse_df )
+        t = _do_group( thorax_pulse_df )
+        sdx_e, sdx_g, sdx_c = _update_latencies( head_pulse_df,sdx_e, sdx_g, sdx_c,'head')
+        sdx_e, sdx_g, sdx_c = _update_latencies( thorax_pulse_df,sdx_e, sdx_g, sdx_c,'thorax')
+        this_data['head%d'%pulse_num] = h
+        this_data['thorax%d'%pulse_num] = t
+        head_data.append( h )
+        thorax_data.append( t )
+        plot_cum( ax_cum, h, #label='head %d'%pulse_num,
+                  lw=0.5, color=COLORS[HEAD])
+        plot_cum( ax_cum, t, #label='thorax %d'%pulse_num,
+                  lw=0.5, color=COLORS[THORAX])
+    all_head_data = combine_cum_data( head_data )
+    all_thorax_data = combine_cum_data( thorax_data )
+    plot_cum( ax_cum, all_head_data, label='head',
+              lw=2, color=COLORS[HEAD])
+    plot_cum( ax_cum, all_thorax_data, label='thorax',
+              lw=2, color=COLORS[THORAX])
+    ax_cum.legend()
+    ax_cum.set_ylabel('Fraction extending wing (%)')
+    ax_cum.set_xlabel('Time (s)')
+
+
+    sdx_e = np.array(sdx_e)
+    sdx_g = np.array(sdx_g)
+    sdx_c = np.array(sdx_c)
+
+    buf = ''
+    alpha = 0.95
+    try:
+        S,P,T = pairwise_logrank_test( sdx_e, sdx_g, sdx_c, alpha=alpha )
+    except np.linalg.linalg.LinAlgError:
+        buf += 'numerical errors computing logrank test'
+    else:
+        buf += '<h1>%s</h1>\n'%label
+        buf += '<h2>pairwise logrank test</h2>\n'
+        buf += '  analyses done using the <a href="http://lifelines.readthedocs.org">lifelines</a> library\n'
+        buf += P._repr_html_()
+        buf += '<h3>significant at alpha=%s?</h3>\n'%alpha
+        buf += T._repr_html_()
+
+    n_head   = len([x for x in sdx_g if x=='head'])
+    n_thorax = len([x for x in sdx_g if x=='thorax'])
+    p_value = P['head']['thorax']
+
+    return {'fig':fig_cum,
+            'ax':ax_cum,
+            'n_head':n_head,
+            'n_thorax':n_thorax,
+            'p_value':p_value,
+            'buf':buf,
+            }
 
 def plot_data(path, data):
+    ci_html_buf = ''
 
     for exp_name in data:
         gts = data[exp_name].keys()
@@ -241,60 +389,31 @@ def plot_data(path, data):
 
             # OK, this is a Gal4 + UAS - do head vs thorax stats
             gtdf = data[exp_name][gt]['df']
+            ci_data = do_cum_incidence(gtdf, label)
+            ci_html_buf += ci_data['buf']
 
-            # Calculate cumulative wing extension since last laser on.
-            # (This is ugly...)
-            gtdf['cum_wei_this_trial'] = 0
-            gtdf['head_trial'] = 0
-            gtdf['thorax_trial'] = 0
-            obj_ids = gtdf['obj_id'].unique()
-            for obj_id in obj_ids:
-                prev_laser_state = 0
-                cur_cum_this_trial = 0
-                cur_head_trial = 0
-                cur_thorax_trial = 0
-                cur_ttm = 0
-                cur_state = 'none'
-                prev_t = -np.inf
-                for rowi in range(len(gtdf)):
-                    row = gtdf.iloc[rowi]
-                    if row['obj_id'] != obj_id:
-                        continue
-                    assert row['t'] > prev_t
-                    prev_t = row['t']
-                    if prev_laser_state == 0 and row['laser_state']:
-                        # new laser pulse, reset cum
-                        cur_cum_this_trial = 0
-                        if row['ttm'] > 0:
-                            cur_head_trial += 1
-                            cur_state = 'head'
-                        elif row['ttm'] < 0:
-                            cur_thorax_trial += 1
-                            cur_state = 'thorax'
-                    prev_laser_state = row['laser_state']
-                    if row['zx'] > 0:
-                        cur_cum_this_trial = 1
-                    #gtdf['cum_wei_this_trial'] = cur_cum_this_trial
-                    row['cum_wei_this_trial'] = cur_cum_this_trial
-                    if cur_state=='head':
-                        row['head_trial'] = cur_head_trial
-                    elif cur_state=='thorax':
-                        row['thorax_trial'] = cur_thorax_trial
-                    gtdf.iloc[rowi] = row
+            ax_cum = ci_data['ax']
+            spine_placer(ax_cum, location='left,bottom' )
 
-            fig_cum = plt.figure('cum indx: %s'%label)
-            ax_cum = fig_cum.add_subplot(111)
-            pulse_nums = [1,2,3]
-            this_data = {}
-            for pulse_num in pulse_nums:
-                head_pulse_df = gtdf[ gtdf['head_trial']==pulse_num ]
-                thorax_pulse_df = gtdf[ gtdf['thorax_trial']==pulse_num ]
+            note = '%s\n%s\np-value: %.3g\n%d flies\nn=%d, %d'%(label,
+                                                                p2stars(ci_data['p_value']),
+                                                            ci_data['p_value'],
+                                                            len(gtdf['obj_id'].unique()),
+                                                            ci_data['n_head'],
+                                                            ci_data['n_thorax'])
+            ax_cum.text(0, 1, #top left
+                        note,
+                        fontsize=10,
+                        horizontalalignment='left',
+                        verticalalignment='top',
+                        transform=ax_cum.transAxes,
+                        zorder=0)
 
-                this_data['head%d'%pulse_num] = _do_group( head_pulse_df )
-                this_data['thorax%d'%pulse_num] = _do_group( thorax_pulse_df )
-                plot_cum( ax_cum, this_data['head%d'%pulse_num]['frac'], label='head %d'%pulse_num )
-                plot_cum( ax_cum, this_data['thorax%d'%pulse_num]['frac'], label='thorax %d'%pulse_num )
-            ax_cum.legend()
+            ci_data['fig'].savefig(flymad_plot.get_plotpath(path,"song_cum_inc_%s.png" % figname),
+                                    bbox_inches='tight')
+            ci_data['fig'].savefig(flymad_plot.get_plotpath(path,"song_cum_inc_%s.svg" % figname),
+                                    bbox_inches='tight')
+
 
 #            for i in range(len(head_times)):
 #                head_values = gtdf[gtdf['t']==head_times[i]]
@@ -329,6 +448,9 @@ def plot_data(path, data):
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.svg" % figname), bbox_inches='tight')
 
+    with open(flymad_plot.get_plotpath(path,"song_cum_in.html"),mode='w') as fd:
+        fd.write(ci_html_buf)
+
 if __name__ == "__main__":
     EXPS = {
         'P1':   {'exp':['wGP','G323'],
@@ -353,7 +475,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
-    bin_size = '5S'
+    bin_size = '1S'
     cache_fname = os.path.join(path,'song_ctrls_%s.madplot-cache' % bin_size)
     cache_args = os.path.join(path, 'TRP_ctrls'), CTRLS, bin_size
     cdata = None
@@ -391,9 +513,6 @@ if __name__ == "__main__":
 #                                           )
     plot_data(path, data)
 
-#    #p_values1, p_values2 = run_stats(path, dfs)
-#    #fit_to_curve( p_values1 )
-#    #fit_to_curve( p_values2 )
 #    plot_data(path, args.laser, gts, dfs)
 
     if args.show:
