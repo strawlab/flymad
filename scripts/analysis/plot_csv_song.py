@@ -199,7 +199,8 @@ def plot_data(path, data):
         gts = data[exp_name].keys()
 
         laser = '130ht'
-        figname = laser + '_' + 'vs'.join(gts)
+        gts_string = 'vs'.join(gts)
+        figname = laser + '_' + gts_string
 
         fig = plt.figure("Song (%s)" % figname)
         ax = fig.add_subplot(1,1,1)
@@ -319,10 +320,11 @@ def plot_data(path, data):
 
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Wing extension index')
-        ax.set_ylim([-0.05,1.0])
+        ax.set_ylim([-0.05,0.4] if gts_string == "40347vswtrpmycvs40347trpmyc" else [-0.05,1.0])
         ax.set_xlim([-10,180])
 
-        flymad_plot.retick_relabel_axis(ax, [0, 60, 120, 180], [0, 0.5, 1])
+        flymad_plot.retick_relabel_axis(ax, [0, 60, 120, 180],
+                [0, 0.2, 0.4] if gts_string == "40347vswtrpmycvs40347trpmyc" else [0, 0.5, 1])
 
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.svg" % figname), bbox_inches='tight')

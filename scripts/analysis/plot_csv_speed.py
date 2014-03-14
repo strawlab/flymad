@@ -137,6 +137,11 @@ def plot_data(path, data, arena, note):
               'OK371shits-130t':flymad_plot.ORANGE,
     }
 
+    ORDERS = {'OK371shits-130h':2,
+              'OK371shits-nolaser':4,
+              'OK371shits-130t':3,
+    }
+
 
     fig2 = plt.figure("Speed")
     ax = fig2.add_subplot(1,1,1)
@@ -150,6 +155,7 @@ def plot_data(path, data, arena, note):
                             n=gtdf['n']['v'].values,
                             label=LABELS[gt],
                             color=COLORS[gt],
+                            order=ORDERS[gt],
                             df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
 

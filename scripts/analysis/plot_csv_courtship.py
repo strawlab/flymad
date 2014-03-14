@@ -39,6 +39,13 @@ DR_COLORS = {'100hpc':flymad_plot.BLACK,
             '140hpc':flymad_plot.RED,
             '160hpc':flymad_plot.BLUE}
 
+GT_COLORS = {'wtrpmyc':flymad_plot.BLACK,
+             'wGP':flymad_plot.RED,
+             '40347trpmyc':flymad_plot.ORANGE,
+             'G323':flymad_plot.BLUE,
+             '40347':flymad_plot.GREEN}
+
+
 DIRECTED_COURTING_DIST = 50
 
 def _get_targets(path, date):
@@ -292,7 +299,7 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
                     targetbetween=dict(xaxis=df['mean']['t'].values,
                                        where=df['mean']['laser_state'].values>0),
                     sem=True,
-                    note="%s\nlaser %s\nthresh %s\nbin %s" % (gt,flymad_analysis.laser_desc(laser),DIRECTED_COURTING_DIST, bin_size),
+                    note="%s\nlaser %s\nthresh %s\nbin %s\n" % (gt,flymad_analysis.laser_desc(laser),DIRECTED_COURTING_DIST, bin_size),
                     total=dict(xaxis=gdf['t'].values,
                                value=gdf['zx'].values,
 #                              std=grp.std()['zx'].values,
@@ -323,25 +330,6 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
     figname = "%s_%s" % (laser,gt)
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.svg" % figname), bbox_inches='tight')
-
-#        wei_ext[laser] = dict(xaxis=gdf['t'].values,
-#                              value=gdf['zx'].values,
-##                              std=grp.std()['zx'].values,
-##                              n=grp.count()['zx'].values,
-#                              color=DR_COLORS[laser],
-#                              label=flymad_analysis.laser_desc(laser),
-#                              df=non_grouped_df,
-#                              N=len(non_grouped_df['obj_id'].unique()))
-
-#        wei_ext_close[laser] = dict(xaxis=cdf['t'].values,
-#                                    value=cdf['zx'].values,
-##                                    std=grp.std()['zx'].values,
-##                                    n=grp.count()['zx'].values,
-#                                    color=DR_COLORS[laser],
-#                                    label=flymad_analysis.laser_desc(laser),
-#                                    df=closedf,
-#                                    N=len(closedf['obj_id'].unique()))
-
 
 def _split_df(df):
     if len(df['obj_id'].unique()) > 1:
@@ -399,30 +387,18 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
 
 def plot_data(path, laser, bin_size, dfs):
 
-    COLORS = {'wtrpmyc':flymad_plot.BLACK,
-              'wGP':flymad_plot.RED,
-              '40347trpmyc':flymad_plot.ORANGE,
-              'G323':flymad_plot.BLUE,
-              '40347':flymad_plot.GREEN}
-
     figname = laser + '_' + '_'.join(dfs)
 
     datasets = {}
     for gt in dfs:
-        if flymad_analysis.genotype_is_exp(gt):
-            order = 1
-        elif flymad_analysis.genotype_is_ctrl(gt):
-            order = 2
-        else:
-            order = 3
         gtdf = dfs[gt]
         datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
                             value=gtdf['mean']['zx'].values,
                             std=gtdf['std']['zx'].values,
                             n=gtdf['n']['zx'].values,
                             label=flymad_analysis.human_label(gt, specific=True),
-                            order=order,
-                            color=COLORS[gt],
+                            order=flymad_analysis.get_genotype_order(gt),
+                            color=GT_COLORS[gt],
                             df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
     ctrlmean = dfs['wtrpmyc']['mean']
@@ -457,20 +433,14 @@ def plot_data(path, laser, bin_size, dfs):
 
     datasets = {}
     for gt in dfs:
-        if flymad_analysis.genotype_is_exp(gt):
-            order = 1
-        elif flymad_analysis.genotype_is_ctrl(gt):
-            order = 2
-        else:
-            order = 3
         gtdf = dfs[gt]
         datasets[gt] = dict(xaxis=gtdf['mean']['t'].values,
                             value=gtdf['mean']['dtarget'].values,
                             std=gtdf['std']['dtarget'].values,
                             n=gtdf['n']['dtarget'].values,
                             label=flymad_analysis.human_label(gt, specific=True),
-                            order=order,
-                            color=COLORS[gt],
+                            order=flymad_analysis.get_genotype_order(gt),
+                            color=GT_COLORS[gt],
                             df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
     ctrlmean = dfs['wtrpmyc']['mean']
