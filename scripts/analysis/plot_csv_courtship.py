@@ -243,8 +243,8 @@ def fit_to_curve ( p_values ):
     print polynom #lazy dan can't use python to solve polynomial eqns. boo.
     return (x, y, xPoly, yPoly, polynom)
 
-def plot_single_genotype(path, laser, gt, df, figsize=(4,4)):
-    figure_title = "%s Courtship Wingext 10min (%s)" % (gt,laser)
+def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
+    figure_title = "%s (%s) Courtship Wingext 10min (%s)" % (flymad_analysis.human_label(gt, specific=True), gt, laser)
     fig = plt.figure(figure_title, figsize=figsize)
     ax = fig.add_subplot(1,1,1)
 
@@ -252,7 +252,7 @@ def plot_single_genotype(path, laser, gt, df, figsize=(4,4)):
                     targetbetween=dict(xaxis=df['mean']['t'].values,
                                        where=df['mean']['laser_state'].values>0),
                     sem=True,
-                    note="%s\nlaser %s\n" % (gt,flymad_analysis.laser_desc(laser)),
+                    note="%s\nlaser %s\nbin %s\n" % (gt,flymad_analysis.laser_desc(laser),bin_size),
                     exp=dict(xaxis=df['mean']['t'].values,
                              value=df['mean']['zx'].values,
                              std=df['std']['zx'].values,
@@ -274,7 +274,78 @@ def plot_single_genotype(path, laser, gt, df, figsize=(4,4)):
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
 
+    #############
+    non_grouped_df = df['df']
+    close = non_grouped_df['dtarget'] < DIRECTED_COURTING_DIST
+    closedf = non_grouped_df[close]
+
+    grpa = non_grouped_df.groupby('t_align')
+    gdf = grpa.mean()
+    grpb = closedf.groupby('t_align')
+    cdf = grpb.mean()
+
+    figure_title = "%s (%s) Courtship Wingext Split 10min (%s)" % (flymad_analysis.human_label(gt, specific=True), gt, laser)
+    fig = plt.figure(figure_title, figsize=figsize)
+    ax = fig.add_subplot(1,1,1)
+
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=df['mean']['t'].values,
+                                       where=df['mean']['laser_state'].values>0),
+                    sem=True,
+                    note="%s\nlaser %s\nthresh %s\nbin %s" % (gt,flymad_analysis.laser_desc(laser),DIRECTED_COURTING_DIST, bin_size),
+                    total=dict(xaxis=gdf['t'].values,
+                               value=gdf['zx'].values,
+#                              std=grp.std()['zx'].values,
+#                              n=grp.count()['zx'].values,
+                               color=flymad_plot.BLACK,
+                               label="Total",
+                               df=non_grouped_df,
+                               marker='o',linestyle='',
+                               N=len(non_grouped_df['obj_id'].unique())),
+                    close=dict(xaxis=cdf['t'].values,
+                               value=cdf['zx'].values,
+#                              std=grp.std()['zx'].values,
+#                              n=grp.count()['zx'].values,
+                               color=flymad_plot.RED,
+                               label="Targeted",
+                               df=closedf,
+                               marker='o',linestyle='',
+                               N=len(closedf['obj_id'].unique()))
+    )
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Wing extension index')
+    ax.set_ylim([0,1])
+    ax.set_xlim(XLIM_10MIN)
+
+    flymad_plot.retick_relabel_axis(ax, [0,240,480], [0,0.5,1])
+
+    figname = "%s_%s" % (laser,gt)
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.png" % figname), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.svg" % figname), bbox_inches='tight')
+
+#        wei_ext[laser] = dict(xaxis=gdf['t'].values,
+#                              value=gdf['zx'].values,
+##                              std=grp.std()['zx'].values,
+##                              n=grp.count()['zx'].values,
+#                              color=DR_COLORS[laser],
+#                              label=flymad_analysis.laser_desc(laser),
+#                              df=non_grouped_df,
+#                              N=len(non_grouped_df['obj_id'].unique()))
+
+#        wei_ext_close[laser] = dict(xaxis=cdf['t'].values,
+#                                    value=cdf['zx'].values,
+##                                    std=grp.std()['zx'].values,
+##                                    n=grp.count()['zx'].values,
+#                                    color=DR_COLORS[laser],
+#                                    label=flymad_analysis.laser_desc(laser),
+#                                    df=closedf,
+#                                    N=len(closedf['obj_id'].unique()))
+
+
 def _split_df(df):
+    if len(df['obj_id'].unique()) > 1:
+        raise Exception("FIXME: need to better pool these....")
     t0 = df[df['t'] == 0].index[0]
     before = df[t0-DateOffset(seconds=60):t0]
     during = df[t0:t0+DateOffset(seconds=20)]
@@ -288,8 +359,9 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
     date = dt.strftime('%Y%m%d')
     targets = _get_targets(path, date)
 
+    #FIXME: I think this doesn't work for sets of multiple flies
     for desc,split in _split_df(df):
-        fig = plt.figure("%s %s Wing Extension (%s)" % (gt,laser,desc), figsize=figsize, frameon=True)
+        fig = plt.figure("%s %s Wing Extension (%s)" % (flymad_analysis.human_label(gt, specific=True),laser,desc), figsize=figsize, frameon=True)
         ax = fig.add_subplot(1,1,1)
         ax.set_aspect('equal')
 
@@ -325,7 +397,7 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
         figname = "%s_%s_%s_courting_trajectory" % (gt, laser, desc)
         fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
 
-def plot_data(path, laser, dfs, autoscale=False):
+def plot_data(path, laser, bin_size, dfs):
 
     COLORS = {'wtrpmyc':flymad_plot.BLACK,
               'wGP':flymad_plot.RED,
@@ -334,8 +406,6 @@ def plot_data(path, laser, dfs, autoscale=False):
               '40347':flymad_plot.GREEN}
 
     figname = laser + '_' + '_'.join(dfs)
-    if autoscale:
-        figname += "_AUTOSCALE"
 
     datasets = {}
     for gt in dfs:
@@ -365,7 +435,7 @@ def plot_data(path, laser, dfs, autoscale=False):
                     targetbetween=dict(xaxis=ctrlmean['t'].values,
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
-                    note="laser %s\n" % flymad_analysis.laser_desc(laser),
+                    note="laser %s\nbin %s\n" % (flymad_analysis.laser_desc(laser), bin_size),
                     individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'zx'} for k in ('wGP','40347trpmyc')},
                     individual_title=figure_title + ' Individual Traces',
                     **datasets
@@ -374,9 +444,8 @@ def plot_data(path, laser, dfs, autoscale=False):
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Wing extension index')
 
-    if not autoscale:
-        ax.set_ylim([0,0.6])
-        ax.set_xlim(XLIM_10MIN)
+    ax.set_ylim([0,0.6])
+    ax.set_xlim(XLIM_10MIN)
 
     flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [0,0.3,0.6])
 
@@ -415,7 +484,7 @@ def plot_data(path, laser, dfs, autoscale=False):
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
                     legend_location='lower right',
-                    note="laser %s\n" % flymad_analysis.laser_desc(laser),
+                    note="laser %s\nbin %s\n" % (flymad_analysis.laser_desc(laser), bin_size),
                     individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'dtarget'} for k in ('wGP','40347trpmyc')},
                     individual_title=figure_title + ' Individual Traces',
                     **datasets
@@ -424,9 +493,8 @@ def plot_data(path, laser, dfs, autoscale=False):
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Distance (px)')
 
-    if not autoscale:
-        ax.set_ylim([40,160])
-        ax.set_xlim(XLIM_10MIN)
+    ax.set_ylim([40,160])
+    ax.set_xlim(XLIM_10MIN)
 
     flymad_plot.retick_relabel_axis(ax, XLABEL_10MIN, [40,0,80,120,160])
 
@@ -732,17 +800,58 @@ if __name__ == "__main__":
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--laser', default='140hpc', help='laser specifier')
-    parser.add_argument('--trajectories', default=False, action='store_true',
-                        help='plot trajectories per fly (LOTS OF PLOTS)')
+    parser.add_argument('--only-trajectories', default=None, required=False,
+                        help='plot trajectories per fly (LOTS OF PLOTS) at this binning then exit.' \
+                             'try 100L')
+    parser.add_argument('--only-single-genotype', default=None, required=False,
+                        help='plot single genotype plots binned as specified then exit. try 2S')
     parser.add_argument('--calibration-file', help='calibration yaml files', required=False, default=None)
 
     args = parser.parse_args()
     path = args.path[0]
 
-    if args.trajectories:
-        bin_size = '100L'
-    else:
-        bin_size = '5S'
+    if args.only_trajectories is not None:
+        bin_size = str(args.only_trajectories)
+        cache_fname = os.path.join(path,'courtship_%s.madplot-cache' % bin_size)
+        cache_args = (args.laser, gts, bin_size)
+        dfs = None
+        if args.only_plot:
+            dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
+        if dfs is None:
+            dfs = prepare_data(path, args.laser, bin_size, gts)
+            madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
+
+        arena = madplot.Arena(
+                    'px',
+                    **flymad_analysis.get_arena_conf(calibration_file=args.calibration_file))
+
+        for gt in dfs:
+            df = dfs[gt]['df']
+            plot_trajectories_by_stage(df, arena, args.laser)
+
+        if args.show:
+            plt.show()
+        sys.exit(0)
+
+    if args.only_single_genotype is not None:
+        bin_size = str(args.only_single_genotype)
+        cache_fname = os.path.join(path,'courtship_%s.madplot-cache' % bin_size)
+        cache_args = (args.laser, gts, bin_size)
+        dfs = None
+        if args.only_plot:
+            dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
+        if dfs is None:
+            dfs = prepare_data(path, args.laser, bin_size, gts)
+            madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
+
+        for gt,gtdf in dfs.iteritems():
+            plot_single_genotype(path, args.laser, bin_size, gt, gtdf)
+
+        if args.show:
+            plt.show()
+        sys.exit(0)
+
+    bin_size = '5S'
     cache_fname = os.path.join(path,'courtship_%s.madplot-cache' % bin_size)
     cache_args = (args.laser, gts, bin_size)
     dfs = None
@@ -764,23 +873,7 @@ if __name__ == "__main__":
                                        stat_colname='dtarget',
                                        )
 
-    plot_data(path, args.laser, dfs, autoscale=args.trajectories)
-
-    for gt,gtdf in dfs.iteritems():
-        plot_single_genotype(path, args.laser, gt, gtdf)
-
-    if args.trajectories:
-        arena = madplot.Arena(
-                    'px',
-                    **flymad_analysis.get_arena_conf(calibration_file=args.calibration_file))
-
-        for gt in dfs:
-            df = dfs[gt]['df']
-            plot_trajectories_by_stage(df, arena, args.laser)
-
-        if args.show:
-            plt.show()
-        sys.exit(0)
+    plot_data(path, args.laser, bin_size, dfs)
 
     bin_size = '5S'
     cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % bin_size)
