@@ -77,7 +77,7 @@ def laser_desc(specifier=None, wavelength=None, current=None):
             if match:
                 current_ma,wavelength = match.groups()
                 wavelength = {'iru':808,'ru':635}[wavelength]
-                if (current_ma == 350) and wavelength == 635:
+                if (int(current_ma) == 350) and (int(wavelength) == 635):
                     #fix dan mislabeling 35ma red laser as 350ma
                     current_ma = 35
                 label = _laser_desc(wavelength, float(current_ma)*1e-3)
@@ -628,4 +628,8 @@ def load_courtship_csv(path):
         df['obj_id'] = create_object_id(date,time)
 
         yield df, (csvfilefn,experimentID,date,time,genotype,laser,repID)
+
+if __name__ == "__main__":
+    for x in ["350ru","033ru","434iru","183iru","130ht","120h","120t","140hpc"]:
+        print x,"->",laser_desc(x)
 
