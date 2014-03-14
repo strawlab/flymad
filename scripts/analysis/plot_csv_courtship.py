@@ -82,12 +82,19 @@ def _get_targets(path, date):
 
         return targets
 
+    def _fmf_click(image_path, cache_path):
+        pass
+
     #cached results
     pata = os.path.join(path,'*%s*.mp4.png.madplot-cache' % date)
     mp4pngcache = glob.glob(pata)
     if len(mp4pngcache) == 1:
         return pickle.load( open(mp4pngcache[0],'rb') )
 
+    #targets from fmf
+    #fmf2bmps wGP-140hpc-10_wide_20140225_105341.fmf --start=10 --stop=10 --extension=fmf.png
+
+    #targets from mp4
     patb = os.path.join(path,'*%s*.mp4.png' % date)
     mp4png = glob.glob(patb)
     if len(mp4png) == 1:
