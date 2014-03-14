@@ -125,6 +125,15 @@ def genotype_is_ctrl(gt):
 def genotype_is_trp_ctrl(gt):
     return re.match('\+/\w+$', genotype_label(gt)) is not None
 
+def get_genotype_order(gt):
+    if genotype_is_exp(gt):
+        order = 1 if gt == 'wGP' else 2
+    elif genotype_is_ctrl(gt):
+        order = 3
+    else:
+        order = 4
+    return order
+
 def to_si(d,space=''):
     incPrefixes = ['k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
     decPrefixes = ['m', 'µ', 'n', 'p', 'f', 'a', 'z', 'y']
