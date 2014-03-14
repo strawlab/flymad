@@ -1566,7 +1566,7 @@ def get_pairwise(data,gt1_name,gt2_name,**kwargs):
         texts.append( '')
 
     this_dict = {
-        'name':'%s vs. %s'%(p_values['name1'][0], p_values['name2'][0]),
+        'name':'%s vs. %s' % (gt1_name, gt2_name),
         'x':[float(x) for x in xs],
         'y':[float(y) for y in ys],
         'text':texts,
