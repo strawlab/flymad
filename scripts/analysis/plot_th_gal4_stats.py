@@ -11,25 +11,15 @@ import argparse
 import lifelines # http://lifelines.readthedocs.org
 from lifelines.statistics import logrank_test, pairwise_logrank_test
 
-def setup_defaults():
-    pd.set_option('display.precision',3)
-    rcParams = matplotlib.rcParams
-
-    rcParams['legend.numpoints'] = 1
-    rcParams['legend.fontsize'] = 'medium' #same as axis
-    rcParams['legend.frameon'] = False
-    rcParams['legend.numpoints'] = 1
-    rcParams['legend.scatterpoints'] = 1
-    matplotlib.rc('font', size=8)
-
-smd.setup_defaults()
-setup_defaults()
-
 import pandas as pd
 import sys, os,re
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
+
+import roslib; roslib.load_manifest('flymad')
+import flymad.flymad_analysis_dan as flymad_analysis
+import flymad.flymad_plot as flymad_plot
 
 np.random.seed(3) # prevent plots from changing
 MAX_LATENCY=20.0 # did not score longer than this...
@@ -59,6 +49,62 @@ def gi2df2(gi):
         data[name] = [num_samples]
     r =pd.DataFrame(data=data,index=['n'])
     return r
+
+def plot_ci_for_ms(path, figname, vals, figsize=(6,4)):
+
+    figname = os.path.splitext(figname)[0]
+
+    NAMES = {'TH>trpA1 head':'TH>trpA1 (head)',
+              'TH>trpA1 thorax':'TH>trpA1 (thorax)',
+              'TH head':'TH (head)',
+              'TH thorax':'TH (thorax)',
+              'trpA1 head':'trpA1 (head)',
+              'trpA1 thorax':'trpA1 (thorax)',
+              'controls head':'controls (head)',
+              'controls thorax':'controls (thorax)',
+    }
+    COLORS = {'TH>trpA1 head':flymad_plot.RED,
+              'TH>trpA1 thorax':flymad_plot.ORANGE,
+              'TH head':flymad_plot.GREEN,
+              'TH thorax':flymad_plot.BLUE,
+              'trpA1 head':flymad_plot.GREEN,
+              'trpA1 thorax':flymad_plot.BLUE,
+              'controls head':flymad_plot.GREEN,
+              'controls thorax':flymad_plot.BLUE,
+    }
+
+    ORDER = ['TH>trpA1 head',
+              'TH>trpA1 thorax',
+              'TH head',
+              'TH thorax',
+              'trpA1 head',
+              'trpA1 thorax',
+              'controls head',
+              'controls thorax',
+    ]
+
+
+    figure_title = "THGAL4 %s cumulative incidence" % figname
+    fig = plt.figure(figsize=figsize)
+    ax = fig.add_subplot(1,1,1)
+
+    for gt in sorted(vals, cmp=lambda a,b: cmp(ORDER.index(a), ORDER.index(b))):
+        ax.plot(vals[gt]['x'],vals[gt]['y'],
+                lw=2,clip_on=False,
+                color=COLORS[gt],label=NAMES[gt])
+
+    spine_placer(ax, location='left,bottom' )
+    ax.legend()
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Cumulative incidence (%)')
+    ax.set_ylim([0,100])
+    ax.set_xlim([0,20])
+
+    flymad_plot.retick_relabel_axis(ax, [0,10,20], [0,100])
+
+    fig.savefig(flymad_plot.get_plotpath(path,"thgal4_ci_%s.png" % figname), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"thgal4_ci_%s.svg" % figname), bbox_inches='tight')
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
@@ -98,7 +144,7 @@ if __name__=='__main__':
             #group_info._repr_html_()
 
             # --- plots --------------------------------
-            fig1 = plt.figure('bar '+measurement+pooled_str,figsize=(1.5,2))
+            fig1 = plt.figure('bar '+measurement+pooled_str,figsize=(3,5))
             ax = fig1.add_subplot(111)
             tick_labels = []
             xticks = []
@@ -140,11 +186,13 @@ if __name__=='__main__':
             fig1.savefig(svg1_fname)
 
             # --- plots --------------------------------
-            fig2 = plt.figure('scatter '+measurement+pooled_str,figsize=(1.5,2))
+            fig2 = plt.figure('scatter '+measurement+pooled_str,figsize=(3,5))
             ax = fig2.add_subplot(111)
             tick_labels = []
             xticks = []
+
             for name_key, group1 in df_all.groupby("name_key",sort=True):
+
                 this_x_value = x_vals[name_key]
                 this_y_values = group1['latency'].values
                 this_y_values = np.clip(this_y_values,0,MAX_LATENCY)
@@ -153,6 +201,7 @@ if __name__=='__main__':
                 this_x_values = np.array([this_x_value]*len(this_y_values))
                 uw = 0.2
                 this_x_values = np.array(this_x_values) + np.random.uniform(-uw, uw, size=(len(this_y_values),))
+
                 ax.plot( this_x_values, this_y_values, 'ko',
                          mew=0.3,
                          mfc='none',
@@ -182,8 +231,9 @@ if __name__=='__main__':
             buf += '<object type="image/svg+xml" data="%s">Your browser does not support SVG</object>'%(svg2_fname,)
 
             # --- cumulative incidence plots ----------
+            ms_data = {}
 
-            fig3 = plt.figure('cum incidence '+measurement+pooled_str,figsize=(1.5,2))
+            fig3 = plt.figure('cum incidence '+measurement+pooled_str,figsize=(3,5))
             ax = fig3.add_subplot(111)
             for name_key, group1 in df_all.groupby("name_key",sort=True):
                 frac = 1.0/len( group1 )
@@ -206,6 +256,9 @@ if __name__=='__main__':
                 this_y_vals.append( maxy*100.0 )
 
                 ax.plot( this_x_vals, this_y_vals, '-', label=name_key )
+
+                ms_data[name_key] = dict(x=this_x_vals, y=this_y_vals)
+
             ax.legend()
             spine_placer(ax, location='left,bottom' )
             ax.set_xlabel('Time (s)')
@@ -215,6 +268,8 @@ if __name__=='__main__':
             svg3_fname = 'th_gal4_latency_cuminc_%s_%s.svg'%(measurement,pooled_str)
             fig3.savefig(svg3_fname)
             buf += '<object type="image/svg+xml" data="%s">Your browser does not support SVG</object>'%(svg3_fname,)
+
+            plot_ci_for_ms(dirname, '%s_%s' % (measurement,pooled_str), ms_data)
 
             # - survival fits ------------------------
             #  "survival functions" for right-censored events
