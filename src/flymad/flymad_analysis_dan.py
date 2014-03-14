@@ -28,15 +28,90 @@ GENOTYPE_LABELS = {
 
 HUMAN_LABELS = {
     "wtrpmyc":"UAS-control","wtrp":"UAS-control",
-    "G323":"Gal4 control","wGP":"P1>TRPA1",
-    "40347":"Gal4 control","40347trpmyc":"pIP10>TRPA1",
+    "G323":"Gal4 control","G323_specific":"P1 Gal4 control","wGP":"P1>TRPA1",
+    "40347":"Gal4 control","40347_specific":"pIP10 Gal4 control","40347trpmyc":"pIP10>TRPA1",
     "5534":"Gal4 control","5534trpmyc":"vPR6>TRPA1",
     "43702":"Gal4 control","43702trp":"vMS11>TRPA1",
     "41688":"Gal4 control","41688trp":"dPR1>TRPA1",
 }
 
-def human_label(gt):
-    return HUMAN_LABELS.get(gt,gt)
+UNIT_SPACE = u"\u205F"
+UNIT_SPACE = " "
+
+def laser_power_string(wavelength, current):
+    if wavelength == 808:
+        #Optical Power (mW) = 597.99(current in A) - 51.78
+        mw = 597.99*float(current) - 51.78
+        return u"%.0f%smW" % (mw, UNIT_SPACE)
+    elif wavelength == 635:
+        #Optical Power (uW) = 59278(current in A) - 1615
+        uw = 59278*float(current) - 1615
+        return u"%.0f%sµW" % (uw, UNIT_SPACE)
+    else:
+        return u"%.0f%smA" % current
+
+def laser_wavelength_string(wavelength):
+    return u"%d%snm" % (int(wavelength), UNIT_SPACE)
+
+def laser_desc(specifier=None, wavelength=None, current=None):
+
+    def _laser_desc(w,c):
+        return "%s %s" % (laser_wavelength_string(w),
+                          laser_power_string(w,c))
+
+    #in dans experiments, specifier is
+    #350iru, 350ru
+    #130ht,120h,120t,140hpc
+    #what consistency!!!
+    if not any((specifier, wavelength, current)):
+        raise Exception("You must provide specifier, wavelength or current")
+
+    if all((wavelength, current)):
+        return _laser_desc(wavelength, current)
+    else:
+        label = specifier
+
+        try:
+            match = re.match('([0-9]{2,})([iru]{2,})', specifier)
+            match_ir = re.match('([0-9]{2,})([htpc]{1,})', specifier)
+            if match:
+                current_ma,wavelength = match.groups()
+                wavelength = {'iru':808,'ru':635}[wavelength]
+                if (int(current_ma) == 350) and (int(wavelength) == 635):
+                    #fix dan mislabeling 35ma red laser as 350ma
+                    current_ma = 35
+                label = _laser_desc(wavelength, float(current_ma)*1e-3)
+            elif match_ir:
+                current_ma,target = match_ir.groups()
+                label = _laser_desc(808, float(current_ma)*1e-3)
+        except (KeyError, ValueError, TypeError), e:
+            print "WARNING: Error parsing",specifier
+            label += "!!!"
+
+    return label
+
+def cmp_laser_desc(desc_a, desc_b):
+    UNIT_MULT = {"mA":1,"mW":1e-3,u"uW":1e-6}
+
+    def _get_cval(desc):
+        wl,_,pwr,pwr_unit = desc.split(' ')
+        #I could not get dicts with unicode keys to work...
+        if pwr_unit == u"µW":
+            mult = 1e-6
+        elif pwr_unit == "mW":
+            mult = 1e-3
+        else:
+            mult = 1.0
+        pwr = float(pwr) * mult
+        return float(wl) + pwr
+    return cmp(_get_cval(desc_a), _get_cval(desc_b))
+
+def cmp_laser(laser_a, laser_b):
+    return cmp_laser_desc(laser_desc(laser_a), laser_desc(laser_b))
+
+def human_label(gt,specific=False):
+    gts = gt+"_specific" if specific else gt
+    return HUMAN_LABELS.get(gts,HUMAN_LABELS.get(gt,gt))
 
 def genotype_label(gt):
     return GENOTYPE_LABELS.get(gt,gt)
@@ -49,6 +124,15 @@ def genotype_is_ctrl(gt):
 
 def genotype_is_trp_ctrl(gt):
     return re.match('\+/\w+$', genotype_label(gt)) is not None
+
+def get_genotype_order(gt):
+    if genotype_is_exp(gt):
+        order = 1 if gt == 'wGP' else 2
+    elif genotype_is_ctrl(gt):
+        order = 3
+    else:
+        order = 4
+    return order
 
 def to_si(d,space=''):
     incPrefixes = ['k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y']
@@ -571,4 +655,8 @@ def load_courtship_csv(path):
         df['obj_id'] = create_object_id(date,time)
 
         yield df, (csvfilefn,experimentID,date,time,genotype,laser,repID)
+
+if __name__ == "__main__":
+    for x in ["350ru","033ru","434iru","183iru","130ht","120h","120t","140hpc"]:
+        print x,"->",laser_desc(x)
 

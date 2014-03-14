@@ -9,6 +9,7 @@ import pickle
 import math
 import itertools
 import re
+import operator
 
 import numpy as np
 import pandas as pd
@@ -33,34 +34,13 @@ HEAD    = +100
 THORAX  = -100
 OFF     = 0
 
-CURRENT_LABELS = {
-    '350ru':'red 35mA',
-    '033ru':'red 33mA',
-    '030ru':'red 30mA',
-    '028ru':'red 28mA',
-    '434iru':'infrared 434mA',
-    '350iru':'infrared 350mA',
-    '266iru':'infrared 266mA',
-    '183iru':'infrared 183mA',
-}
-POWER_LABELS = {
-    '350ru':u'red 460\u00B5W',
-    '033ru':u'red 341\u00B5W',
-    '030ru':u'red 163\u00B5W',
-    '028ru':u'red 50\u00B5W',
-    '434iru':'infrared 208mW',
-    '350iru':'infrared 158mW',
-    '266iru':'infrared 107mW',
-    '183iru':'infrared 58mW',
-}
-
 EXPERIMENT_DURATION = 130.0
 
 YLIM = [-10, 30]
 YTICKS = [-20, 0, 20, 40]
 
 XLIM = [-10, 80]
-XTICKS = [0, 2, 24, 48, 72]
+XTICKS = [0, 40, 80]
 
 def prepare_data(path, arena, smooth, medfilt, only_laser, gts):
 
@@ -179,8 +159,6 @@ def prepare_data(path, arena, smooth, medfilt, only_laser, gts):
 
 def plot_cross_activation_only(path, data, arena, note):
 
-    LABELS = POWER_LABELS
-
     PLOTS = [('50660chrim',{'activation':'350ru','cross_activation':'350iru'}),
              ('50660trp',{'activation':'434iru','cross_activation':'350ru'}),
              ('50660trp',{'activation':'350iru','cross_activation':'350ru'}),
@@ -198,7 +176,7 @@ def plot_cross_activation_only(path, data, arena, note):
                               value=adf['mean']['Vfwd'].values,
                               std=adf['std']['Vfwd'].values,
                               n=adf['n']['Vfwd'].values,
-                              label='Activation (%s)' % LABELS[alaser],
+                              label='Activation (%s)' % flymad_analysis.laser_desc(alaser),
                               order=0,
                               color=flymad_plot.RED,
                               N=len(adf['df']['obj_id'].unique()),
@@ -208,8 +186,8 @@ def plot_cross_activation_only(path, data, arena, note):
                               value=cdf['mean']['Vfwd'].values,
                               std=cdf['std']['Vfwd'].values,
                               n=cdf['n']['Vfwd'].values,
-                              label='Cross Activation (%s)' % LABELS[claser],
-                              order=0,
+                              label='Cross Activation (%s)' % flymad_analysis.laser_desc(claser),
+                              order=1,
                               color=flymad_plot.BLACK,
                               N=len(cdf['df']['obj_id'].unique()),
                               df=cdf['df']),
@@ -246,16 +224,13 @@ def plot_cross_activation_only(path, data, arena, note):
 
 def plot_all_data(path, data, arena, note):
 
-    LABELS = POWER_LABELS
-
     for gt in data:
         datasets = {}
         color_cycle = itertools.cycle(flymad_plot.EXP_COLORS)
 
-        #sort by power but make the odd one out last
-        laser_powers = sorted(data[gt])
+        laser_powers_sorted = sorted(data[gt], cmp=flymad_analysis.cmp_laser, reverse=True)
 
-        for laser in data[gt]:
+        for order,laser in enumerate(laser_powers_sorted):
 
             #also sort to make cross-activation first
             cross_activation = (re.match('[0-9]+iru$',laser) and gt.endswith('chrim')) or \
@@ -263,12 +238,13 @@ def plot_all_data(path, data, arena, note):
 
             gtdf = data[gt][laser][gt]
 
+            laser_desc = flymad_analysis.laser_desc(laser)
             datasets[laser] = dict(xaxis=gtdf['mean']['t'].values,
                                    value=gtdf['mean']['Vfwd'].values,
                                    std=gtdf['std']['Vfwd'].values,
                                    n=gtdf['n']['Vfwd'].values,
-                                   label=LABELS[laser],
-                                   order=-1 if cross_activation else laser_powers.index(laser),
+                                   label=laser_desc,
+                                   order=50 if cross_activation else order,
                                    color=color_cycle.next(),
                                    N=len(gtdf['df']['obj_id'].unique()),
                                    df=gtdf['df'],

@@ -99,6 +99,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                                     legend_location='upper right', note="",
                                     individual=None, individual_title=None,
                                     marker=None,linestyle='-',markersize=1,
+									return_dict=False,
                                     **datasets):
 
     ORDER_LAST = 100
@@ -116,6 +117,17 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                 tmp.append( scipy.stats.nanmean(vals) )
             return np.array(tmp)
 
+    def _dn(a,b):
+        nans_a, = np.where(np.isnan(a))
+        nans_b, = np.where(np.isnan(b))
+        nans_all = np.union1d(nans_a, nans_b)
+        n_nans = len(nans_all)
+        if n_nans:
+            print "\tremoving %d nans from plot" % n_nans
+        clean_a = np.delete(a,nans_all)
+        clean_b = np.delete(b,nans_all)
+        return clean_a, clean_b
+
     def _sort_by_order(a,b):
         return cmp(datasets[a].get('order', ORDER_LAST), datasets[b].get('order', ORDER_LAST))
 
@@ -131,7 +143,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         for tb in targetbetween:
             _fill_between(ax, tb['xaxis'], tb['where'], tb.get('facecolor','yellow'))
 
-    if any(['std' in exp for exp in datasets]):
+    if any(['std' in datasets[exp] for exp in datasets]):
         note += "+/- SEM\n" if sem else "+/- STD\n"
     note += "" if downsample == 1 else ("downsample x %d\n" % downsample)
 
@@ -162,13 +174,15 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         else:
             spread = None
 
+        color = exp.get('color',DEFAULT_COLORS.get(data,'k'))
+
         if spread is not None:
             ax.fill_between(exp['xaxis'][::downsample], _ds(exp['value']+spread), _ds(exp['value']-spread),
-                        alpha=0.1, color=exp.get('color',DEFAULT_COLORS.get(data,'k')),
+                        alpha=0.1, color=color,
                         zorder=this_zorder)
 
-        color = exp.get('color',DEFAULT_COLORS.get(data,'k'))
-        ax.plot(exp['xaxis'][::downsample], _ds(exp['value']),
+        x,y = _dn(exp['xaxis'][::downsample], _ds(exp['value']))
+        ax.plot(x,y,
                     color=color,label=label,
                     lw=2,linestyle=linestyle,clip_on=True,
                     marker=marker,markerfacecolor=color,markersize=markersize,markeredgecolor='none',
@@ -191,7 +205,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
 
     axs = [ax]
     figs = {}
-    if (individual is not None) and isinstance(individual, dict):
+    if (not os.environ.get('FLYMAD_FINAL')) and (individual is not None) and isinstance(individual, dict):
         for data in individual:
             try:
                 #try to avoid creating many duplicate figures
@@ -228,10 +242,12 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                     grp_yaxis = np.array(group[ycol])
 
                     iax = fig2.add_subplot(gridspec_id)
-                    iax.plot(grp_xaxis[::downsample], _ds(grp_yaxis),
+
+                    print "\tplot",name,xcol,"vs",ycol
+                    x,y = _dn(grp_xaxis[::downsample], _ds(grp_yaxis))
+                    iax.plot(x, y,
                              label=name, color='k')
                     iax.legend(loc=legend_location)
-                    print "\tplot",name,xcol,"vs",ycol
 
 #                    if fb_wherecol:
 #                        _fill_between(iax,
@@ -246,6 +262,12 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
             except KeyError, e:
                 print "\terror plotting individual timeseries (%s)" % e
 
+    if return_dict:
+        result = dict(legend=l,
+                      axs=axs,
+                      figs=figs,
+                      )
+        return result
     return l, axs, figs
 
 #setup default plotting styles

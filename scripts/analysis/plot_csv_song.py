@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
 from scipy.stats import ttest_ind
+from scipy.stats import kruskal
 
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
@@ -28,7 +29,9 @@ HEAD    = +100
 THORAX  = -100
 OFF     = 0
 
-def prepare_data(path, gts):
+EXPERIMENT_DURATION = 200.0
+
+def prepare_data(path, resample_bin, gts):
 
     LASER_THORAX_MAP = {True:THORAX,False:HEAD}
 
@@ -47,6 +50,12 @@ def prepare_data(path, gts):
             print "\tskipping genotype", genotype
             continue
 
+        duration = (df.index[-1] - df.index[0]).total_seconds()
+        if duration < EXPERIMENT_DURATION:
+            print "\tmissing data", csvfilefn
+            continue
+        print "\t%ss experiment" % duration
+
         #make new columns that indicates HEAD/THORAX targeting
         thorax = True
         laser_state = False
@@ -64,24 +73,32 @@ def prepare_data(path, gts):
         trg.append(OFF)
         df['ttm'] = trg
 
-        #don't do any alignment other than starting time at zero. other
-        df['t'] = df['t'].values - df['t'].values[0]
+        #resample into 5S bins
+        df = df.resample(resample_bin, fill_method='ffill')
+        #trim dataframe
+        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION, resample_bin))
+        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION, resample_bin)
 
-        #bin to  5 second bins:
-        #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
-        #df = df.resample('5S')
-        df['t'] = df['t'] /5
-        df['t'] = df['t'].astype(int)
-        df['t'] = df['t'].astype(float)
-        df['t'] = df['t'] *5
-        df = df.groupby(df['t'], axis=0).mean() 
+        #fix cols due to resampling
+        df['laser_state'][df['laser_state'] > 0] = 1
+        df['zx_binary'] = (df['zx'] > 0).values.astype(float)
+        df['ttm'][df['ttm'] > 0] = HEAD
+        df['ttm'][df['ttm'] < 0] = THORAX
+
+        dlaser = np.gradient( (df['laser_state'].values > 0).astype(int) ) > 0
+        t0idx = np.argmax(dlaser)
+        t0 = tb[t0idx-1]
+        df['t'] = tb - t0
+
+        #groupby on float times is slow. make a special align column
+        df['t_align'] = np.array(range(0,len(df))) - t0idx
 
         df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
         df['lasergroup'] = laser
         df['RepID'] = repID
 
-        pooldf = pd.concat([pooldf, df]) 
+        pooldf = pd.concat([pooldf, df])
 
     data = {}
     for gt in gts:
@@ -107,9 +124,9 @@ def run_stats (path, dfs):
             ctrldf, ctrlmean, ctrlstd, ctrln,
             ctrltrpdf, ctrltrpmean, ctrltrpstd, ctrltrpn,
             pooldf) = dfs
- 
-    print type(pooldf), pooldf.shape 
-    p_values = pd.DataFrame()  
+
+    print type(pooldf), pooldf.shape
+    p_values = pd.DataFrame()
     df_ctrl = pooldf[pooldf['Genotype'] == ctrl_trp_genotype]
     df_exp1 = pooldf[pooldf['Genotype'] == EXP_GENOTYPE]
     df_exp2 = pooldf[pooldf['Genotype'] == EXP_GENOTYPE2]
@@ -124,7 +141,7 @@ def run_stats (path, dfs):
     binned_ctrl = pd.cut(df_ctrl['t'], bins, labels= bins[:-1])
     binned_exp1 = pd.cut(df_exp1['t'], bins, labels= bins[:-1])
     binned_exp2 = pd.cut(df_exp2['t'], bins, labels= bins[:-1])
-    for x in binned_ctrl.levels:               
+    for x in binned_ctrl.levels:
         testctrl = df_ctrl['zx'][binned_ctrl == x]
         test1 = df_exp1['zx'][binned_exp1 == x]
         test2 = df_exp2['zx'][binned_exp2 == x]
@@ -157,13 +174,33 @@ def fit_to_curve ( p_values ):
     return (x, y, xPoly, yPoly, polynom)
 
 
+def _do_group(df):
+    xvals = []
+    frac = []
+    for tval, tdf in df.groupby(['t'], as_index=False):
+        print 'tval',tval
+        print tdf
+        xvals.append( tval )
+
+        cum_ind = tdf['cum_wei_this_trial'].values
+        cum = np.sum(cum_ind)
+        tot = len(cum_ind)
+        frac.append( float(cum)/tot )
+    return dict(frac=np.array(frac),
+                t=np.array(xvals))
+
+def plot_cum( ax, frac, label=None):
+    ax.plot( frac, label=label )
+
+
 def plot_data(path, data):
 
     for exp_name in data:
         gts = data[exp_name].keys()
 
         laser = '130ht'
-        figname = laser + '_' + 'vs'.join(gts)
+        gts_string = 'vs'.join(gts)
+        figname = laser + '_' + gts_string
 
         fig = plt.figure("Song (%s)" % figname)
         ax = fig.add_subplot(1,1,1)
@@ -190,9 +227,83 @@ def plot_data(path, data):
                                 std=gtdf['std']['zx'].values,
                                 n=gtdf['n']['zx'].values,
                                 order=order,
+                                df=gtdf,
                                 label=flymad_analysis.human_label(gt),
                                 color=color,
                                 N=len(gtdf['df']['obj_id'].unique()))
+
+        pvalue_buf = ''
+
+        for gt in datasets:
+            label=flymad_analysis.human_label(gt)
+            if '>' not in label:
+                continue
+
+            # OK, this is a Gal4 + UAS - do head vs thorax stats
+            gtdf = data[exp_name][gt]['df']
+
+            # Calculate cumulative wing extension since last laser on.
+            # (This is ugly...)
+            gtdf['cum_wei_this_trial'] = 0
+            gtdf['head_trial'] = 0
+            gtdf['thorax_trial'] = 0
+            obj_ids = gtdf['obj_id'].unique()
+            for obj_id in obj_ids:
+                prev_laser_state = 0
+                cur_cum_this_trial = 0
+                cur_head_trial = 0
+                cur_thorax_trial = 0
+                cur_ttm = 0
+                cur_state = 'none'
+                prev_t = -np.inf
+                for rowi in range(len(gtdf)):
+                    row = gtdf.iloc[rowi]
+                    if row['obj_id'] != obj_id:
+                        continue
+                    assert row['t'] > prev_t
+                    prev_t = row['t']
+                    if prev_laser_state == 0 and row['laser_state']:
+                        # new laser pulse, reset cum
+                        cur_cum_this_trial = 0
+                        if row['ttm'] > 0:
+                            cur_head_trial += 1
+                            cur_state = 'head'
+                        elif row['ttm'] < 0:
+                            cur_thorax_trial += 1
+                            cur_state = 'thorax'
+                    prev_laser_state = row['laser_state']
+                    if row['zx'] > 0:
+                        cur_cum_this_trial = 1
+                    #gtdf['cum_wei_this_trial'] = cur_cum_this_trial
+                    row['cum_wei_this_trial'] = cur_cum_this_trial
+                    if cur_state=='head':
+                        row['head_trial'] = cur_head_trial
+                    elif cur_state=='thorax':
+                        row['thorax_trial'] = cur_thorax_trial
+                    gtdf.iloc[rowi] = row
+
+            fig_cum = plt.figure('cum indx: %s'%label)
+            ax_cum = fig_cum.add_subplot(111)
+            pulse_nums = [1,2,3]
+            this_data = {}
+            for pulse_num in pulse_nums:
+                head_pulse_df = gtdf[ gtdf['head_trial']==pulse_num ]
+                thorax_pulse_df = gtdf[ gtdf['thorax_trial']==pulse_num ]
+
+                this_data['head%d'%pulse_num] = _do_group( head_pulse_df )
+                this_data['thorax%d'%pulse_num] = _do_group( thorax_pulse_df )
+                plot_cum( ax_cum, this_data['head%d'%pulse_num]['frac'], label='head %d'%pulse_num )
+                plot_cum( ax_cum, this_data['thorax%d'%pulse_num]['frac'], label='thorax %d'%pulse_num )
+            ax_cum.legend()
+
+#            for i in range(len(head_times)):
+#                head_values = gtdf[gtdf['t']==head_times[i]]
+#                thorax_values = gtdf[gtdf['t']==thorax_times[i]]
+#                test1 = head_values['zx'].values
+#                test2 = thorax_values['zx'].values
+#                hval, pval = kruskal(test1, test2)
+#                pvalue_buf += 'Pulse %d: Head vs thorax WEI p-value: %.3g (n=%d, %d)\n'%(
+#                    i+1, pval, len(test1), len(test2) )
 
         #all experiments used identical activation times
         headtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
@@ -203,15 +314,17 @@ def plot_data(path, data):
         flymad_plot.plot_timeseries_with_activation(ax,
                     targetbetween=[headtargetbetween,thoraxtargetbetween],
                     sem=True,
+                                                    note=pvalue_buf,
                     **datasets
         )
 
         ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Wing Ext. Index')
-        ax.set_ylim([-0.05,1.0])
-        ax.set_xlim([0,210])
+        ax.set_ylabel('Wing extension index')
+        ax.set_ylim([-0.05,0.4] if gts_string == "40347vswtrpmycvs40347trpmyc" else [-0.05,1.0])
+        ax.set_xlim([-10,180])
 
-        flymad_plot.retick_relabel_axis(ax, [20, 30, 50, 200], [0, 0.5, 1])
+        flymad_plot.retick_relabel_axis(ax, [0, 60, 120, 180],
+                [0, 0.2, 0.4] if gts_string == "40347vswtrpmycvs40347trpmyc" else [0, 0.5, 1])
 
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.svg" % figname), bbox_inches='tight')
@@ -240,24 +353,25 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
-    cache_fname = os.path.join(path,'song_ctrls.madplot-cache')
-    cache_args = (os.path.join(path, 'TRP_ctrls'), CTRLS)
+    bin_size = '5S'
+    cache_fname = os.path.join(path,'song_ctrls_%s.madplot-cache' % bin_size)
+    cache_args = os.path.join(path, 'TRP_ctrls'), CTRLS, bin_size
     cdata = None
     if args.only_plot:
         cdata = madplot.load_bagfile_cache(cache_args, cache_fname)
     if cdata is None:
-        cdata = prepare_data(os.path.join(path, 'TRP_ctrls'), CTRLS)
+        cdata = prepare_data(os.path.join(path, 'TRP_ctrls'), bin_size, CTRLS)
         madplot.save_bagfile_cache(cdata, cache_args, cache_fname)
 
-    cache_fname = os.path.join(path,'song.madplot-cache')
-    cache_args = (path, EXPS)
+    cache_fname = os.path.join(path,'song_%s.madplot-cache' % bin_size)
+    cache_args = path, EXPS, bin_size
     data = None
     if args.only_plot:
         data = madplot.load_bagfile_cache(cache_args, cache_fname)
     if data is None:
         data = {}
         for exp_name in EXPS:
-            data[exp_name] = prepare_data(os.path.join(path, exp_name), EXPS[exp_name]['exp'])
+            data[exp_name] = prepare_data(os.path.join(path, exp_name), bin_size, EXPS[exp_name]['exp'])
         madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
     #share the controls between experiments
@@ -265,7 +379,16 @@ if __name__ == "__main__":
         for ctrl_name in cdata:
             if ctrl_name in EXPS[exp_name]['ctrl']:
                 data[exp_name][ctrl_name] = cdata[ctrl_name]
+    for exp_name in data:
+        gts = data[exp_name].keys()
 
+        fname_prefix = flymad_plot.get_plotpath(path,'csv_song_exp_%s'%exp_name)
+#        madplot.view_pairwise_stats_plotly(data[exp_name], gts,
+#                                           fname_prefix,
+#                                           align_colname='t',
+#                                           stat_colname='zx',
+#                                           layout_title='pvalues: WEI %s'%exp_name,
+#                                           )
     plot_data(path, data)
 
 #    #p_values1, p_values2 = run_stats(path, dfs)
