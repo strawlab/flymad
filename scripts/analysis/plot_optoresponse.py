@@ -400,7 +400,7 @@ def plot_data(arena, path, smoothstr, data):
         if not did_stimulus_plot:
             ax_angular_vel.plot( stim_times,
                                  stim_vel*R2D,flymad_plot.ORANGE,
-                                 lw=2, label='Stimulus')
+                                 lw=2, label='Stimulus', clip_on=False)
             did_stimulus_plot = True
 
         transition_idxs = np.nonzero(abs(stim_vel[1:]-stim_vel[:-1]))[0]
@@ -516,8 +516,9 @@ def plot_data(arena, path, smoothstr, data):
     ax_angular_vel.set_xlabel('Time (s)')
     ax_angular_vel.set_ylabel('Angular velocity (deg/s)')
     ax_angular_vel.set_ylim(-200,200)
-    ax_angular_vel.set_xlim(-10,340)
-    #flymad_plot.retick_relabel_axis(ax_angular_vel, [0,150,300], [-200,0,200])
+    ax_angular_vel.set_xlim(0,300)
+
+    flymad_plot.retick_relabel_axis(ax_angular_vel, [0,150,300], [-200,0,200])
 
     figname = 'optoresponse_ts_angular_vel'
     fig_angular_vel.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
@@ -530,7 +531,7 @@ def plot_data(arena, path, smoothstr, data):
                                      **plot_linear_datasets)
 
     ax_linear_vel.set_ylim([0,40])
-    ax_linear_vel.set_xlim(-10,340)
+    ax_linear_vel.set_xlim(0,300)
 #    ax_linear_vel.spines['bottom'].set_bounds(0,330.0)
 #    ax_linear_vel.spines['bottom'].set_linewidth(0.3)
 #    ax_linear_vel.spines['left'].set_linewidth(0.3)
