@@ -116,6 +116,17 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                 tmp.append( scipy.stats.nanmean(vals) )
             return np.array(tmp)
 
+    def _dn(a,b):
+        nans_a, = np.where(np.isnan(a))
+        nans_b, = np.where(np.isnan(b))
+        nans_all = np.union1d(nans_a, nans_b)
+        n_nans = len(nans_all)
+        if n_nans:
+            print "\tremoving %d nans from plot" % n_nans
+        clean_a = np.delete(a,nans_all)
+        clean_b = np.delete(b,nans_all)
+        return clean_a, clean_b
+
     def _sort_by_order(a,b):
         return cmp(datasets[a].get('order', ORDER_LAST), datasets[b].get('order', ORDER_LAST))
 
@@ -162,13 +173,15 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         else:
             spread = None
 
+        color = exp.get('color',DEFAULT_COLORS.get(data,'k'))
+
         if spread is not None:
             ax.fill_between(exp['xaxis'][::downsample], _ds(exp['value']+spread), _ds(exp['value']-spread),
-                        alpha=0.1, color=exp.get('color',DEFAULT_COLORS.get(data,'k')),
+                        alpha=0.1, color=color,
                         zorder=this_zorder)
 
-        color = exp.get('color',DEFAULT_COLORS.get(data,'k'))
-        ax.plot(exp['xaxis'][::downsample], _ds(exp['value']),
+        x,y = _dn(exp['xaxis'][::downsample], _ds(exp['value']))
+        ax.plot(x,y,
                     color=color,label=label,
                     lw=2,linestyle=linestyle,clip_on=True,
                     marker=marker,markerfacecolor=color,markersize=markersize,markeredgecolor='none',
@@ -228,10 +241,12 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                     grp_yaxis = np.array(group[ycol])
 
                     iax = fig2.add_subplot(gridspec_id)
-                    iax.plot(grp_xaxis[::downsample], _ds(grp_yaxis),
+
+                    print "\tplot",name,xcol,"vs",ycol
+                    x,y = _dn(grp_xaxis[::downsample], _ds(grp_yaxis))
+                    iax.plot(x, y,
                              label=name, color='k')
                     iax.legend(loc=legend_location)
-                    print "\tplot",name,xcol,"vs",ycol
 
 #                    if fb_wherecol:
 #                        _fill_between(iax,
