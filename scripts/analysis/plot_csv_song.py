@@ -29,7 +29,9 @@ HEAD    = +100
 THORAX  = -100
 OFF     = 0
 
-def prepare_data(path, gts):
+EXPERIMENT_DURATION = 200.0
+
+def prepare_data(path, resample_bin, gts):
 
     LASER_THORAX_MAP = {True:THORAX,False:HEAD}
 
@@ -48,6 +50,12 @@ def prepare_data(path, gts):
             print "\tskipping genotype", genotype
             continue
 
+        duration = (df.index[-1] - df.index[0]).total_seconds()
+        if duration < EXPERIMENT_DURATION:
+            print "\tmissing data", csvfilefn
+            continue
+        print "\t%ss experiment" % duration
+
         #make new columns that indicates HEAD/THORAX targeting
         thorax = True
         laser_state = False
@@ -65,17 +73,25 @@ def prepare_data(path, gts):
         trg.append(OFF)
         df['ttm'] = trg
 
-        #don't do any alignment other than starting time at zero. other
-        df['t'] = df['t'].values - df['t'].values[0] # XXX should align to laser on time?
+        #resample into 5S bins
+        df = df.resample(resample_bin, fill_method='ffill')
+        #trim dataframe
+        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION, resample_bin))
+        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION, resample_bin)
+ 
+        #fix cols due to resampling
+        df['laser_state'][df['laser_state'] > 0] = 1
+        df['zx_binary'] = (df['zx'] > 0).values.astype(float)
+        df['ttm'][df['ttm'] > 0] = HEAD
+        df['ttm'][df['ttm'] < 0] = THORAX
 
-        #bin to  5 second bins:
-        #FIXME: this is depressing dan code, lets just set a datetime index and resample properly...
-        #df = df.resample('5S')
-        df['t'] = df['t'] /5
-        df['t'] = df['t'].astype(int)
-        df['t'] = df['t'].astype(float)
-        df['t'] = df['t'] *5
-        df = df.groupby(df['t'], axis=0).mean() 
+        dlaser = np.gradient( (df['laser_state'].values > 0).astype(int) ) > 0
+        t0idx = np.argmax(dlaser)
+        t0 = tb[t0idx-1]
+        df['t'] = tb - t0
+ 
+        #groupby on float times is slow. make a special align column 
+        df['t_align'] = np.array(range(0,len(df))) - t0idx
 
         df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
@@ -198,6 +214,7 @@ def plot_data(path, data):
 
         pvalue_buf = ''
 
+        #FIXME
         head_times =   [35,  95, 155]
         thorax_times = [65, 125, 185]
         for gt in datasets:
@@ -208,14 +225,14 @@ def plot_data(path, data):
             # OK, this is a Gal4 + UAS - do head vs thorax stats
             gtdf = data[exp_name][gt]['df']
 
-            for i in range(len(head_times)):
-                head_values = gtdf[gtdf['t']==head_times[i]]
-                thorax_values = gtdf[gtdf['t']==thorax_times[i]]
-                test1 = head_values['zx'].values
-                test2 = thorax_values['zx'].values
-                hval, pval = kruskal(test1, test2)
-                pvalue_buf += 'Pulse %d: Head vs thorax WEI p-value: %.3g (n=%d, %d)\n'%(
-                    i+1, pval, len(test1), len(test2) )
+#            for i in range(len(head_times)):
+#                head_values = gtdf[gtdf['t']==head_times[i]]
+#                thorax_values = gtdf[gtdf['t']==thorax_times[i]]
+#                test1 = head_values['zx'].values
+#                test2 = thorax_values['zx'].values
+#                hval, pval = kruskal(test1, test2)
+#                pvalue_buf += 'Pulse %d: Head vs thorax WEI p-value: %.3g (n=%d, %d)\n'%(
+#                    i+1, pval, len(test1), len(test2) )
 
         #all experiments used identical activation times
         headtargetbetween = dict(xaxis=data['pIP10']['wtrpmyc']['first']['t'].values,
@@ -231,11 +248,11 @@ def plot_data(path, data):
         )
 
         ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Wing Ext. Index')
+        ax.set_ylabel('Wing extension index')
         ax.set_ylim([-0.05,1.0])
-        ax.set_xlim([0,210])
+        ax.set_xlim([-10,180])
 
-        flymad_plot.retick_relabel_axis(ax, [20, 30, 50, 200], [0, 0.5, 1])
+        flymad_plot.retick_relabel_axis(ax, [0, 60, 120, 180], [0, 0.5, 1])
 
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.svg" % figname), bbox_inches='tight')
@@ -264,24 +281,25 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
-    cache_fname = os.path.join(path,'song_ctrls.madplot-cache')
-    cache_args = (os.path.join(path, 'TRP_ctrls'), CTRLS)
+    bin_size = '5S'
+    cache_fname = os.path.join(path,'song_ctrls_%s.madplot-cache' % bin_size)
+    cache_args = os.path.join(path, 'TRP_ctrls'), CTRLS, bin_size
     cdata = None
     if args.only_plot:
         cdata = madplot.load_bagfile_cache(cache_args, cache_fname)
     if cdata is None:
-        cdata = prepare_data(os.path.join(path, 'TRP_ctrls'), CTRLS)
+        cdata = prepare_data(os.path.join(path, 'TRP_ctrls'), bin_size, CTRLS)
         madplot.save_bagfile_cache(cdata, cache_args, cache_fname)
 
-    cache_fname = os.path.join(path,'song.madplot-cache')
-    cache_args = (path, EXPS)
+    cache_fname = os.path.join(path,'song_%s.madplot-cache' % bin_size)
+    cache_args = path, EXPS, bin_size
     data = None
     if args.only_plot:
         data = madplot.load_bagfile_cache(cache_args, cache_fname)
     if data is None:
         data = {}
         for exp_name in EXPS:
-            data[exp_name] = prepare_data(os.path.join(path, exp_name), EXPS[exp_name]['exp'])
+            data[exp_name] = prepare_data(os.path.join(path, exp_name), bin_size, EXPS[exp_name]['exp'])
         madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
     #share the controls between experiments
@@ -293,12 +311,12 @@ if __name__ == "__main__":
         gts = data[exp_name].keys()
 
         fname_prefix = flymad_plot.get_plotpath(path,'csv_song_exp_%s'%exp_name)
-        madplot.view_pairwise_stats_plotly(data[exp_name], gts,
-                                           fname_prefix,
-                                           align_colname='t',
-                                           stat_colname='zx',
-                                           layout_title='pvalues: WEI %s'%exp_name,
-                                           )
+#        madplot.view_pairwise_stats_plotly(data[exp_name], gts,
+#                                           fname_prefix,
+#                                           align_colname='t',
+#                                           stat_colname='zx',
+#                                           layout_title='pvalues: WEI %s'%exp_name,
+#                                           )
     plot_data(path, data)
 
 #    #p_values1, p_values2 = run_stats(path, dfs)
