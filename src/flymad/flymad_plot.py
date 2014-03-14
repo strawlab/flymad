@@ -183,7 +183,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         x,y = _dn(exp['xaxis'][::downsample], _ds(exp['value']))
         ax.plot(x,y,
                     color=color,label=label,
-                    lw=2,linestyle=linestyle,clip_on=True,
+                    lw=2,linestyle=linestyle,clip_on=exp.get('clip_on',True),
                     marker=marker,markerfacecolor=color,markersize=markersize,markeredgecolor='none',
                     zorder=this_zorder+1)
 
