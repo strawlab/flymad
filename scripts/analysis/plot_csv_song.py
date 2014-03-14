@@ -8,6 +8,8 @@ import glob
 import pickle
 import re
 import collections
+import lifelines # http://lifelines.readthedocs.org, developed with v 0.2.3.0.7
+from lifelines.statistics import logrank_test, pairwise_logrank_test
 
 import numpy as np
 import pandas as pd
@@ -21,6 +23,7 @@ import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
 import madplot
+from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
@@ -30,11 +33,21 @@ HEAD    = -100
 THORAX  = +100
 OFF     = 0
 
-COLORS = {HEAD:'k',
-          THORAX:'b',
+COLORS = {HEAD:flymad_plot.RED,
+          THORAX:flymad_plot.ORANGE,
           }
 
 EXPERIMENT_DURATION = 200.0
+
+def p2stars(pval):
+    result = ''
+    if pval < 0.05:
+        result = '*'
+    if pval < 0.01:
+        result = '**'
+    if pval < 0.001:
+        result = '***'
+    return result
 
 def prepare_data(path, resample_bin, gts):
 
@@ -123,6 +136,34 @@ def prepare_data(path, resample_bin, gts):
 
     return data
 
+def _update_latencies(df, sdx_e, sdx_g, sdx_c, name):
+    # copy inputs
+    sdx_e = sdx_e[:]
+    sdx_g = sdx_g[:]
+    sdx_c = sdx_c[:]
+
+    VALID = True
+    INVALID = False
+
+    for obj_id, odf in df.groupby(['obj_id']):
+        t0 = None
+        found = False
+        for tval, tdf in odf.groupby(['t']):
+            if t0 is None:
+                t0 = tval
+            pulse_t = tval-t0 # time within current pulse
+            if tdf['zx']>0:
+                found = True
+                sdx_e.append( pulse_t )
+                sdx_g.append( name )
+                sdx_c.append( VALID )
+                break
+        if not found:
+            sdx_e.append( 1000.0 )
+            sdx_g.append( name )
+            sdx_c.append( INVALID )
+    return sdx_e, sdx_g, sdx_c
+
 def _do_group(df):
     t = []
     pulse_t = []
@@ -189,7 +230,118 @@ def combine_cum_data(list_of_dicts):
                 cum=np.array(cum),
                 n=np.array(n))
 
+def do_cum_incidence(gtdf,label):
+    # Calculate cumulative wing extension since last laser on.
+    # (This is ugly...)
+
+    gtdf['cum_wei_this_trial'] = 0
+    gtdf['head_trial'] = 0
+    gtdf['thorax_trial'] = 0
+    obj_ids = gtdf['obj_id'].unique()
+    for obj_id in obj_ids:
+        prev_laser_state = 0
+        cur_cum_this_trial = 0
+        cur_head_trial = 0
+        cur_thorax_trial = 0
+        cur_ttm = 0
+        cur_state = 'none'
+        prev_t = -np.inf
+        for rowi in range(len(gtdf)):
+            row = gtdf.iloc[rowi]
+            if row['obj_id'] != obj_id:
+                continue
+            assert row['t'] > prev_t
+            prev_t = row['t']
+            if prev_laser_state == 0 and row['laser_state']:
+                # new laser pulse, reset cum
+                cur_cum_this_trial = 0
+                if row['ttm'] < 0:
+                    cur_head_trial += 1
+                    cur_state = 'head'
+                elif row['ttm'] > 0:
+                    cur_thorax_trial += 1
+                    cur_state = 'thorax'
+            prev_laser_state = row['laser_state']
+            if row['zx'] > 0:
+                cur_cum_this_trial = 1
+            #gtdf['cum_wei_this_trial'] = cur_cum_this_trial
+            row['cum_wei_this_trial'] = cur_cum_this_trial
+            if cur_state=='head':
+                row['head_trial'] = cur_head_trial
+            elif cur_state=='thorax':
+                row['thorax_trial'] = cur_thorax_trial
+            gtdf.iloc[rowi] = row
+
+    fig_cum = plt.figure('cum indx: %s'%label)
+    ax_cum = fig_cum.add_subplot(111)
+    pulse_nums = [1,2,3]
+    this_data = {}
+    head_data = []
+    thorax_data = []
+
+    sdx_e = []
+    sdx_g = []
+    sdx_c = []
+
+    for pulse_num in pulse_nums:
+        head_pulse_df = gtdf[ gtdf['head_trial']==pulse_num ]
+        thorax_pulse_df = gtdf[ gtdf['thorax_trial']==pulse_num ]
+
+        h = _do_group( head_pulse_df )
+        t = _do_group( thorax_pulse_df )
+        sdx_e, sdx_g, sdx_c = _update_latencies( head_pulse_df,sdx_e, sdx_g, sdx_c,'head')
+        sdx_e, sdx_g, sdx_c = _update_latencies( thorax_pulse_df,sdx_e, sdx_g, sdx_c,'thorax')
+        this_data['head%d'%pulse_num] = h
+        this_data['thorax%d'%pulse_num] = t
+        head_data.append( h )
+        thorax_data.append( t )
+        plot_cum( ax_cum, h, #label='head %d'%pulse_num,
+                  lw=0.5, color=COLORS[HEAD])
+        plot_cum( ax_cum, t, #label='thorax %d'%pulse_num,
+                  lw=0.5, color=COLORS[THORAX])
+    all_head_data = combine_cum_data( head_data )
+    all_thorax_data = combine_cum_data( thorax_data )
+    plot_cum( ax_cum, all_head_data, label='head',
+              lw=2, color=COLORS[HEAD])
+    plot_cum( ax_cum, all_thorax_data, label='thorax',
+              lw=2, color=COLORS[THORAX])
+    ax_cum.legend()
+    ax_cum.set_ylabel('Fraction extending wing (%)')
+    ax_cum.set_xlabel('Time (s)')
+
+
+    sdx_e = np.array(sdx_e)
+    sdx_g = np.array(sdx_g)
+    sdx_c = np.array(sdx_c)
+
+    buf = ''
+    alpha = 0.95
+    try:
+        S,P,T = pairwise_logrank_test( sdx_e, sdx_g, sdx_c, alpha=alpha )
+    except np.linalg.linalg.LinAlgError:
+        buf += 'numerical errors computing logrank test'
+    else:
+        buf += '<h1>%s</h1>\n'%label
+        buf += '<h2>pairwise logrank test</h2>\n'
+        buf += '  analyses done using the <a href="http://lifelines.readthedocs.org">lifelines</a> library\n'
+        buf += P._repr_html_()
+        buf += '<h3>significant at alpha=%s?</h3>\n'%alpha
+        buf += T._repr_html_()
+
+    n_head   = len([x for x in sdx_g if x=='head'])
+    n_thorax = len([x for x in sdx_g if x=='thorax'])
+    p_value = P['head']['thorax']
+
+    return {'fig':fig_cum,
+            'ax':ax_cum,
+            'n_head':n_head,
+            'n_thorax':n_thorax,
+            'p_value':p_value,
+            'buf':buf,
+            }
+
 def plot_data(path, data):
+    ci_html_buf = ''
 
     for exp_name in data:
         gts = data[exp_name].keys()
@@ -237,76 +389,31 @@ def plot_data(path, data):
 
             # OK, this is a Gal4 + UAS - do head vs thorax stats
             gtdf = data[exp_name][gt]['df']
+            ci_data = do_cum_incidence(gtdf, label)
+            ci_html_buf += ci_data['buf']
 
-            # Calculate cumulative wing extension since last laser on.
-            # (This is ugly...)
-            gtdf['cum_wei_this_trial'] = 0
-            gtdf['head_trial'] = 0
-            gtdf['thorax_trial'] = 0
-            obj_ids = gtdf['obj_id'].unique()
-            for obj_id in obj_ids:
-                prev_laser_state = 0
-                cur_cum_this_trial = 0
-                cur_head_trial = 0
-                cur_thorax_trial = 0
-                cur_ttm = 0
-                cur_state = 'none'
-                prev_t = -np.inf
-                for rowi in range(len(gtdf)):
-                    row = gtdf.iloc[rowi]
-                    if row['obj_id'] != obj_id:
-                        continue
-                    assert row['t'] > prev_t
-                    prev_t = row['t']
-                    if prev_laser_state == 0 and row['laser_state']:
-                        # new laser pulse, reset cum
-                        cur_cum_this_trial = 0
-                        if row['ttm'] < 0:
-                            cur_head_trial += 1
-                            cur_state = 'head'
-                        elif row['ttm'] > 0:
-                            cur_thorax_trial += 1
-                            cur_state = 'thorax'
-                    prev_laser_state = row['laser_state']
-                    if row['zx'] > 0:
-                        cur_cum_this_trial = 1
-                    #gtdf['cum_wei_this_trial'] = cur_cum_this_trial
-                    row['cum_wei_this_trial'] = cur_cum_this_trial
-                    if cur_state=='head':
-                        row['head_trial'] = cur_head_trial
-                    elif cur_state=='thorax':
-                        row['thorax_trial'] = cur_thorax_trial
-                    gtdf.iloc[rowi] = row
+            ax_cum = ci_data['ax']
+            spine_placer(ax_cum, location='left,bottom' )
 
-            fig_cum = plt.figure('cum indx: %s'%label)
-            ax_cum = fig_cum.add_subplot(111)
-            pulse_nums = [1,2,3]
-            this_data = {}
-            head_data = []
-            thorax_data = []
-            for pulse_num in pulse_nums:
-                head_pulse_df = gtdf[ gtdf['head_trial']==pulse_num ]
-                thorax_pulse_df = gtdf[ gtdf['thorax_trial']==pulse_num ]
+            note = '%s\n%s\np-value: %.3g\n%d flies\nn=%d, %d'%(label,
+                                                                p2stars(ci_data['p_value']),
+                                                            ci_data['p_value'],
+                                                            len(gtdf['obj_id'].unique()),
+                                                            ci_data['n_head'],
+                                                            ci_data['n_thorax'])
+            ax_cum.text(0, 1, #top left
+                        note,
+                        fontsize=10,
+                        horizontalalignment='left',
+                        verticalalignment='top',
+                        transform=ax_cum.transAxes,
+                        zorder=0)
 
-                h = _do_group( head_pulse_df )
-                t = _do_group( thorax_pulse_df )
-                this_data['head%d'%pulse_num] = h
-                this_data['thorax%d'%pulse_num] = t
-                head_data.append( h )
-                thorax_data.append( t )
-                plot_cum( ax_cum, h, #label='head %d'%pulse_num,
-                          lw=0.5, color=COLORS[HEAD])
-                plot_cum( ax_cum, t, #label='thorax %d'%pulse_num,
-                          lw=0.5, color=COLORS[THORAX])
-            all_head_data = combine_cum_data( head_data )
-            all_thorax_data = combine_cum_data( thorax_data )
-            plot_cum( ax_cum, all_head_data, label='head',
-                      lw=2, color=COLORS[HEAD])
-            plot_cum( ax_cum, all_thorax_data, label='thorax',
-                      lw=2, color=COLORS[THORAX])
-            ax_cum.legend()
-            ax_cum.set_ylabel('Cumulative incidence of wing extension (%)')
-            ax_cum.set_xlabel('')
+            ci_data['fig'].savefig(flymad_plot.get_plotpath(path,"song_cum_inc_%s.png" % figname),
+                                    bbox_inches='tight')
+            ci_data['fig'].savefig(flymad_plot.get_plotpath(path,"song_cum_inc_%s.svg" % figname),
+                                    bbox_inches='tight')
+
 
 #            for i in range(len(head_times)):
 #                head_values = gtdf[gtdf['t']==head_times[i]]
@@ -340,6 +447,9 @@ def plot_data(path, data):
 
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.png" % figname), bbox_inches='tight')
         fig.savefig(flymad_plot.get_plotpath(path,"song_%s.svg" % figname), bbox_inches='tight')
+
+    with open(flymad_plot.get_plotpath(path,"song_cum_in.html"),mode='w') as fd:
+        fd.write(ci_html_buf)
 
 if __name__ == "__main__":
     EXPS = {
