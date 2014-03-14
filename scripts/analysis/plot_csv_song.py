@@ -78,7 +78,7 @@ def prepare_data(path, resample_bin, gts):
         #trim dataframe
         df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION, resample_bin))
         tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION, resample_bin)
- 
+
         #fix cols due to resampling
         df['laser_state'][df['laser_state'] > 0] = 1
         df['zx_binary'] = (df['zx'] > 0).values.astype(float)
@@ -89,8 +89,8 @@ def prepare_data(path, resample_bin, gts):
         t0idx = np.argmax(dlaser)
         t0 = tb[t0idx-1]
         df['t'] = tb - t0
- 
-        #groupby on float times is slow. make a special align column 
+
+        #groupby on float times is slow. make a special align column
         df['t_align'] = np.array(range(0,len(df))) - t0idx
 
         df['obj_id'] = flymad_analysis.create_object_id(date,time)
@@ -98,7 +98,7 @@ def prepare_data(path, resample_bin, gts):
         df['lasergroup'] = laser
         df['RepID'] = repID
 
-        pooldf = pd.concat([pooldf, df]) 
+        pooldf = pd.concat([pooldf, df])
 
     data = {}
     for gt in gts:
@@ -124,9 +124,9 @@ def run_stats (path, dfs):
             ctrldf, ctrlmean, ctrlstd, ctrln,
             ctrltrpdf, ctrltrpmean, ctrltrpstd, ctrltrpn,
             pooldf) = dfs
- 
-    print type(pooldf), pooldf.shape 
-    p_values = pd.DataFrame()  
+
+    print type(pooldf), pooldf.shape
+    p_values = pd.DataFrame()
     df_ctrl = pooldf[pooldf['Genotype'] == ctrl_trp_genotype]
     df_exp1 = pooldf[pooldf['Genotype'] == EXP_GENOTYPE]
     df_exp2 = pooldf[pooldf['Genotype'] == EXP_GENOTYPE2]
@@ -141,7 +141,7 @@ def run_stats (path, dfs):
     binned_ctrl = pd.cut(df_ctrl['t'], bins, labels= bins[:-1])
     binned_exp1 = pd.cut(df_exp1['t'], bins, labels= bins[:-1])
     binned_exp2 = pd.cut(df_exp2['t'], bins, labels= bins[:-1])
-    for x in binned_ctrl.levels:               
+    for x in binned_ctrl.levels:
         testctrl = df_ctrl['zx'][binned_ctrl == x]
         test1 = df_exp1['zx'][binned_exp1 == x]
         test2 = df_exp2['zx'][binned_exp2 == x]
