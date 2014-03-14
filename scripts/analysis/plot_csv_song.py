@@ -306,9 +306,6 @@ def do_cum_incidence(gtdf,label):
     plot_cum( ax_cum, all_thorax_data, label='thorax',
               lw=2, color=COLORS[THORAX])
     ax_cum.legend()
-    ax_cum.set_ylabel('Fraction extending wing (%)')
-    ax_cum.set_xlabel('Time (s)')
-
 
     sdx_e = np.array(sdx_e)
     sdx_g = np.array(sdx_g)
@@ -394,6 +391,9 @@ def plot_data(path, data):
 
             ax_cum = ci_data['ax']
             spine_placer(ax_cum, location='left,bottom' )
+
+            ax_cum.set_ylabel('Fraction extending wing (%)')
+            ax_cum.set_xlabel('Time since pulse onset (s)')
 
             note = '%s\n%s\np-value: %.3g\n%d flies\nn=%d, %d'%(label,
                                                                 p2stars(ci_data['p_value']),
