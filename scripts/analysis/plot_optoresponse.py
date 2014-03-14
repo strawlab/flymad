@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+import os
+if 'DISPLAY' not in os.environ:
+    import matplotlib
+    matplotlib.use('Agg')
+
 import re
 import warnings
 import os.path
@@ -9,17 +14,21 @@ import datetime
 import math
 import cPickle as pickle
 
+import roslib; roslib.load_manifest('flymad')
+import rosbag
+import madplot
+import flymad.flymad_plot as flymad_plot
+import flymad.flymad_analysis_dan as flymad_analysis
+
 import pandas as pd
 import numpy as np
 import matplotlib
 import matplotlib.transforms as mtransforms
-import strawlab_mpl.defaults as smd
+import matplotlib.pyplot as plt
+
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
 from pairs2groups import label_homogeneous_groups, label_homogeneous_groups_pandas # github.com/astraw/pairs2groups
-
-import roslib; roslib.load_manifest('flymad')
-import rosbag
 
 import scipy.signal
 import scipy.stats
@@ -28,15 +37,15 @@ import scipy.interpolate
 R2D = 180/np.pi
 CACHE_FNAME = 'optodata.pkl'
 
-def setup_defaults():
-    rcParams = matplotlib.rcParams
+#def setup_defaults():
+#    rcParams = matplotlib.rcParams
 
-    rcParams['legend.numpoints'] = 1
-    rcParams['legend.fontsize'] = 'medium' #same as axis
-    rcParams['legend.frameon'] = False
-    rcParams['legend.numpoints'] = 1
-    rcParams['legend.scatterpoints'] = 1
-    matplotlib.rc('font', size=8)
+#    rcParams['legend.numpoints'] = 1
+#    rcParams['legend.fontsize'] = 'medium' #same as axis
+#    rcParams['legend.frameon'] = False
+#    rcParams['legend.numpoints'] = 1
+#    rcParams['legend.scatterpoints'] = 1
+#    matplotlib.rc('font', size=8)
 
 def wrap_dtheta_plus_minus(dtheta, around=np.pi):
     """
@@ -208,9 +217,6 @@ def supplement_angles(df,
 
 
 def prepare_data(arena, path, smoothstr, smooth):
-    # keep here to allow use('Agg') to work
-    import matplotlib.pyplot as plt
-    import madplot
 
     path = os.path.abspath(path)
     print 'opening bag files in %r'%path
@@ -328,13 +334,14 @@ def prepare_data(arena, path, smoothstr, smooth):
     return data
 
 def plot_data(arena, path, smoothstr, data):
-    import matplotlib.pyplot as plt
 
-    COLORS = {"NINE":"r",
-              "CSSHITS":"g",
-              "NINGal4":"b",
-              'pooled controls':'k'
+    COLORS = {"NINE":flymad_plot.RED,
+              "CSSHITS":flymad_plot.BLUE,
+              "NINGal4":flymad_plot.GREEN,
+              'pooled controls':flymad_plot.BLACK,
               }
+    ORDERS = {"NINE":1,"pooled controls":2,"NINGal4":3,"CSSHITS":4}
+    LABELS = {"NINE":"NINE>ShiTS","pooled controls":"Controls","NINGal4":"Gal4-control","CSSHITS":"ShiTS-control"}
 
     # ---- pool controls ------------
     data['pooled controls'] = copy.deepcopy(data['CSSHITS'])
@@ -356,8 +363,8 @@ def plot_data(arena, path, smoothstr, data):
 
     # ----- raw timeseries plots ------------
 
-    fig_angular_vel = plt.figure(figsize=(3.5, 2.0))
-    fig_linear_vel = plt.figure(figsize=(3.5, 2.0))
+    fig_angular_vel = plt.figure()
+    fig_linear_vel = plt.figure()
 
     fig_summary_angular = plt.figure()
     ax_summary_angular = fig_summary_angular.add_subplot(211)
@@ -369,7 +376,6 @@ def plot_data(arena, path, smoothstr, data):
     n_subplots = len(order)
     ax = None
     ax_angular_vel = fig_angular_vel.add_subplot(111)
-    ax_angular_vel.axhline(0,color='black')
     ax_linear_vel = fig_linear_vel.add_subplot(111)
 
     did_stimulus_plot = False
@@ -393,8 +399,8 @@ def plot_data(arena, path, smoothstr, data):
 
         if not did_stimulus_plot:
             ax_angular_vel.plot( stim_times,
-                                 stim_vel*R2D,'k',
-                                 lw=0.5, label='stimulus')
+                                 stim_vel*R2D,flymad_plot.ORANGE,
+                                 lw=2, label='Stimulus')
             did_stimulus_plot = True
 
         transition_idxs = np.nonzero(abs(stim_vel[1:]-stim_vel[:-1]))[0]
@@ -484,68 +490,58 @@ def plot_data(arena, path, smoothstr, data):
                                  'std':error_angular_timeseries*R2D,
                                  'label':gt,
                                  'color':COLORS[gt],
+                                 'label':LABELS[gt],
+                                 'order':ORDERS[gt],
                                  }
         this_data_linear_vel = {'xaxis':times,
                                 'value':mean_linear_timeseries,
                                 'std':error_linear_timeseries,
                                 'label':gt,
                                 'color':COLORS[gt],
+                                'label':LABELS[gt],
+                                'order':ORDERS[gt],
                                 }
         plot_angular_datasets[gt]=this_data_angular_vel
         plot_linear_datasets[gt]=this_data_linear_vel
 
-    from flymad.flymad_plot import plot_timeseries_with_activation
     tb = {'xaxis':data['pooled controls']['save_times'],
           'where':data['pooled controls']['laser_power']>1,
           }
-    plot_timeseries_with_activation( ax_angular_vel,
+    flymad_plot.plot_timeseries_with_activation(
+                                     ax_angular_vel,
                                      downsample=2,
                                      targetbetween=[tb],
                                      **plot_angular_datasets)
-    ax_angular_vel.set_xticks([0,150,300])
-    ax_angular_vel.set_yticks([-200,0,200])
-    ax_angular_vel.set_ylim(-200,200)
-    ax_angular_vel.spines['left'].set_bounds(-200,200.0)
-    ax_angular_vel.spines['bottom'].set_bounds(0,330.0)
-    ax_angular_vel.spines['bottom'].set_linewidth(0.3)
-    ax_angular_vel.spines['left'].set_linewidth(0.3)
+    ax_angular_vel.axhline(0,color='black')
     ax_angular_vel.set_xlabel('Time (s)')
     ax_angular_vel.set_ylabel('Angular velocity (deg/s)')
-    fig_angular_vel.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
-    fig_fname = 'fig_ts_angular_vel.png'
-    fig_angular_vel.savefig(fig_fname)
-    print 'saved',fig_fname
-    fig_fname = 'fig_ts_angular_vel.svg'
-    fig_angular_vel.savefig(fig_fname)
-    print 'saved',fig_fname
-    fig_fname = 'fig_ts_angular_vel.pdf'
-    fig_angular_vel.savefig(fig_fname)
-    print 'saved',fig_fname
+    ax_angular_vel.set_ylim(-200,200)
+    ax_angular_vel.set_xlim(-10,340)
+    #flymad_plot.retick_relabel_axis(ax_angular_vel, [0,150,300], [-200,0,200])
 
+    figname = 'optoresponse_ts_angular_vel'
+    fig_angular_vel.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+    fig_angular_vel.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
-
-    plot_timeseries_with_activation( ax_linear_vel,
+    flymad_plot.plot_timeseries_with_activation(
+                                     ax_linear_vel,
                                      targetbetween=[tb],
                                      downsample=3,
                                      **plot_linear_datasets)
-    ax_linear_vel.set_xticks([0,150,300])
-    ax_linear_vel.set_yticks([0,20,40])
+
     ax_linear_vel.set_ylim([0,40])
-    ax_linear_vel.spines['bottom'].set_bounds(0,330.0)
-    ax_linear_vel.spines['bottom'].set_linewidth(0.3)
-    ax_linear_vel.spines['left'].set_linewidth(0.3)
+    ax_linear_vel.set_xlim(-10,340)
+#    ax_linear_vel.spines['bottom'].set_bounds(0,330.0)
+#    ax_linear_vel.spines['bottom'].set_linewidth(0.3)
+#    ax_linear_vel.spines['left'].set_linewidth(0.3)
     ax_linear_vel.set_xlabel('Time (s)')
-    ax_linear_vel.set_ylabel('Velocity (mm/s)')
-    fig_linear_vel.subplots_adjust(left=0.2,bottom=0.23) # do not clip text
-    fig_fname = 'fig_ts_linear_vel.png'
-    fig_linear_vel.savefig(fig_fname)
-    print 'saved',fig_fname
-    fig_fname = 'fig_ts_linear_vel.svg'
-    fig_linear_vel.savefig(fig_fname)
-    print 'saved',fig_fname
-    fig_fname = 'fig_ts_linear_vel.pdf'
-    fig_linear_vel.savefig(fig_fname)
-    print 'saved',fig_fname
+    ax_linear_vel.set_ylabel('Velocity (%s/s)' % arena.unit)
+
+    flymad_plot.retick_relabel_axis(ax_linear_vel, [0,150,300], [0,20,40])
+
+    figname = 'optoresponse_ts_linear_vel'
+    fig_linear_vel.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+    fig_linear_vel.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
     if 1:
 
@@ -735,13 +731,6 @@ if __name__ == "__main__":
     parser.add_argument('--no-smooth', action='store_false', dest='smooth', default=True)
 
     args = parser.parse_args()
-
-    if not args.show:
-        matplotlib.use('Agg')
-
-    smd.setup_defaults()
-    setup_defaults()
-
     path = os.path.abspath(args.path[0])
 
     print 'bagfiles in',path
@@ -749,7 +738,6 @@ if __name__ == "__main__":
 
     smoothstr = '%s' % {True:'smooth',False:'nosmooth'}[args.smooth]
 
-    import madplot # keep here to allow use('Agg') to work
     arena = madplot.Arena('mm')
 
     if args.only_plot:
@@ -762,5 +750,5 @@ if __name__ == "__main__":
     plot_data(arena, path, smoothstr, data)
 
     if args.show:
-        import matplotlib.pyplot as plt # keep here to allow use('Agg') to work
         plt.show()
+
