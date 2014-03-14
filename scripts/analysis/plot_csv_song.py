@@ -7,6 +7,7 @@ import argparse
 import glob
 import pickle
 import re
+import collections
 
 import numpy as np
 import pandas as pd
@@ -28,6 +29,10 @@ assert pd.version.version in ("0.11.0", "0.12.0")
 HEAD    = +100
 THORAX  = -100
 OFF     = 0
+
+COLORS = {HEAD:'k',
+          THORAX:'b',
+          }
 
 EXPERIMENT_DURATION = 200.0
 
@@ -175,23 +180,70 @@ def fit_to_curve ( p_values ):
 
 
 def _do_group(df):
-    xvals = []
+    t = []
+    pulse_t = []
+    all_cum = []
+    all_n = []
     frac = []
+    t0 = None
     for tval, tdf in df.groupby(['t'], as_index=False):
-        print 'tval',tval
-        print tdf
-        xvals.append( tval )
+        t.append( tval )
+        if t0 is None:
+            t0 = tval
+        pulse_t.append( tval-t0 )
 
         cum_ind = tdf['cum_wei_this_trial'].values
         cum = np.sum(cum_ind)
-        tot = len(cum_ind)
-        frac.append( float(cum)/tot )
+        n = len(cum_ind)
+        all_cum.append( cum )
+        all_n.append( n)
+        frac.append( float(cum)/n )
     return dict(frac=np.array(frac),
-                t=np.array(xvals))
+                pulse_t=np.array(pulse_t),
+                cum=np.array(all_cum),
+                n=np.array(all_n),
+                t=np.array(t))
 
-def plot_cum( ax, frac, label=None):
-    ax.plot( frac, label=label )
+def plot_cum( ax, data, **kw):
+    t = data['pulse_t']
+    frac = data['frac']
 
+    xs = [0]
+    ys = [0]
+    for i in range(len(t)-1):
+        xs.append( t[i] )
+        ys.append( frac[i] )
+
+        xs.append( t[i+1] )
+        ys.append( frac[i] )
+    ax.plot( xs, 100.0*np.array(ys), **kw )
+
+def combine_cum_data(list_of_dicts):
+    cum_by_pulse_t = collections.defaultdict(list)
+    n_by_pulse_t = collections.defaultdict(list)
+    for this_dict in list_of_dicts:
+        pulse_t = this_dict['pulse_t']
+        cum = this_dict['cum']
+        n = this_dict['n']
+        for i in range(len(pulse_t)):
+            pulse_t[i]
+            cum[i]
+            n[i]
+            cum_by_pulse_t[pulse_t[i]].append( cum[i] )
+            n_by_pulse_t[pulse_t[i]].append( n[i] )
+    pulse_ts = cum_by_pulse_t.keys()
+    pulse_ts.sort()
+    cum = []
+    n = []
+    frac = []
+    for i in range(len(pulse_ts)):
+        cum.append( np.sum(cum_by_pulse_t[ pulse_ts[i] ] ))
+        n.append( np.sum(n_by_pulse_t[ pulse_ts[i] ] ))
+        frac.append( float(cum[-1]) / n[-1] )
+    return dict(frac=np.array(frac),
+                pulse_t=np.array(pulse_t),
+                cum=np.array(cum),
+                n=np.array(n))
 
 def plot_data(path, data):
 
@@ -286,15 +338,31 @@ def plot_data(path, data):
             ax_cum = fig_cum.add_subplot(111)
             pulse_nums = [1,2,3]
             this_data = {}
+            head_data = []
+            thorax_data = []
             for pulse_num in pulse_nums:
                 head_pulse_df = gtdf[ gtdf['head_trial']==pulse_num ]
                 thorax_pulse_df = gtdf[ gtdf['thorax_trial']==pulse_num ]
 
-                this_data['head%d'%pulse_num] = _do_group( head_pulse_df )
-                this_data['thorax%d'%pulse_num] = _do_group( thorax_pulse_df )
-                plot_cum( ax_cum, this_data['head%d'%pulse_num]['frac'], label='head %d'%pulse_num )
-                plot_cum( ax_cum, this_data['thorax%d'%pulse_num]['frac'], label='thorax %d'%pulse_num )
+                h = _do_group( head_pulse_df )
+                t = _do_group( thorax_pulse_df )
+                this_data['head%d'%pulse_num] = h
+                this_data['thorax%d'%pulse_num] = t
+                head_data.append( h )
+                thorax_data.append( t )
+                plot_cum( ax_cum, h, #label='head %d'%pulse_num,
+                          lw=0.5, color=COLORS[HEAD])
+                plot_cum( ax_cum, t, #label='thorax %d'%pulse_num,
+                          lw=0.5, color=COLORS[THORAX])
+            all_head_data = combine_cum_data( head_data )
+            all_thorax_data = combine_cum_data( thorax_data )
+            plot_cum( ax_cum, all_head_data, label='head',
+                      lw=2, color=COLORS[HEAD])
+            plot_cum( ax_cum, all_thorax_data, label='thorax',
+                      lw=2, color=COLORS[THORAX])
             ax_cum.legend()
+            ax_cum.set_ylabel('Cumulative incidence of wing extension (%)')
+            ax_cum.set_xlabel('')
 
 #            for i in range(len(head_times)):
 #                head_values = gtdf[gtdf['t']==head_times[i]]
@@ -353,7 +421,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     path = args.path[0]
 
-    bin_size = '5S'
+    bin_size = '1S'
     cache_fname = os.path.join(path,'song_ctrls_%s.madplot-cache' % bin_size)
     cache_args = os.path.join(path, 'TRP_ctrls'), CTRLS, bin_size
     cdata = None
