@@ -26,8 +26,8 @@ import madplot
 assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.version.version in ("0.11.0", "0.12.0")
 
-HEAD    = +100
-THORAX  = -100
+HEAD    = -100
+THORAX  = +100
 OFF     = 0
 
 COLORS = {HEAD:'k',
@@ -87,8 +87,8 @@ def prepare_data(path, resample_bin, gts):
         #fix cols due to resampling
         df['laser_state'][df['laser_state'] > 0] = 1
         df['zx_binary'] = (df['zx'] > 0).values.astype(float)
-        df['ttm'][df['ttm'] > 0] = HEAD
-        df['ttm'][df['ttm'] < 0] = THORAX
+        df['ttm'][df['ttm'] < 0] = HEAD
+        df['ttm'][df['ttm'] > 0] = THORAX
 
         dlaser = np.gradient( (df['laser_state'].values > 0).astype(int) ) > 0
         t0idx = np.argmax(dlaser)
@@ -261,10 +261,10 @@ def plot_data(path, data):
                     if prev_laser_state == 0 and row['laser_state']:
                         # new laser pulse, reset cum
                         cur_cum_this_trial = 0
-                        if row['ttm'] > 0:
+                        if row['ttm'] < 0:
                             cur_head_trial += 1
                             cur_state = 'head'
-                        elif row['ttm'] < 0:
+                        elif row['ttm'] > 0:
                             cur_thorax_trial += 1
                             cur_state = 'thorax'
                     prev_laser_state = row['laser_state']
