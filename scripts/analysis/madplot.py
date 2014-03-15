@@ -1476,16 +1476,6 @@ if __name__ == "__main__":
 
     print a == c
 
-def add_obj_id(df,align_colname='t_align'):
-    results = np.zeros( (len(df),), dtype=np.int )
-    obj_id = 0
-    for i,(ix,row) in enumerate(df.iterrows()):
-        if row[align_colname]==0.0:
-            obj_id += 1
-        results[i] = obj_id
-    df['obj_id']=results
-    return df
-
 def calc_p_values(data, gt1_name, gt2_name,
                   align_colname=None, stat_colname=None,
                   binsize=50,
@@ -1498,9 +1488,6 @@ def calc_p_values(data, gt1_name, gt2_name,
 
     df_ctrl = data[gt1_name]['df']
     df_exp = data[gt2_name]['df']
-
-    df_ctrl = add_obj_id(df_ctrl,align_colname=align_colname)
-    df_exp = add_obj_id(df_exp,align_colname=align_colname)
 
     align_start = df_ctrl[align_colname].min()
     dalign = df_ctrl[align_colname].max() - align_start
