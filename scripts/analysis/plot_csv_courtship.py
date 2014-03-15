@@ -400,15 +400,32 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.svg" % figname), bbox_inches='tight')
 
+PERIODS = dict(before=(-60,0),
+               during=(0,20),
+               early=(20,200),
+               late=(200,340),
+               #very_late=(60,340),
+               )
+period_order = ['before','during','early','late']#,'very_late']
+
+# PERIODS = dict(before=(-60,0),
+#                during=(0,20),
+#                after=(20,200),
+#                )
+# period_order = ['before','during','after']
+
 def _split_df(df):
     if len(df['obj_id'].unique()) > 1:
         raise Exception("FIXME: need to better pool these....")
     t0 = df[df['t'] == 0].index[0]
-    before = df[t0-DateOffset(seconds=60):t0]
-    during = df[t0:t0+DateOffset(seconds=20)]
-    early = df[t0+DateOffset(seconds=120-100):t0+DateOffset(seconds=120)]
-    late = df[t0+DateOffset(seconds=240):t0+DateOffset(seconds=340)]
-    return (('before',before),('during',during),('early',early),('late',late))
+    result = []
+    for period_name in period_order:
+        start_offset_sec, stop_offset_sec = PERIODS[period_name]
+        start_offset = DateOffset(seconds=start_offset_sec)
+        stop_offset  = DateOffset(seconds=stop_offset_sec)
+        this_df = df[ t0+start_offset:t0+stop_offset ]
+        result.append( (period_name, this_df) )
+    return result
 
 def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
 
