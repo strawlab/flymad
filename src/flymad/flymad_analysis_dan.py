@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 import shapely.geometry as sg
 import matplotlib.patches
+import matplotlib.image as mimg
+import matplotlib.pyplot as plt
 
 SECOND_TO_NANOSEC = 1e9
 
@@ -165,7 +167,36 @@ def to_si(d,space=''):
 
     return s
 
-def get_arena_conf(calibration_file=None):
+
+def scoring_video_mp4_click(image_path):
+    img = mimg.imread(image_path)
+    fig1 = plt.figure()
+    fig1.set_size_inches(12,8)
+    fig1.subplots_adjust(hspace=0)
+    ax1 = fig1.add_subplot(1,1,1)
+
+    #the original wide field camera was 659x494px. The rendered mp4 is 384px high
+    #the widefield image is padded with a 10px margin, so it is technically 514 high.
+    #scaling h=384->514 means new w=1371
+    #
+    #the image origin is top-left because matplotlib
+    ax1.imshow(img, extent=[0,1371,514,0],zorder=0) #extent=[h_min,h_max,v_min,v_max]
+    ax1.axis('off')
+
+    targets = []
+    def _onclick(target):
+        #subtract 10px for the margin
+        xydict = {'x': target.xdata-10, 'y': target.ydata-10}
+        targets.append(xydict)
+
+    cid = fig1.canvas.mpl_connect('button_press_event', _onclick)
+    plt.show()
+    fig1.canvas.mpl_disconnect(cid)
+
+    return targets
+
+
+def get_arena_conf(calibration_file=None, **kwargs):
     #DEFAULTS FROM THE FIRST NMETH SUBMISSION - AS USED FOR DANS
     #FIRST EXPERIMENTS
 
@@ -659,4 +690,8 @@ def load_courtship_csv(path):
 if __name__ == "__main__":
     for x in ["350ru","033ru","434iru","183iru","130ht","120h","120t","140hpc"]:
         print x,"->",laser_desc(x)
+
+    import sys
+    print scoring_video_mp4_click(sys.argv[1])
+
 
