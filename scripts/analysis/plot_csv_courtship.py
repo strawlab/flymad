@@ -838,17 +838,23 @@ if __name__ == "__main__":
         dfs = prepare_data(path, args.laser, bin_size, gts)
         madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
-    fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_WEI')
-    madplot.view_pairwise_stats_plotly(dfs, gts, fname_prefix,
-                                       align_colname='t',
-                                       stat_colname='zx',
-                                       )
+    finescale_stat_info = [
+        ('P1', ('wGP', 'G323', 'wtrpmyc')),
+        ('pIP10', ('40347trpmyc','40347','wtrpmyc')),
+        ]
 
-    fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_dtarget')
-    madplot.view_pairwise_stats_plotly(dfs, gts, fname_prefix,
-                                       align_colname='t',
-                                       stat_colname='dtarget',
-                                       )
+    for experiment_name, exp_gts in finescale_stat_info:
+        fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_WEI_%s'%experiment_name)
+        madplot.view_pairwise_stats_plotly(dfs, exp_gts, fname_prefix,
+                                           align_colname='t',
+                                           stat_colname='zx',
+                                           )
+
+        fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_dtarget_%s'%experiment_name)
+        madplot.view_pairwise_stats_plotly(dfs, exp_gts, fname_prefix,
+                                           align_colname='t',
+                                           stat_colname='dtarget',
+                                           )
 
     plot_data(path, args.laser, bin_size, dfs)
 
