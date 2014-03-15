@@ -1594,6 +1594,7 @@ def get_pairwise(data,gt1_name,gt2_name,**kwargs):
         layout['title'] = layout_title
     results = {'data':this_dict,
                'layout':layout,
+               'df':p_values,
                }
     return results
 
@@ -1634,9 +1635,15 @@ def view_pairwise_stats_plotly( data, names, fig_prefix, **kwargs):
 
     result2 = fake_plotly.plot( graph_data, layout=layout)
     ax = result2['fig'].add_subplot(111)
+    ax.axhline( -np.log10(1), color='k', lw=0.2 )
     ax.axhline( -np.log10(0.05), color='k', lw=0.2 )
     ax.axhline( -np.log10(0.01), color='k', lw=0.2 )
     ax.axhline( -np.log10(0.001), color='k', lw=0.2 )
+    if len(graph_data)>=1:
+        #only one pairwise comparison
+        n_comparisons = len(pairwise_data['df'])
+        ax.axhline( -np.log10(0.05/n_comparisons), color='r', lw=0.5, linestyle='--' )
+
     pprint.pprint(result2)
     for ext in ['.png','.svg']:
         fig_fname = fig_prefix + '_p_values' + ext
