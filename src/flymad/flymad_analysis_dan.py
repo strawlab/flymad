@@ -638,7 +638,7 @@ def fixup_index_and_resample(df, resample_specifier='10L'):
     df.set_index(['time'], inplace=True)
     #
     #now resample to 10ms (mean)
-    df = df.resample(resample_specifier)
+    df = df.resample(resample_specifier, fill_method='ffill')
 
     return df
 
