@@ -39,8 +39,8 @@ EXPERIMENT_DURATION = 130.0
 YLIM = [-10, 30]
 YTICKS = [-20, 0, 20, 40]
 
-XLIM = [-10, 80]
-XTICKS = [0, 40, 80]
+XLIM = [-1, 9]
+XTICKS = [0, 4, 8]
 
 def prepare_data(path, arena, smooth, medfilt, only_laser, gts):
 
@@ -115,17 +115,15 @@ def prepare_data(path, arena, smooth, medfilt, only_laser, gts):
         df['Afwd'] = np.gradient(df['Vfwd'].values) / dt
         df['dorientation'] = np.gradient(df['orientation'].values) / dt
 
-        #Here we have a 10ms resampled dataframe at least EXPERIMENT_DURATION seconds long.
-        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION))
-        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION)
-        #find when the laser first came on (argmax returns the first true value if
-        #all values are identical
-        t0idx = np.argmax(np.gradient(df['laser_state'].values > 0))
-        t0 = tb[t0idx]
-        df['t'] = tb - t0
-
-        #groupby on float times is slow. make a special align column 
-        df['t_align'] = np.array(range(0,len(df))) - t0idx
+        try:
+            df = flymad_analysis.align_t_by_laser_on(
+                    df, min_experiment_duration=EXPERIMENT_DURATION,
+                    align_first_only=False,
+                    t_range=(-1,9),
+                    min_num_ranges=5)
+        except flymad_analysis.AlignError, err:
+            print "\talign error %s (%s)" % (csvfilefn, err)
+            continue
 
         #median filter
         if medfilt:
@@ -147,7 +145,7 @@ def prepare_data(path, arena, smooth, medfilt, only_laser, gts):
             raise Exception("only one lasergroup handled for gt %s: not %s" % (
                              gt, lgs))
 
-        grouped = gtdf.groupby(['t_align'], as_index=False)
+        grouped = gtdf.groupby(['t'], as_index=False)
 
         data[gt] = dict(mean=grouped.mean().astype(float),
                         std=grouped.std().astype(float),
@@ -198,11 +196,12 @@ def plot_cross_activation_only(path, data, arena, note):
         fig = plt.figure(figure_title, figsize=(10,8))
         ax = fig.add_subplot(1,1,1)
         l,axs, figs = flymad_plot.plot_timeseries_with_activation(ax,
-                    targetbetween=dict(xaxis=adf['mean']['t'].values,
-                                       where=adf['mean']['laser_state'].values>0),
-                    downsample=25,
+                    targetbetween=dict(xaxis=adf['first']['t'].values,
+                                       where=adf['first']['laser_state'].values>0),
+                    sem=True,
+                    downsample=5,
                     note="%s\n%s\n" % (gt,note),
-                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'Vfwd'} for k in datasets},
+                    individual={k:{'groupby':('obj_id','trial'),'xaxis':'t','yaxis':'Vfwd'} for k in datasets},
                     individual_title=figure_title + ' Individual Traces',
                     **datasets
         )
@@ -255,11 +254,12 @@ def plot_all_data(path, data, arena, note):
         fig = plt.figure(figure_title, figsize=(10,8))
         ax = fig.add_subplot(1,1,1)
         l, axs, figs = flymad_plot.plot_timeseries_with_activation(ax,
-                            targetbetween=dict(xaxis=gtdf['mean']['t'].values,
-                                               where=gtdf['mean']['laser_state'].values>0),
-                            downsample=25,
+                            targetbetween=dict(xaxis=gtdf['first']['t'].values,
+                                               where=gtdf['first']['laser_state'].values>0),
+                            sem=True,
+                            downsample=5,
                             note="%s\n%s\n" % (gt,note),
-                            individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'Vfwd'} for k in datasets},
+                            individual={k:{'groupby':('obj_id','trial'),'xaxis':'t','yaxis':'Vfwd'} for k in datasets},
                             individual_title=figure_title + ' Individual Traces',
                             **datasets
         )
@@ -360,7 +360,7 @@ if __name__ == "__main__":
     assert d1_arena.unit == d2_arena.unit
 
     plot_all_data(path, all_data, d1_arena, note)
-    #plot_cross_activation_only(path, all_data, d1_arena, note)
+    plot_cross_activation_only(path, all_data, d1_arena, note)
 
     if args.show:
         plt.show()
