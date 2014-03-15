@@ -13,6 +13,8 @@ from lifelines.statistics import logrank_test, pairwise_logrank_test
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.rc('font', size=22)
 import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
@@ -272,7 +274,7 @@ def do_cum_incidence(gtdf,label):
                 row['thorax_trial'] = cur_thorax_trial
             gtdf.iloc[rowi] = row
 
-    fig_cum = plt.figure('cum indx: %s'%label)
+    fig_cum = plt.figure('cum indx: %s'%label,figsize=(6,5))
     ax_cum = fig_cum.add_subplot(111)
     pulse_nums = [1,2,3]
     this_data = {}
@@ -347,7 +349,7 @@ def plot_data(path, data):
         gts_string = 'vs'.join(gts)
         figname = laser + '_' + gts_string
 
-        fig = plt.figure("Song (%s)" % figname)
+        fig = plt.figure("Song (%s)" % figname,figsize=(10,6))
         ax = fig.add_subplot(1,1,1)
 
         datasets = {}
@@ -393,7 +395,7 @@ def plot_data(path, data):
             spine_placer(ax_cum, location='left,bottom' )
 
             ax_cum.set_ylabel('Fraction extending wing (%)')
-            ax_cum.set_xlabel('Time since pulse onset (s)')
+            ax_cum.set_xlabel('Time (s)')
 
             note = '%s\n%s\np-value: %.3g\n%d flies\nn=%d, %d'%(label,
                                                                 p2stars(ci_data['p_value']),
