@@ -322,49 +322,73 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
 
     #############
     non_grouped_df = df['df']
-    close = non_grouped_df['dtarget'] < DIRECTED_COURTING_DIST
-    closedf = non_grouped_df[close]
 
-    grpa = non_grouped_df.groupby('t_align')
-    gdf = grpa.mean()
-    grpb = closedf.groupby('t_align')
-    cdf = grpb.mean()
+    #group the flies into directed and total we phases. do it by
+    #iterating because im lazy
+    total = []
+    targeted = []
+    time = []
+    laser_state = []
+    nens = []
+    for t,grp in non_grouped_df.groupby('t_align'):
+        nf = float(len(grp))
+        nens.append(nf)
+
+        first = grp.head(1)
+        time.append( float(first['t']) )
+
+        court = grp['zx'] > 0
+        total.append( court.sum() / nf )
+
+        trg = grp[court & (grp['dtarget'] < DIRECTED_COURTING_DIST)]
+        targeted.append( len(trg) / nf )
+
+        laser_state.append(bool(first['laser_state']))
 
     figure_title = "%s (%s) Courtship Wingext Split 10min (%s)" % (flymad_analysis.human_label(gt, specific=True), gt, laser)
     fig = plt.figure(figure_title, figsize=figsize)
     ax = fig.add_subplot(1,1,1)
 
-    flymad_plot.plot_timeseries_with_activation(ax,
-                    targetbetween=dict(xaxis=df['mean']['t'].values,
-                                       where=df['mean']['laser_state'].values>0),
+    xaxis = np.array(time)
+
+    result = flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=xaxis,
+                                       where=np.array(laser_state)),
                     sem=True,
                     note="%s\nlaser %s\nthresh %s\nbin %s\n" % (gt,flymad_analysis.laser_desc(laser),DIRECTED_COURTING_DIST, bin_size),
-                    total=dict(xaxis=gdf['t'].values,
-                               value=gdf['zx'].values,
+                    return_dict=True,
+                    total=dict(xaxis=xaxis,
+                               value=np.array(total),
 #                              std=grp.std()['zx'].values,
 #                              n=grp.count()['zx'].values,
                                color=flymad_plot.BLACK,
                                label="Total",
-                               df=non_grouped_df,
+#                               df=non_grouped_df,
                                marker='o',linestyle='',
-                               N=len(non_grouped_df['obj_id'].unique())),
-                    close=dict(xaxis=cdf['t'].values,
-                               value=cdf['zx'].values,
+                               N=int(np.mean(nens))),
+                    close=dict(xaxis=xaxis,
+                               value=np.array(targeted),
 #                              std=grp.std()['zx'].values,
 #                              n=grp.count()['zx'].values,
-                               color=flymad_plot.RED,
+                               color=flymad_plot.GREEN,
                                label="Targeted",
-                               df=closedf,
+#                               df=closedf,
                                marker='o',linestyle='',
-                               N=len(closedf['obj_id'].unique()))
+                               N=int(np.mean(nens)))
     )
+
+    #now fill between the lines as drawn
+    for plotted_name,plotted in result['plotted'].iteritems():
+        ax.fill_between(plotted['x'], 0, plotted['y'],
+                        color=plotted['color'],
+                        zorder=plotted['zorder'])
 
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Wing extension index')
     ax.set_ylim([0,1])
     ax.set_xlim(XLIM_10MIN)
 
-    flymad_plot.retick_relabel_axis(ax, [0,240,480], [0,0.5,1])
+    flymad_plot.retick_relabel_axis(ax, [0,240,480], [0,1])
 
     figname = "%s_%s" % (laser,gt)
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.png" % figname), bbox_inches='tight')
@@ -388,7 +412,7 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
 
     #FIXME: I think this doesn't work for sets of multiple flies
     for desc,split in _split_df(df):
-        fig = plt.figure("%s %s Wing Extension (%s)" % (flymad_analysis.human_label(gt, specific=True),laser,desc), figsize=figsize, frameon=True)
+        fig = plt.figure("%s %s Wing Extension (%s)" % (flymad_analysis.human_label(gt, specific=True),laser,desc), figsize=figsize, frameon=False)
         ax = fig.add_subplot(1,1,1)
         ax.set_aspect('equal')
 
@@ -402,7 +426,7 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
 
         if traj:
             t = np.array(traj)
-            ax.plot(t[:,0], t[:,1], color=flymad_plot.BLACK, zorder=5, lw=1.5)
+            ax.plot(t[:,0], t[:,1], color=flymad_plot.BLACK, zorder=5, lw=2)
         if courting:
             t = np.array(courting)
             ax.plot(t[:,0], t[:,1],
