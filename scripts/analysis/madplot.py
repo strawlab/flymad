@@ -1488,7 +1488,7 @@ if __name__ == "__main__":
 
 def calc_p_values(data, gt1_name, gt2_name,
                   align_colname=None, stat_colname=None,
-                  binsize=50,
+                  num_bins=50,
                   ):
 
     if align_colname is None:
@@ -1504,7 +1504,7 @@ def calc_p_values(data, gt1_name, gt2_name,
 
     p_values = DataFrame()
 
-    bins = np.linspace(0,dalign,binsize) + align_start
+    bins = np.linspace(0,dalign,num_bins) + align_start
     binned_ctrl = pd.cut(df_ctrl[align_colname], bins, labels= bins[:-1])
     binned_exp = pd.cut(df_exp[align_colname], bins, labels= bins[:-1])
     for x in binned_ctrl.levels:
