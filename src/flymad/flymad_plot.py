@@ -47,6 +47,9 @@ def setup_defaults():
     rcParams['legend.numpoints'] = 1
     rcParams['legend.scatterpoints'] = 1
 
+    if os.environ.get('FLYMAD_FINAL'):
+        rcParams['font.size'] = 22
+
 def get_plotpath(path, name):
     if os.path.isdir(path):
         default = path
@@ -105,6 +108,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
     DEFAULT_COLORS = {"exp":RED,"ctrl":BLACK}
 
     trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
+    final_copy = os.environ.get('FLYMAD_FINAL')
 
     def _ds(a):
         if downsample == 1:
@@ -130,17 +134,18 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
     def _sort_by_order(a,b):
         return cmp(datasets[a].get('order', ORDER_LAST), datasets[b].get('order', ORDER_LAST))
 
-    def _fill_between(f_ax, f_xaxis, f_where, f_facecolor):
+    def _fill_between(f_ax, f_xaxis, f_where, f_facecolor, f_zorder):
         f_ax.fill_between(f_xaxis, 0, 1, where=f_where,
                           edgecolor='none', facecolor=f_facecolor,
-                          alpha=0.15, transform=trans, zorder=1)
+                          alpha=0.15, transform=trans, zorder=f_zorder)
 
 
     if targetbetween is not None:
         if not (isinstance(targetbetween, list) or isinstance(targetbetween, tuple)):
             targetbetween = [targetbetween]
         for tb in targetbetween:
-            _fill_between(ax, tb['xaxis'], tb['where'], tb.get('facecolor','yellow'))
+            _fill_between(ax, tb['xaxis'], tb['where'], tb.get('facecolor','yellow'),
+                          tb.get('zorder',1))
 
     if any(['std' in datasets[exp] for exp in datasets]):
         note += "+/- SEM\n" if sem else "+/- STD\n"
@@ -149,6 +154,8 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
     #zorder = 1 = back
     top_zorder = 60
     bottom_zorder = 30
+
+    plotted = {}
 
     cur_zorder = 2
     for data in sorted(datasets.keys(), cmp=_sort_by_order):
@@ -181,11 +188,14 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                         zorder=this_zorder)
 
         x,y = _dn(exp['xaxis'][::downsample], _ds(exp['value']))
+        zorder = this_zorder + 1
+
+        plotted[data] = dict(x=x,y=y,color=color,label=label,zorder=zorder)
         ax.plot(x,y,
                     color=color,label=label,
                     lw=2,linestyle=linestyle,clip_on=exp.get('clip_on',True),
                     marker=marker,markerfacecolor=color,markersize=markersize,markeredgecolor='none',
-                    zorder=this_zorder+1)
+                    zorder=zorder)
 
         cur_zorder -= 2
 
@@ -200,11 +210,12 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
             horizontalalignment='left',
             verticalalignment='top',
             transform=ax.transAxes,
-            zorder=0)
+            color='white' if final_copy else 'k',
+            zorder=-100)
 
     axs = [ax]
     figs = {}
-    if (not os.environ.get('FLYMAD_FINAL')) and (individual is not None) and isinstance(individual, dict):
+    if (not final_copy) and (individual is not None) and isinstance(individual, dict):
         for data in individual:
             try:
                 #try to avoid creating many duplicate figures
@@ -265,7 +276,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         result = dict(legend=l,
                       axs=axs,
                       figs=figs,
-                      )
+                      plotted=plotted)
         return result
     return l, axs, figs
 
