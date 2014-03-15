@@ -162,21 +162,25 @@ def prepare_data(path, only_laser, resample_bin, gts):
         print "\t%ss experiment" % duration
 
         #resample into 5S bins
-        df = df.resample(resample_bin)
-        #trim dataframe
-        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION, resample_bin))
-        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION, resample_bin)
+        df = df.resample(resample_bin, fill_method='ffill')
 
         #fix laser_state due to resampling
+        df['laser_state'] = df['laser_state'].fillna(value=0)
         df['laser_state'][df['laser_state'] > 0] = 1
         df['zx_binary'] = (df['zx'] > 0).values.astype(float)
 
-        t0idx = np.argmax(np.gradient(df['laser_state'].values > 0))
-        t0 = tb[t0idx]
-        df['t'] = tb - t0
+        try:
+            df = flymad_analysis.align_t_by_laser_on(
+                    df,
+                    resample_bin=resample_bin,
+                    min_experiment_duration=EXPERIMENT_DURATION,
+                    align_first_only=True)
+        except flymad_analysis.AlignError, err:
+            print "\talign error %s (%s)" % (csvfilefn, err)
+            continue
 
-        #groupby on float times is slow. make a special align column 
-        df['t_align'] = np.array(range(0,len(df))) - t0idx
+        #FIXME
+        df['t_align'] = df['t']
 
         df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
