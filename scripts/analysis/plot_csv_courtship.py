@@ -436,7 +436,7 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
         for t in targets:
             x = arena.scale_x(t['x'])
             y = arena.scale_y(t['y'])
-            ax.add_patch(matplotlib.patches.Circle((x,y), radius=5,
+            ax.add_patch(matplotlib.patches.Circle((x,y), radius=7,
                          fill=True, color=flymad_plot.GREEN, zorder=7))
 
         xlim,ylim = arena.get_limits()
@@ -447,6 +447,11 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
 
         figname = "%s_%s_%s_courting_trajectory" % (gt, laser, desc)
         fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+        fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
+
+        ax.axis('off')
+        fig.canvas.print_svg(
+                filename=flymad_plot.get_plotpath(path,"%s_bare.svg" % figname))
 
 def plot_data(path, laser, bin_size, dfs):
 
