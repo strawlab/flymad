@@ -249,6 +249,21 @@ def plot_all_data(path, data, arena, note):
                                    df=gtdf['df'],
             )
 
+        if 1:
+            if gt == "50660chrim":
+                cgt = "50660"
+                gtdf = data[cgt]["350iru"][cgt]
+                datasets['control'] = dict(xaxis=gtdf['mean']['t'].values,
+                                   value=gtdf['mean']['Vfwd'].values,
+                                   std=gtdf['std']['Vfwd'].values,
+                                   n=gtdf['n']['Vfwd'].values,
+                                   label=flymad_analysis.human_label(cgt),#laser_desc,
+                                   order=100,
+                                   color=flymad_plot.BLACK,
+                                   N=len(gtdf['df']['obj_id'].unique()),
+                                   df=gtdf['df'],
+            )
+
         figure_title = "Moonwalker Thorax %s (%s)" % (gt,smoothstr)
 
         fig = plt.figure(figure_title, figsize=(10,8))
