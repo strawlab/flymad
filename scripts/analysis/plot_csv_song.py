@@ -13,8 +13,6 @@ from lifelines.statistics import logrank_test, pairwise_logrank_test
 
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.rc('font', size=22)
 import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
