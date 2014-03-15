@@ -45,7 +45,11 @@ GT_COLORS = {'wtrpmyc':flymad_plot.BLACK,
              'wGP':flymad_plot.RED,
              '40347trpmyc':flymad_plot.ORANGE,
              'G323':flymad_plot.BLUE,
-             '40347':flymad_plot.GREEN}
+             '40347':flymad_plot.GREEN,
+
+             'pooled controls for P1':flymad_plot.BLACK,
+             'pooled controls for pIP10':flymad_plot.BLACK,
+             }
 
 
 DIRECTED_COURTING_DIST = 50
@@ -188,11 +192,29 @@ def prepare_data(path, only_laser, resample_bin, gts):
         df['lasergroup'] = laser
         df['RepID'] = repID
 
-        pooldf = pd.concat([pooldf, df])   
+        pooldf = pd.concat([pooldf, df])
 
     data = {}
     for gt in gts:
         gtdf = pooldf[pooldf['Genotype'] == gt]
+        data[gt] = dict(df=gtdf)
+
+    do_pooled_controls = True
+    if do_pooled_controls:
+        data['pooled controls for P1']={}
+        data['pooled controls for pIP10']={}
+        try:
+            data['pooled controls for P1']['df'] = pd.concat( [data['G323']['df'], data['wtrpmyc']['df']] )
+        except KeyError as err:
+            del data['pooled controls for P1']
+        data['pooled controls for pIP10']={}
+        try:
+            data['pooled controls for pIP10']['df'] = pd.concat( [data['40347']['df'], data['wtrpmyc']['df']] )
+        except KeyError as err:
+            del data['pooled controls for pIP10']
+
+    for gt in data:
+        gtdf = data[gt]['df']
 
         lgs = gtdf['lasergroup'].unique()
         if len(lgs) != 1:
