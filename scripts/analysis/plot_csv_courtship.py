@@ -162,8 +162,8 @@ def prepare_data(path, only_laser, resample_bin, gts):
 
         print "\t%ss experiment" % duration
 
-        #resample into 5S bins
-        df = df.resample(resample_bin, fill_method='ffill')
+        # do resampling
+        df = df.resample(resample_bin, fill_method='ffill', how='median')
 
         #fix laser_state due to resampling
         df['laser_state'] = df['laser_state'].fillna(value=0)
