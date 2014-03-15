@@ -39,8 +39,8 @@ EXPERIMENT_DURATION = 80.0
 YLIM = [-10, 25]
 YTICKS = [-20, 0, 20, 40]
 
-XLIM = [-10, 60]
-XTICKS = [0, 30, 60]
+XLIM = [-1, 6]
+XTICKS = [0, 3, 6]
 
 TS_FIGSIZE = (10,6)
 
@@ -117,18 +117,15 @@ def prepare_data(path, arena, smooth, medfilt, only_laser, gts):
         df['Afwd'] = np.gradient(df['Vfwd'].values) / dt
         df['dorientation'] = np.gradient(df['orientation'].values) / dt
 
-        #Here we have a 10ms resampled dataframe at least EXPERIMENT_DURATION seconds long.
-        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION))
-        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION)
-        #find when the laser first came on (argmax returns the first true value if
-        #all values are identical
-        dlaser = np.gradient( (df['laser_state'].values > 0).astype(int) ) > 0
-        t0idx = np.argmax(dlaser)
-        t0 = tb[t0idx-1]
-        df['t'] = tb - t0
-
-        #groupby on float times is slow. make a special align column
-        df['t_align'] = np.array(range(0,len(df))) - t0idx
+        try:
+            df = flymad_analysis.align_t_by_laser_on(
+                    df, min_experiment_duration=EXPERIMENT_DURATION,
+                    align_first_only=False,
+                    t_range=(-1,6),
+                    min_num_ranges=5)
+        except flymad_analysis.AlignError, err:
+            print "\talign error %s (%s)" % (csvfilefn, err)
+            continue
 
         #median filter
         if medfilt:
@@ -150,7 +147,7 @@ def prepare_data(path, arena, smooth, medfilt, only_laser, gts):
             raise Exception("only one lasergroup handled for gt %s: not %s" % (
                              gt, lgs))
 
-        grouped = gtdf.groupby(['t_align'], as_index=False)
+        grouped = gtdf.groupby(['t'], as_index=False)
 
         data[gt] = dict(mean=grouped.mean().astype(float),
                         std=grouped.std().astype(float),
@@ -187,9 +184,10 @@ def plot_all_data(path, data, arena, note, laser='350iru'):
     l, axs, figs = flymad_plot.plot_timeseries_with_activation(ax,
                         targetbetween=dict(xaxis=data['50660trp'][laser]['50660trp']['first']['t'].values,
                                            where=data['50660trp'][laser]['50660trp']['first']['laser_state'].values>0),
-                        downsample=25,
+                        downsample=5,
+                        sem=True,
                         note="%s\n" % (note,),
-                        individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'Vfwd'} for k in datasets},
+                        individual={k:{'groupby':('obj_id','trial'),'xaxis':'t','yaxis':'Vfwd'} for k in datasets},
                         individual_title=figure_title + ' Individual Traces',
                         **datasets
     )
@@ -202,9 +200,11 @@ def plot_all_data(path, data, arena, note, laser='350iru'):
 
     flymad_plot.retick_relabel_axis(ax, XTICKS, YTICKS)
 
-    fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_hate.png"), bbox_inches='tight')
-    fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_hate.svg"), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_simple.png"), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"moonwalker_simple.svg"), bbox_inches='tight')
 
+    for efigname, efig in figs.iteritems():
+        efig.savefig(flymad_plot.get_plotpath(path,"moonwalker_simple_individual_%s.png" % efigname), bbox_inches='tight')
 
 if __name__ == "__main__":
 
