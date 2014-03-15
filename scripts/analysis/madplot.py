@@ -1632,6 +1632,10 @@ def view_pairwise_stats_plotly( data, names, fig_prefix, **kwargs):
         pprint.pprint( result )
 
     result2 = fake_plotly.plot( graph_data, layout=layout)
+    ax = result2['fig'].add_subplot(111)
+    ax.axhline( -np.log10(0.05), color='k', lw=0.2 )
+    ax.axhline( -np.log10(0.01), color='k', lw=0.2 )
+    ax.axhline( -np.log10(0.001), color='k', lw=0.2 )
     pprint.pprint(result2)
     for ext in ['.png','.svg']:
         fig_fname = fig_prefix + '_p_values' + ext
