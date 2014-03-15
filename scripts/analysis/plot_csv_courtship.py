@@ -289,6 +289,38 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.svg" % figname), bbox_inches='tight')
 
     #############
+    figure_title = "%s (%s) Courtship Dtarget 10min (%s)" % (flymad_analysis.human_label(gt, specific=True), gt, laser)
+    fig = plt.figure(figure_title, figsize=figsize)
+    ax = fig.add_subplot(1,1,1)
+
+    flymad_plot.plot_timeseries_with_activation(ax,
+                    targetbetween=dict(xaxis=df['mean']['t'].values,
+                                       where=df['mean']['laser_state'].values>0),
+                    sem=True,
+                    note="%s\nlaser %s\nbin %s\n" % (gt,flymad_analysis.laser_desc(laser),bin_size),
+                    exp=dict(xaxis=df['mean']['t'].values,
+                             value=df['mean']['dtarget'].values,
+                             std=df['std']['dtarget'].values,
+                             n=df['n']['dtarget'].values,
+                             label=flymad_analysis.human_label(gt, specific=True),
+                             color=flymad_plot.BLACK,
+                             df=df['df'],
+                             N=len(df['df']['obj_id'].unique()))
+    )
+
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Distance (px)')
+    ax.set_ylim([40,160])
+    ax.set_xlim(XLIM_10MIN)
+
+    flymad_plot.retick_relabel_axis(ax, [0,240,480], [40,160])
+
+    figname = "%s_%s" % (laser,gt)
+    fig.savefig(flymad_plot.get_plotpath(path,"dtarget_and_WingExt_%s.png" % figname), bbox_inches='tight')
+    fig.savefig(flymad_plot.get_plotpath(path,"dtarget_and_WingExt_%s.svg" % figname), bbox_inches='tight')
+
+
+    #############
     non_grouped_df = df['df']
     close = non_grouped_df['dtarget'] < DIRECTED_COURTING_DIST
     closedf = non_grouped_df[close]
