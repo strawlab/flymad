@@ -32,6 +32,7 @@ assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.version.version in ("0.11.0", "0.12.0")
 
 EXPERIMENT_DURATION = 600
+STATS_NUM_BINS = 40
 
 XLIM_10MIN = [-60,480]
 XLABEL_10MIN = [0, 120, 240, 360, 480]
@@ -747,6 +748,7 @@ def plot_dose_response(path, bin_size, exp_gt, data):
                                        align_colname='t',
                                        stat_colname='dtarget',
                                        layout_title='p-values for Dose-Response of distance',
+                                       num_bins=STATS_NUM_BINS,
                                        )
 
     fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_DR_wei')
@@ -754,6 +756,7 @@ def plot_dose_response(path, bin_size, exp_gt, data):
                                        align_colname='t',
                                        stat_colname='zx',
                                        layout_title='p-values for Dose-Response of WEI',
+                                       num_bins=STATS_NUM_BINS,
                                        )
 
 
@@ -1088,6 +1091,7 @@ if __name__ == "__main__":
                                            align_colname='t',
                                            stat_colname='zx',
                                            layout_title='p-values for WEI, %s (binsize %s)'%(experiment_name,bin_size),
+                                           num_bins=STATS_NUM_BINS,
                                            )
 
         fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_dtarget_%s'%experiment_name)
@@ -1095,6 +1099,7 @@ if __name__ == "__main__":
                                            align_colname='t',
                                            stat_colname='dtarget',
                                            layout_title='p-values for dtarget, %s (binsize %s)'%(experiment_name,bin_size),
+                                           num_bins=STATS_NUM_BINS,
                                            )
 
     plot_data(path, args.laser, bin_size, dfs)
