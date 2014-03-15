@@ -909,12 +909,14 @@ if __name__ == "__main__":
         madplot.view_pairwise_stats_plotly(dfs, exp_gts, fname_prefix,
                                            align_colname='t',
                                            stat_colname='zx',
+                                           layout_title='p-values for WEI',
                                            )
 
         fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_dtarget_%s'%experiment_name)
         madplot.view_pairwise_stats_plotly(dfs, exp_gts, fname_prefix,
                                            align_colname='t',
                                            stat_colname='dtarget',
+                                           layout_title='p-values for dtarget',
                                            )
 
     plot_data(path, args.laser, bin_size, dfs)
