@@ -35,6 +35,7 @@ HUMAN_LABELS = {
     "5534":"Gal4-control","5534trpmyc":"vPR6>TRPA1",
     "43702":"Gal4-control","43702trp":"vMS11>TRPA1",
     "41688":"Gal4-control","41688trp":"dPR1>TRPA1",
+    "50660trp":"Moonwalker","50660":"Gal4-control",
 }
 
 UNIT_SPACE = u"\u205F"
