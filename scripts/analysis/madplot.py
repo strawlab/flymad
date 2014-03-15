@@ -1575,8 +1575,12 @@ def get_pairwise(data,gt1_name,gt2_name,**kwargs):
         ys.append( logs[i] )
         texts.append( '')
 
+    import flymad.flymad_analysis_dan as flymad_analysis
+    human1 = flymad_analysis.human_label(gt1_name)
+    human2 = flymad_analysis.human_label(gt2_name)
+
     this_dict = {
-        'name':'%s vs. %s' % (gt1_name, gt2_name),
+        'name':'%s vs. %s' % (human1, human2),
         'x':[float(x) for x in xs],
         'y':[float(y) for y in ys],
         'text':texts,
