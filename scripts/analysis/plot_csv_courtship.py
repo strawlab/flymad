@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
 from scipy.stats import ttest_ind
+from scipy.stats import kruskal, mannwhitneyu
 
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
@@ -458,6 +459,120 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
         fig.canvas.print_svg(
                 filename=flymad_plot.get_plotpath(path,"%s_bare.svg" % figname))
 
+def plot_distance_histograms( path, bin_size, dfs, gts_only=None ):
+    if gts_only is None:
+        gts_only = dfs.keys()
+
+    for gt in gts_only:
+        gtdf = dfs[gt]['df']
+        new_df_by_period = {}
+
+        # slice by obj_id and then concat back into one big dataframe per period
+        for obj_id, odf in gtdf.groupby('obj_id'):
+            sliced_dfs = _split_df(odf)
+            for period, period_df in sliced_dfs:
+                if period not in new_df_by_period:
+                    new_df_by_period[period] = pd.DataFrame()
+                new_df_by_period[period] = pd.concat([new_df_by_period[period], period_df])
+
+        max_dist = np.max(gtdf['dtarget'].values)
+        n_bins = 10
+        bins = np.linspace(0,max_dist,n_bins)
+        mini_figsize = (4,4)
+
+        fig_all = plt.figure('distance histograms all periods %s'%gt,figsize=mini_figsize)
+        ax_all = fig_all.add_subplot(111)
+
+        max_ylim = 40
+        max_xlim = 160
+        steps = False
+
+        all_dists = {}
+        for period in period_order:
+            figname = 'distance_histogram_%s_%s'%(gt,period)
+            df = new_df_by_period[period]
+            dists = df['dtarget'].values
+            all_dists[period] = dists
+
+            n_distance_by_bin, _ = np.histogram( dists, bins=bins )
+            normed_distance_by_bin = n_distance_by_bin/float(np.sum(n_distance_by_bin))
+
+            xs = []
+            ys = []
+            for i in range(len(normed_distance_by_bin)):
+                xs.append( bins[i] )
+                ys.append( normed_distance_by_bin[i]*100.0 )
+
+                if steps:
+                    xs.append( bins[i+1] )
+                    ys.append( normed_distance_by_bin[i]*100.0 )
+            if steps:
+                xs.append(bins[-1])
+                ys.append(0)
+
+            fig = plt.figure(figname,figsize=mini_figsize)
+            ax = fig.add_subplot(111)
+            ax.plot( xs, ys, color=flymad_plot.BLACK, linestyle='-')
+            label = '%s (%d - %d)'%(period,
+                                    PERIODS[period][0],
+                                    PERIODS[period][1] )
+            ax_all.plot( xs, ys, label=label )
+
+            spine_placer(ax, location='left,bottom')
+            ax.set_ylim((0,max_ylim))
+            ax.set_xlim((0,max_xlim))
+            ax.set_ylabel('Fraction time (%)')
+            ax.set_xlabel('Distance (px)')
+            flymad_plot.retick_relabel_axis(ax, [0, max_xlim//2, max_xlim], [0, max_ylim//2, max_ylim])
+
+            fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+            fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
+
+
+        figname = 'distance_histogram_%s_all'%(gt,)
+        spine_placer(ax_all, location='left,bottom')
+        ax_all.set_ylim((0,max_ylim))
+        ax_all.set_xlim((0,max_xlim))
+        ax_all.set_ylabel('Fraction time (%)')
+        ax_all.set_xlabel('Distance (px)')
+        ax_all.legend()
+        flymad_plot.retick_relabel_axis(ax_all, [0, max_xlim//2, max_xlim], [0, max_ylim//2, max_ylim])
+        fig_all.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+        fig_all.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
+
+        # statistics on distances
+        p_data = {}
+        pstar_data = {}
+        for i,period1 in enumerate(period_order):
+            p_data[period1] = []
+            pstar_data[period1] = []
+            for j,period2 in enumerate(period_order):
+                test1 = all_dists[period1]
+                test2 = all_dists[period2]
+                #hval, pval = kruskal(test1, test2)
+                U, p1 = mannwhitneyu(test1, test2)
+                pval = p1*2 # two tail
+                p_data[period1].append( pval )
+                pstar_data[period1].append( p2stars(pval) )
+        P = pd.DataFrame(p_data,index=period_order)
+        Pstar = pd.DataFrame(pstar_data,index=period_order)
+        fname = 'distance_histogram_%s_stats'%(gt,)
+        fname = flymad_plot.get_plotpath(path,"%s.html" % fname)
+        pd.set_option('display.precision',3) # print full P values below
+        human_gt = flymad_analysis.human_label(gt)
+        with open(fname, mode='w') as fd:
+            fd.write('<h1>%s</h1>'%human_gt)
+            fd.write( '<object type="image/svg+xml" data="%s">Your browser does not support SVG</object>'%(figname+'.svg',) )
+
+            fd.write( '<h2>p values</h2>\n' )
+            fd.write( P._repr_html_() + '\n\n' )
+            fd.write( Pstar._repr_html_() + '\n\n' )
+            fd.write( '<h2>N numbers</h2>\n' )
+            fd.write('<ul>\n')
+            for period1 in period_order:
+                fd.write('<li>%s: %d</li>\n'%(period1, len(all_dists[period1]) ))
+            fd.write('</ul>\n')
+
 def plot_data(path, laser, bin_size, dfs):
 
     figname = laser + '_' + '_'.join(dfs)
@@ -848,6 +963,8 @@ if __name__ == "__main__":
                              'try 100L')
     parser.add_argument('--only-single-genotype', default=None, required=False,
                         help='plot single genotype plots binned as specified then exit. try 2S')
+    parser.add_argument('--only-period-histograms', default=None, required=False,
+                        help='plot histograms for periods as specified then exit. try 2S')
     parser.add_argument('--calibration-file', help='calibration yaml files', required=False, default=None)
 
     args = parser.parse_args()
@@ -889,6 +1006,23 @@ if __name__ == "__main__":
 
         for gt,gtdf in dfs.iteritems():
             plot_single_genotype(path, args.laser, bin_size, gt, gtdf)
+
+        if args.show:
+            plt.show()
+        sys.exit(0)
+
+    if args.only_period_histograms is not None:
+        bin_size = str(args.only_period_histograms)
+        cache_fname = os.path.join(path,'courtship_%s.madplot-cache' % bin_size)
+        cache_args = (args.laser, gts, bin_size)
+        dfs = None
+        if args.only_plot:
+            dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
+        if dfs is None:
+            dfs = prepare_data(path, args.laser, bin_size, gts)
+            madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
+
+        plot_distance_histograms( path, bin_size, dfs)#, gts_only=['wGP'] )
 
         if args.show:
             plt.show()
