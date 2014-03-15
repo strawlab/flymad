@@ -22,6 +22,7 @@ import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
 import madplot
+from madplot import p2stars
 
 from strawlab_mpl.spines import spine_placer
 

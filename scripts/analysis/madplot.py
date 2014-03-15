@@ -44,6 +44,16 @@ def pairwise(iterable):
     next(b, None)
     return itertools.izip(a, b)
 
+def p2stars(pval):
+    result = ''
+    if pval < 0.05:
+        result = '*'
+    if pval < 0.01:
+        result = '**'
+    if pval < 0.001:
+        result = '***'
+    return result
+
 class Kalman:
     ### KEEP THESE IN SYNC WITH FLYMAD TRACKER
 

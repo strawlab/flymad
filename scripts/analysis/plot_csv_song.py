@@ -23,6 +23,7 @@ import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
 import madplot
+from madplot import p2stars
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
 #need to support numpy datetime64 types for resampling in pandas
@@ -38,16 +39,6 @@ COLORS = {HEAD:flymad_plot.RED,
           }
 
 EXPERIMENT_DURATION = 200.0
-
-def p2stars(pval):
-    result = ''
-    if pval < 0.05:
-        result = '*'
-    if pval < 0.01:
-        result = '**'
-    if pval < 0.001:
-        result = '***'
-    return result
 
 def prepare_data(path, resample_bin, gts):
 
