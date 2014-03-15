@@ -79,21 +79,18 @@ def prepare_data(path, arena, smoothstr, smooth, medfilt, gts):
         df['v'][df['v'] >= 300] = np.nan
         df['v'] = df['v'].fillna(method='ffill')
 
+        try:
+            df = flymad_analysis.align_t_by_laser_on(
+                    df, min_experiment_duration=EXPERIMENT_DURATION,
+                    align_first_only=True,
+                    exact_num_ranges=1)
+        except flymad_analysis.AlignError, err:
+            print "\talign error %s (%s)" % (csvfile, err)
+            continue
+
         #median filter
         if medfilt:
             df['v'] = scipy.signal.medfilt(df['v'].values, medfilt)
-
-        #Here we have a 10ms resampled dataframe at least EXPERIMENT_DURATION seconds long.
-        df = df.head(flymad_analysis.get_num_rows(EXPERIMENT_DURATION))
-        tb = flymad_analysis.get_resampled_timebase(EXPERIMENT_DURATION)
-        #find when the laser first came on (argmax returns the first true value if
-        #all values are identical
-        t0idx = np.argmax(np.gradient(df['laser_state'].values > 0))
-        t0 = tb[t0idx]
-        df['t'] = tb - t0
-
-        #groupby on float times is slow. make a special align column 
-        df['t_align'] = np.array(range(0,len(df))) - t0idx
 
         df['obj_id'] = flymad_analysis.create_object_id(date,time)
         df['Genotype'] = genotype
@@ -110,7 +107,7 @@ def prepare_data(path, arena, smoothstr, smooth, medfilt, gts):
             raise Exception("only one lasergroup handled for gt %s: not %s" % (
                              gt, lgs))
 
-        grouped = gtdf.groupby(['t_align'], as_index=False)
+        grouped = gtdf.groupby(['t'], as_index=False)
         data[gt] = dict(mean=grouped.mean().astype(float),
                         std=grouped.std().astype(float),
                         n=grouped.count().astype(float),
@@ -159,11 +156,11 @@ def plot_data(path, data, arena, note):
                             df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
 
-    ctrlmean = data['OK371shits-nolaser']['mean']
+    ctrlfirst = data['OK371shits-nolaser']['first']
 
     result_d = flymad_plot.plot_timeseries_with_activation(ax,
-                targetbetween=dict(xaxis=ctrlmean['t'].values,
-                                   where=ctrlmean['laser_state'].values>0),
+                targetbetween=dict(xaxis=ctrlfirst['t'].values,
+                                   where=ctrlfirst['laser_state'].values>0),
                 downsample=5,
                 sem=True,
                 note="OK371shits\n%s\n" % note,
@@ -230,7 +227,7 @@ if __name__ == "__main__":
                                              CTRL_GENOTYPE,
                                              EXP2_GENOTYPE],
                                        fname_prefix,
-                                       align_colname='t_align',
+                                       align_colname='t',
                                        stat_colname='v',
                                        )
     plot_data(path, data, arena, note)
