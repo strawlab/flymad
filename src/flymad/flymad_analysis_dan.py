@@ -14,6 +14,7 @@ import shapely.geometry as sg
 import matplotlib.patches
 import matplotlib.image as mimg
 import matplotlib.pyplot as plt
+from pandas.tseries.offsets import DateOffset
 
 SECOND_TO_NANOSEC = 1e9
 
@@ -40,6 +41,9 @@ HUMAN_LABELS = {
 
 UNIT_SPACE = u"\u205F"
 UNIT_SPACE = " "
+
+class AlignError(Exception):
+    pass
 
 def laser_power_string(wavelength, current):
     if wavelength == 808:
@@ -558,6 +562,63 @@ def get_resampled_timebase_from_df(df, resample_specifier='10L'):
     f = _resample_freq(resample_specifier)
     len_s = len(df) / f
     return np.arange(0, len_s, 1.0/f)
+
+def align_t_by_laser_on(df, min_experiment_duration, align_first_only, t_range=None, min_num_ranges=1):
+
+    duration = (df.index[-1] - df.index[0]).total_seconds()
+    if duration < min_experiment_duration:
+        raise AlignError("dataframe too short (%ss vs %ss)" % (duration, min_experiment_duration))
+
+    if align_first_only:
+        min_num_ranges = 1
+
+    #Here we have a 10ms resampled dataframe at least min_experiment_duration seconds long.
+    df = df.head(get_num_rows(min_experiment_duration))
+
+    #find when the laser first came on (argmax returns the first true value if
+    #all values are identical
+    #
+    #gradient on an array of 0/1 using a distance of 1 (default) uses
+    #one sample each side, giving 2x the number of non-zero values.
+    dlaser = np.gradient( (df['laser_state'].values > 0).astype(int) ) > 0
+    rising_edges = np.where(dlaser)[0]
+    #check we detected 2x these values (an even number)
+    if (len(rising_edges) % 2) != 0:
+        raise AlignError('something wrong with laser_state/rising edge detection/interpolation')
+
+    #keep only the first rising edge
+    rising_edges = rising_edges[::2]
+
+    if len(rising_edges) < min_num_ranges:
+        raise AlignError('insufficient number of laser on periods (%s)' % len(rising_edges))
+
+    if align_first_only:
+        tb = get_resampled_timebase(min_experiment_duration)
+        t0 = tb[rising_edges[0]]
+        df['t'] = tb - t0
+        df['trial'] = 1.0
+        return df
+
+    t_before, t_after = t_range
+    ranges = []
+    for edge_idx in rising_edges:
+        t = df.index[edge_idx]
+        ranges.append((t+DateOffset(seconds=t_before),t+DateOffset(seconds=t_after)))
+
+    df['t'] = np.nan
+    df['trial'] = np.nan
+    for range_number,r in enumerate(ranges):
+        r_df = df[r[0]:r[1]]
+        r_duration = (r_df.index[-1] - r_df.index[0]).total_seconds()
+        if r_duration < (t_after - t_before):
+            #this trial was too short
+            continue
+
+        r_tb = get_resampled_timebase_from_df(r_df) + t_before
+        r_df['t'] = r_tb
+        r_df['trial'] = float(range_number)
+
+    return df
 
 def fixup_index_and_resample(df, resample_specifier='10L'):
     if resample_specifier != '10L':

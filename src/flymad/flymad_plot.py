@@ -256,7 +256,7 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
                     print "\tplot",name,xcol,"vs",ycol
                     x,y = _dn(grp_xaxis[::downsample], _ds(grp_yaxis))
                     iax.plot(x, y,
-                             label=name, color='k')
+                             label=str(name), color='k')
                     iax.legend(loc=legend_location)
 
 #                    if fb_wherecol:
