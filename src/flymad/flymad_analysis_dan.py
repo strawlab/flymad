@@ -563,7 +563,7 @@ def get_resampled_timebase_from_df(df, resample_specifier='10L'):
     len_s = len(df) / f
     return np.arange(0, len_s, 1.0/f)
 
-def align_t_by_laser_on(df, min_experiment_duration, align_first_only, t_range=None, min_num_ranges=1):
+def align_t_by_laser_on(df, min_experiment_duration, align_first_only, t_range=None, min_num_ranges=1, exact_num_ranges=None):
 
     duration = (df.index[-1] - df.index[0]).total_seconds()
     if duration < min_experiment_duration:
@@ -581,16 +581,18 @@ def align_t_by_laser_on(df, min_experiment_duration, align_first_only, t_range=N
     #gradient on an array of 0/1 using a distance of 1 (default) uses
     #one sample each side, giving 2x the number of non-zero values.
     dlaser = np.gradient( (df['laser_state'].values > 0).astype(int) ) > 0
-    rising_edges = np.where(dlaser)[0]
-    #check we detected 2x these values (an even number)
-    if (len(rising_edges) % 2) != 0:
-        raise AlignError('something wrong with laser_state/rising edge detection/interpolation')
+    #but if we treat the array as a string we can find those edges \x00\01
+    dlaser_str = dlaser.tostring()
+    rising_edges = [n for n in xrange(len(dlaser_str)) if dlaser_str.find('\x00\x01', n) == n]
 
-    #keep only the first rising edge
-    rising_edges = rising_edges[::2]
+    n_rising_edges = len(rising_edges)
+    print "\t%s laser pulses" % n_rising_edges
 
-    if len(rising_edges) < min_num_ranges:
-        raise AlignError('insufficient number of laser on periods (%s)' % len(rising_edges))
+    if n_rising_edges < min_num_ranges:
+        raise AlignError('insufficient number of laser on periods (%s)' % n_rising_edges)
+
+    if (exact_num_ranges is not None) and (n_rising_edges != exact_num_ranges):
+        raise AlignError('incorrect umber of laser on periods (%s vs %s). delete your cache' % (n_rising_edges,exact_num_ranges))
 
     if align_first_only:
         tb = get_resampled_timebase(min_experiment_duration)
