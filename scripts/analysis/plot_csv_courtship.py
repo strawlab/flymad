@@ -1070,7 +1070,7 @@ if __name__ == "__main__":
             plt.show()
         sys.exit(0)
 
-    bin_size = '5S'
+    bin_size = '1S'
     cache_fname = os.path.join(path,'courtship_%s.madplot-cache' % bin_size)
     cache_args = (args.laser, gts, bin_size)
     dfs = None
@@ -1081,8 +1081,10 @@ if __name__ == "__main__":
         madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
     finescale_stat_info = [
-        ('P1', ('wGP', 'G323', 'wtrpmyc')),
-        ('pIP10', ('40347trpmyc','40347','wtrpmyc')),
+        #('P1', ('wGP', 'G323', 'wtrpmyc')),
+        #('pIP10', ('40347trpmyc','40347','wtrpmyc')),
+        ('P1', ('wGP', 'pooled controls for P1')),
+        ('pIP10', ('40347trpmyc','pooled controls for pIP10')),
         ]
 
     for experiment_name, exp_gts in finescale_stat_info:
