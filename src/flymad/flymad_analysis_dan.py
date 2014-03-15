@@ -226,7 +226,7 @@ def get_arena_conf(calibration_file=None, **kwargs):
 
     rw = 0.045
 
-    if l not in kwargs:
+    if 'l' not in kwargs:
         #keep backwards compat with dan's first nmeth submission
         sx = 0.045/160
         sy = 0.045/185
