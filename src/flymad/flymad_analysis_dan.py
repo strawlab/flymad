@@ -563,7 +563,7 @@ def get_resampled_timebase_from_df(df, resample_specifier='10L'):
     len_s = len(df) / f
     return np.arange(0, len_s, 1.0/f)
 
-def align_t_by_laser_on(df, min_experiment_duration, align_first_only, t_range=None, min_num_ranges=1, exact_num_ranges=None):
+def align_t_by_laser_on(df, min_experiment_duration, resample_bin='10L', align_first_only=True, t_range=None, min_num_ranges=1, exact_num_ranges=None):
 
     duration = (df.index[-1] - df.index[0]).total_seconds()
     if duration < min_experiment_duration:
@@ -573,7 +573,7 @@ def align_t_by_laser_on(df, min_experiment_duration, align_first_only, t_range=N
         min_num_ranges = 1
 
     #Here we have a 10ms resampled dataframe at least min_experiment_duration seconds long.
-    df = df.head(get_num_rows(min_experiment_duration))
+    df = df.head(get_num_rows(min_experiment_duration, resample_bin))
 
     #find when the laser first came on (argmax returns the first true value if
     #all values are identical
@@ -592,10 +592,10 @@ def align_t_by_laser_on(df, min_experiment_duration, align_first_only, t_range=N
         raise AlignError('insufficient number of laser on periods (%s)' % n_rising_edges)
 
     if (exact_num_ranges is not None) and (n_rising_edges != exact_num_ranges):
-        raise AlignError('incorrect umber of laser on periods (%s vs %s). delete your cache' % (n_rising_edges,exact_num_ranges))
+        raise AlignError('incorrect umber of laser on periods (%s vs %s). delete your cache or check your resample paramers' % (n_rising_edges,exact_num_ranges))
 
     if align_first_only:
-        tb = get_resampled_timebase(min_experiment_duration)
+        tb = get_resampled_timebase(min_experiment_duration, resample_bin)
         t0 = tb[rising_edges[0]]
         df['t'] = tb - t0
         df['trial'] = 1.0
@@ -616,7 +616,7 @@ def align_t_by_laser_on(df, min_experiment_duration, align_first_only, t_range=N
             #this trial was too short
             continue
 
-        r_tb = get_resampled_timebase_from_df(r_df) + t_before
+        r_tb = get_resampled_timebase_from_df(r_df, resample_bin) + t_before
         r_df['t'] = r_tb
         r_df['trial'] = float(range_number)
 
