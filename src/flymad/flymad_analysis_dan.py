@@ -221,8 +221,16 @@ def get_arena_conf(calibration_file=None, **kwargs):
     ylim = [x-r-10,x+r+10]
 
     rw = 0.045
-    sx = 0.045/160
-    sy = 0.045/185
+
+    if l not in kwargs:
+        #keep backwards compat with dan's first nmeth submission
+        sx = 0.045/160
+        sy = 0.045/185
+    else:
+        #the more correct case for a camera viewing the arena
+        #perpendicuarly, and the user supplying l,r,t,b points
+        sx = 0.045/(w/2.0)
+        sy = 0.045/(h/2.0)
 
     conf = {'cx':x,'cy':y,'cr':r,'rw':rw,'sx':sx,'sy':sy}
 
