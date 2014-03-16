@@ -744,21 +744,27 @@ def plot_dose_response(path, bin_size, exp_gt, data):
 
 
     fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_DR_dtarget')
-    madplot.view_pairwise_stats_plotly(laser_dtarget, stat_groups, fname_prefix,
+    pp = madplot.view_pairwise_stats_plotly(laser_dtarget, stat_groups, fname_prefix,
                                        align_colname='t',
                                        stat_colname='dtarget',
                                        layout_title='p-values for Dose-Response of distance',
-                                       num_bins=STATS_NUM_BINS,
+                                       num_bins=20,
                                        )
+    print 'dtarget'
+    for pair in pp:
+        print pp[pair]
 
     fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_DR_wei')
-    madplot.view_pairwise_stats_plotly(laser_court, stat_groups, fname_prefix,
+    pp = madplot.view_pairwise_stats_plotly(laser_court, stat_groups, fname_prefix,
                                        align_colname='t',
                                        stat_colname='zx',
                                        layout_title='p-values for Dose-Response of WEI',
-                                       num_bins=STATS_NUM_BINS,
+                                       num_bins=20,
                                        )
 
+    print 'WEI'
+    for pair in pp:
+        print pp[pair]
 
     #all D/R experiments were identical, so take activation times from the
     #last one
