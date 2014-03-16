@@ -1488,7 +1488,7 @@ if __name__ == "__main__":
 
 def calc_p_values(data, gt1_name, gt2_name,
                   align_colname=None, stat_colname=None,
-                  num_bins=50,
+                  num_bins=50, bin_how='mean',
                   ):
 
     if align_colname is None:
@@ -1504,6 +1504,11 @@ def calc_p_values(data, gt1_name, gt2_name,
 
     p_values = DataFrame()
 
+    if bin_how=='mean':
+        bin_func = np.mean
+    elif bin_how=='median':
+        bin_func = np.median
+
     bins = np.linspace(0,dalign,num_bins) + align_start
     binned_ctrl = pd.cut(df_ctrl[align_colname], bins, labels= bins[:-1])
     binned_exp = pd.cut(df_exp[align_colname], bins, labels= bins[:-1])
@@ -1514,13 +1519,13 @@ def calc_p_values(data, gt1_name, gt2_name,
 
         test1 = []
         for obj_id, fly_group in test1_all_flies_df.groupby('obj_id'):
-            test1.append( np.mean(fly_group[stat_colname].values) )
+            test1.append( bin_func(fly_group[stat_colname].values) )
         test1 = np.array(test1)
 
         test2_all_flies_df = df_exp[binned_exp == x]
         test2 = []
         for obj_id, fly_group in test2_all_flies_df.groupby('obj_id'):
-            test2.append( np.mean(fly_group[stat_colname].values) )
+            test2.append( bin_func(fly_group[stat_colname].values) )
         test2 = np.array(test2)
 
         if len(test1)<=5 or len(test2)<=5:
