@@ -16,6 +16,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.image as mimg
 
+import scipy.stats
 from scipy.stats import ttest_ind
 from scipy.stats import kruskal, mannwhitneyu
 
@@ -36,6 +37,8 @@ STATS_NUM_BINS = 40
 
 XLIM_10MIN = [-60,480]
 XLABEL_10MIN = [0, 120, 240, 360, 480]
+
+MINIPLOTS_XTICKS = [0,200,400]
 
 DR_COLORS = {'100hpc':flymad_plot.BLACK,
             '120hpc':flymad_plot.GREEN,
@@ -167,8 +170,13 @@ def prepare_data(path, only_laser, resample_bin, gts):
 
         print "\t%ss experiment" % duration
 
+        #total_zx = df['zx'].sum()
+        zx_series = df['zx']
+
         # do resampling
         df = df.resample(resample_bin, fill_method='ffill', how='median')
+        zx_series_resampled = zx_series.resample( resample_bin, fill_method='ffill', how='sum')
+        df['zx_counts'] = zx_series_resampled
 
         #fix laser_state due to resampling
         df['laser_state'] = df['laser_state'].fillna(value=0)
@@ -317,7 +325,7 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
         ax.set_ylim([0,1])
         ax.set_xlim(XLIM_10MIN)
 
-        flymad_plot.retick_relabel_axis(ax, [0,240,480], [0,0.5,1])
+        flymad_plot.retick_relabel_axis(ax, MINIPLOTS_XTICKS, [0,0.5,1])
 
         figname = "%s_%s" % (laser,gt)
         fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_%s.png" % figname), bbox_inches='tight')
@@ -351,7 +359,7 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
         ax.set_ylim([40,160])
         ax.set_xlim(XLIM_10MIN)
 
-        flymad_plot.retick_relabel_axis(ax, [0,240,480], [40,160])
+        flymad_plot.retick_relabel_axis(ax, MINIPLOTS_XTICKS, [40,160])
 
         figname = "%s_%s" % (laser,gt)
         fig.savefig(flymad_plot.get_plotpath(path,"dtarget_and_WingExt_%s.png" % figname), bbox_inches='tight')
@@ -368,20 +376,71 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
     time = []
     laser_state = []
     nens = []
+    bins_proximal = []
+    bins_total = []
     for t,grp in non_grouped_df.groupby('t_align'):
-        nf = float(len(grp))
+        nf = float(len(grp)) # number of observations (==flies) at this timepoint
         nens.append(nf)
 
         first = grp.head(1)
-        time.append( float(first['t']) )
+        time.append( float(first['t']) ) # get x index for this timepoint
 
-        court = grp['zx'] > 0
-        total.append( court.sum() / nf )
+        court = grp['zx_counts'] > 0
+        total.append( court.sum() / nf ) # get number of wing extensions at this timepoint
 
-        trg = grp[court & (grp['dtarget'] < DIRECTED_COURTING_DIST)]
+        trg = grp[court & (grp['dtarget'] < DIRECTED_COURTING_DIST)] # get number of proximal wing extensions
         targeted.append( len(trg) / nf )
 
-        laser_state.append(bool(first['laser_state']))
+        bins_proximal.append( len(grp[ grp['dtarget'] < DIRECTED_COURTING_DIST ]) )
+        bins_total.append( len(grp) )
+
+        laser_state.append(bool(first['laser_state'])) # keep track of laser state, too
+
+    # calculate proximity stats -----
+
+    n_wingext_total = dict( [(period,0) for period in period_order] )
+    n_wingext_proximal = dict( [(period,0) for period in period_order] )
+    n_bins_total = dict( [(period,0) for period in period_order] )
+    n_bins_proximal = dict( [(period,0) for period in period_order] )
+    n_flies = {}
+    for this_time, this_total_wing_ext, this_proximal_wing_ext, this_nf, this_total_bins, this_proximal_bins in zip( time, total, targeted, nens, bins_total, bins_proximal ):
+        for period in period_order:
+            period_start, period_stop = PERIODS[period]
+            if (period_start <= this_time) and (this_time < period_stop):
+                n_wingext_total[period] += this_total_wing_ext*this_nf
+                n_wingext_proximal[period] += this_proximal_wing_ext*this_nf
+                n_bins_total[period] += this_total_bins
+                n_bins_proximal[period] += this_proximal_bins
+                n_flies[period] = this_nf
+    time_arr = np.array(time)
+    bin_size_seconds = np.mean(time_arr[1:]-time_arr[:-1])
+    stat_rows = []
+    for period in period_order:
+        # convert back to actual number of observations (max rate of one per bin)
+        total_obs = int(n_wingext_total[period])
+        proximal_obs = int(n_wingext_proximal[period])
+        if total_obs > 0:
+            fraction = float(proximal_obs)/total_obs
+        else:
+            fraction = np.nan
+
+        this_row = dict( Genotype=gt,
+                         period=period,
+                         total_wing_ext=total_obs,
+                         proximal_wing_ext=proximal_obs,
+                         fraction_wing_ext=fraction,
+                         bin_size=bin_size,
+                         bin_start=PERIODS[period][0],
+                         bin_stop=PERIODS[period][1],
+                         bin_size_seconds=bin_size_seconds,
+                         proximal_bins=n_bins_proximal[period],
+                         total_bins=n_bins_total[period],
+                         fraction_proximal_bins=n_bins_proximal[period]/float(n_bins_total[period]),
+                         n_flies=n_flies[period],
+                         )
+        stat_rows.append(this_row)
+
+    # --------
 
     figure_title = "%s (%s) Courtship Wingext Split 10min (%s)" % (flymad_analysis.human_label(gt, specific=True), gt, laser)
     fig = plt.figure(figure_title, figsize=figsize)
@@ -397,20 +456,14 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
                     return_dict=True,
                     total=dict(xaxis=xaxis,
                                value=np.array(total),
-#                              std=grp.std()['zx'].values,
-#                              n=grp.count()['zx'].values,
                                color=flymad_plot.BLACK,
                                label="Total",
-#                               df=non_grouped_df,
                                marker='o',linestyle='',
                                N=int(np.mean(nens))),
                     close=dict(xaxis=xaxis,
                                value=np.array(targeted),
-#                              std=grp.std()['zx'].values,
-#                              n=grp.count()['zx'].values,
                                color=flymad_plot.GREEN,
                                label="Targeted",
-#                               df=closedf,
                                marker='o',linestyle='',
                                N=int(np.mean(nens)))
     )
@@ -426,16 +479,103 @@ def plot_single_genotype(path, laser, bin_size, gt, df, figsize=(4,4)):
     ax.set_ylim([0,1])
     ax.set_xlim(XLIM_10MIN)
 
-    flymad_plot.retick_relabel_axis(ax, [0,240,480], [0,1])
+    flymad_plot.retick_relabel_axis(ax, MINIPLOTS_XTICKS, [0,1])
 
     figname = "%s_%s" % (laser,gt)
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.png" % figname), bbox_inches='tight')
     fig.savefig(flymad_plot.get_plotpath(path,"following_and_WingExt_split_%s.svg" % figname), bbox_inches='tight')
 
+    return stat_rows
+
+def do_chi_squares(df):
+    save_fname = flymad_plot.get_plotpath(path,"following_and_WingExt_stats.html")
+
+    with open(save_fname,mode='w') as fd:
+        fd.write('<h1>raw data</h1>\n')
+        fd.write("all tests: Pearson's chi square test, 1 degree of freedom\n")
+        fd.write(df._repr_html_())
+
+        fd.write('<h1>test 1</h1>\n')
+        fd.write('''
+
+        Test the hypothesis that a random sample of N proximal wing
+        extensions has been drawn from a population in which early and
+        late wing proximal extensions are equal in frequency.
+
+        ''')
+
+        for gt, gtdf in df.groupby('Genotype'):
+
+
+            rows = []
+            index = []
+            for i,period1 in enumerate(period_order):
+                index.append(period1)
+                this_row = dict(Genotype=gt)
+                for j,period2 in enumerate(period_order):
+                    proximal1 = gtdf[ gtdf['period']==period1]['proximal_wing_ext']
+                    proximal2 = gtdf[ gtdf['period']==period2]['proximal_wing_ext']
+                    assert len(proximal1.values)==1
+                    assert len(proximal2.values)==1
+                    proximal1 = float(proximal1)
+                    proximal2 = float(proximal2)
+                    total = proximal1 + proximal2
+                    equal_prediction = total/2.0
+                    if equal_prediction==0:
+                        chi_square = np.nan
+                    else:
+                        chi_square = (proximal1-equal_prediction)**2/equal_prediction + \
+                                     (proximal2-equal_prediction)**2/equal_prediction
+                    pval = scipy.stats.chisqprob(chi_square, 1)
+                    this_row[period2] = pval
+                rows.append(this_row)
+            pvals_gt_df = pd.DataFrame(rows,index=index)
+            fd.write('<h2>%s</h2>\n'%flymad_analysis.human_label(gt, specific=True))
+            fd.write(pvals_gt_df._repr_html_())
+
+
+        fd.write('<h1>test 2</h1>\n')
+        fd.write('''
+
+        Test the hypothesis that a random sample of N proximal visits
+        has been drawn from a population in which early and late
+        proximal visits are equal in frequency.
+
+        ''')
+
+        for gt, gtdf in df.groupby('Genotype'):
+
+
+            rows = []
+            index = []
+            for i,period1 in enumerate(period_order):
+                index.append(period1)
+                this_row = dict(Genotype=gt)
+                for j,period2 in enumerate(period_order):
+                    proximal1 = gtdf[ gtdf['period']==period1]['proximal_bins']
+                    proximal2 = gtdf[ gtdf['period']==period2]['proximal_bins']
+                    assert len(proximal1.values)==1
+                    assert len(proximal2.values)==1
+                    proximal1 = float(proximal1)
+                    proximal2 = float(proximal2)
+                    total = proximal1 + proximal2
+                    equal_prediction = total/2.0
+                    if equal_prediction==0:
+                        chi_square = np.nan
+                    else:
+                        chi_square = (proximal1-equal_prediction)**2/equal_prediction + \
+                                     (proximal2-equal_prediction)**2/equal_prediction
+                    pval = scipy.stats.chisqprob(chi_square, 1)
+                    this_row[period2] = pval
+                rows.append(this_row)
+            pvals_gt_df = pd.DataFrame(rows,index=index)
+            fd.write('<h2>%s</h2>\n'%flymad_analysis.human_label(gt, specific=True))
+            fd.write(pvals_gt_df._repr_html_())
+
 PERIODS = dict(before=(-60,0),
                during=(0,20),
-               early=(20,200),
-               late=(200,340),
+               early=(20,240),
+               late=(240,460),
                #very_late=(60,340),
                )
 period_order = ['before','during','early','late']#,'very_late']
@@ -1061,8 +1201,13 @@ if __name__ == "__main__":
             dfs = prepare_data(path, args.laser, bin_size, gts)
             madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
+        stats = []
         for gt,gtdf in dfs.iteritems():
-            plot_single_genotype(path, args.laser, bin_size, gt, gtdf)
+            stats.extend(plot_single_genotype(path, args.laser, bin_size, gt, gtdf))
+        stats_df = pd.DataFrame(stats)
+        print stats_df
+
+        do_chi_squares(stats_df)
 
         if args.show:
             plt.show()
