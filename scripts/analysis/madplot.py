@@ -1555,6 +1555,7 @@ def calc_p_values(data, gt1_name, gt2_name,
 
 def get_pairwise(data,gt1_name,gt2_name,**kwargs):
     layout_title = kwargs.pop('layout_title',None)
+    human_label_dict = kwargs.pop('human_label_dict',None)
     p_values = calc_p_values(data, gt1_name, gt2_name,**kwargs)
     if len(p_values)==0:
         return None
@@ -1581,8 +1582,12 @@ def get_pairwise(data,gt1_name,gt2_name,**kwargs):
         texts.append( '')
 
     import flymad.flymad_analysis_dan as flymad_analysis
-    human1 = flymad_analysis.human_label(gt1_name)
-    human2 = flymad_analysis.human_label(gt2_name)
+    if human_label_dict is None:
+        human1 = flymad_analysis.human_label(gt1_name)
+        human2 = flymad_analysis.human_label(gt2_name)
+    else:
+        human1 = human_label_dict[gt1_name]
+        human2 = human_label_dict[gt2_name]
 
     this_dict = {
         'name':'%s vs. %s' % (human1, human2),
