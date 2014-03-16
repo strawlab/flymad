@@ -1613,12 +1613,14 @@ def view_pairwise_stats_plotly( data, names, fig_prefix, **kwargs):
 
     graph_data = []
     layout=None
+    pvalue_results = {}
     for pair in pairs:
         name1, name2 = pair
         pairwise_data = get_pairwise( data, name1, name2, **kwargs)
         if pairwise_data is not None:
             graph_data.append( pairwise_data['data'] )
             layout=pairwise_data['layout']
+            pvalue_results[pair] = pairwise_data['df']
 
     if len( graph_data )==0:
         return
@@ -1654,3 +1656,5 @@ def view_pairwise_stats_plotly( data, names, fig_prefix, **kwargs):
         fig_fname = fig_prefix + '_p_values' + ext
         result2['fig'].savefig(fig_fname)
         print 'saved',fig_fname
+
+    return pvalue_results
