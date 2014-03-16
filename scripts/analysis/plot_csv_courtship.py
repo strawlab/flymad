@@ -572,6 +572,46 @@ def do_chi_squares(df):
             fd.write('<h2>%s</h2>\n'%flymad_analysis.human_label(gt, specific=True))
             fd.write(pvals_gt_df._repr_html_())
 
+
+        fd.write('<h1>test 3</h1>\n')
+        fd.write('''
+
+        Test the hypothesis that a random sample of N (total) wing
+        extensions has been drawn from a population in which early and
+        late wing extensions are equal in frequency.
+
+        ''')
+
+        for gt, gtdf in df.groupby('Genotype'):
+
+
+            rows = []
+            index = []
+            for i,period1 in enumerate(period_order):
+                index.append(period1)
+                this_row = dict(Genotype=gt)
+                for j,period2 in enumerate(period_order):
+                    proximal1 = gtdf[ gtdf['period']==period1]['total_wing_ext']
+                    proximal2 = gtdf[ gtdf['period']==period2]['total_wing_ext']
+                    assert len(proximal1.values)==1
+                    assert len(proximal2.values)==1
+                    proximal1 = float(proximal1)
+                    proximal2 = float(proximal2)
+                    total = proximal1 + proximal2
+                    equal_prediction = total/2.0
+                    if equal_prediction==0:
+                        chi_square = np.nan
+                    else:
+                        chi_square = (proximal1-equal_prediction)**2/equal_prediction + \
+                                     (proximal2-equal_prediction)**2/equal_prediction
+                    pval = scipy.stats.chisqprob(chi_square, 1)
+                    this_row[period2] = pval
+                rows.append(this_row)
+            pvals_gt_df = pd.DataFrame(rows,index=index)
+            fd.write('<h2>%s</h2>\n'%flymad_analysis.human_label(gt, specific=True))
+            fd.write(pvals_gt_df._repr_html_())
+
+
 PERIODS = dict(before=(-60,0),
                during=(0,20),
                early=(20,240),
