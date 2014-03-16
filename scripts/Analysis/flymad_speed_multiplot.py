@@ -123,12 +123,6 @@ def load_data(path, smoothstr):
             pd.load(path + "/df2" + smoothstr + ".df"),
     )
 
-def get_stats(group):
-    return {'mean': group.mean(),
-            'var' : group.var(),
-            'n' : group.count()
-           }
-
 def add_obj_id(df):
     results = np.zeros( (len(df),), dtype=np.int )
     obj_id = 0
@@ -136,83 +130,53 @@ def add_obj_id(df):
         if row['align']==0.0:
             obj_id += 1
         results[i] = obj_id
+    df = df.copy()
     df['obj_id']=results
     return df
 
-def calc_kruskal(df_ctrl, df_exp, number_of_bins, align_colname='align', vfwd_colname='v'):
-    df_ctrl = add_obj_id(df_ctrl)
-    df_exp = add_obj_id(df_exp)
+def do_stats(path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2):
+    exp_genotype = 'OK371shib'
+    ctrl_genotype = 'wshib'
 
-    dalign = df_ctrl['align'].max() - df_ctrl['align'].min()
+    df2 = add_obj_id(df2)
+    df2['t'] = df2['align']-10
+    df2 = df2[ df2['t'] <= 40 ]
 
-    p_values = DataFrame()
-    for binsize in number_of_bins:
-        bins = np.linspace(0,dalign,binsize)
-        binned_ctrl = pd.cut(df_ctrl['align'], bins, labels= bins[:-1])
-        binned_exp = pd.cut(df_exp['align'], bins, labels= bins[:-1])
-        for x in binned_ctrl.levels:
-            test1_all_flies_df = df_ctrl[binned_ctrl == x]
-            test1 = []
-            for obj_id, fly_group in test1_all_flies_df.groupby('obj_id'):
-                test1.append( np.mean(fly_group['v'].values) )
-            test1 = np.array(test1)
+    expdf = df2[df2['Genotype'] == exp_genotype]
+    ctrldf = df2[df2['Genotype']== ctrl_genotype]
 
-            test2_all_flies_df = df_exp[binned_exp == x]
-            test2 = []
-            for obj_id, fly_group in test2_all_flies_df.groupby('obj_id'):
-                test2.append( np.mean(fly_group['v'].values) )
-            test2 = np.array(test2)
+    data={
+        'OK371>ShiTs':dict(df=expdf),
+        'controls':dict(df=ctrldf),
+        }
+    names=['OK371>ShiTs','controls']
 
-            hval, pval = kruskal(test1, test2)
-            dftemp = DataFrame({'Total_bins': binsize , 'Bin_number': x, 'P': pval}, index=[x])
-            p_values = pd.concat([p_values, dftemp])
-    return p_values
-
-def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln , df2):
-    number_of_bins = [ 6990//4 ]
-    df_ctrl = df2[df2['Genotype'] == ctrl_genotype]
-    df_exp = df2[df2['Genotype'] == exp_genotype]
-    return calc_kruskal(df_ctrl, df_exp, number_of_bins)
-
-def fit_to_curve (path, smoothstr, p_values):
-    x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
-    logs = -1*(np.log10(p_values['P'][p_values['Bin_number'] <= 50]))
-    y = np.array(logs)
-    # order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
-    # poly_params = np.polyfit(x,y,order)
-    # polynom = np.poly1d(poly_params)
-    # xPoly = np.linspace(0, max(x), 100)
-    # yPoly = polynom(xPoly)
-    fig1 = plt.figure()
-    ax = fig1.add_subplot(1,1,1)
-    ax.plot(x, y, 'bo-')
-
-    ax.axvspan(10,20,
-               facecolor='Yellow', alpha=0.15,
-               edgecolor='none',
-               zorder=-20)
-
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('-log10(p)')
-    ax.set_ylim([0, 25])
-    ax.set_xlim([5, 40])
+    import madplot
+    num_bins=40
+    fname_prefix = flymad_plot.get_plotpath(path,'OK371_pvalues_%d_bins'%(num_bins,))
+    madplot.view_pairwise_stats_plotly( data, names, fname_prefix,
+                                        align_colname='align',
+                                        stat_colname='v',
+                                        num_bins=num_bins,
+                                        )
 
 def plot_data(path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, df2):
 
     fig2 = plt.figure("Speed Multiplot %s" % smoothstr)
     ax = fig2.add_subplot(1,1,1)
+    t0=10
 
     tb = dict(where=ctrlmean['laser_state'].values>0,
-              xaxis=ctrlmean['align'].values,
+              xaxis=ctrlmean['align'].values-t0,
               )
     flymad_plot.plot_timeseries_with_activation(ax,
-                    exp=dict(xaxis=expmean['align'].values,
+                    exp=dict(xaxis=expmean['align'].values-t0,
                              value=expmean['v'].values,
                              std=expstd['v'].values,
                              n=expn['v'].values,
                              label='OK371>ShibireTS',
                              ontop=True),
-                    ctrl=dict(xaxis=ctrlmean['align'].values,
+                    ctrl=dict(xaxis=ctrlmean['align'].values-t0,
                               value=ctrlmean['v'].values,
                               std=ctrlstd['v'].values,
                               n=ctrln['v'].values,
@@ -222,8 +186,10 @@ def plot_data(path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, 
                     downsample=25
     )
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Speed (%s/s) +/- STD' % arena.unit)
-    ax.set_xlim([0, 70])
+    ax.set_ylabel('Speed (%s/s)' % arena.unit)
+    ax.set_xlim([-t0, 40])
+    ax.set_yticks([0,20,40])
+    ax.set_xticks(range(0,41,10))
 
     ax.set_title("Speed %s" % smoothstr)
 
@@ -253,8 +219,9 @@ if __name__ == "__main__":
     else:
         data = prepare_data(path, smoothstr, args.smooth, EXP_GENOTYPE, CTRL_GENOTYPE)
 
-    p_values = run_stats(path, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
-    fit_to_curve(path, smoothstr, p_values)
+    #p_values = run_stats(path, EXP_GENOTYPE, CTRL_GENOTYPE, *data)
+    #fit_to_curve(path, smoothstr, p_values)
+    do_stats(path, smoothstr, *data)
     plot_data(path, smoothstr, *data)
 
     if args.show:
