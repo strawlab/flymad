@@ -220,6 +220,63 @@ def plot_cross_activation_only(path, data, arena, note):
         for efigname, efig in figs.iteritems():
             efig.savefig(flymad_plot.get_plotpath(path,"moonwalker_%s_%s_individual_%s.png" % (gt, figname, efigname)), bbox_inches='tight')
 
+def do_stats(path,data,d1_arena,note):
+
+    datasets = {}
+    laser_powers = set()
+    for gt in data:
+        laser_powers_sorted = sorted(data[gt], cmp=flymad_analysis.cmp_laser, reverse=True)
+        for order,laser in enumerate(laser_powers_sorted):
+            laser_powers.add( laser )
+            gtdf = data[gt][laser][gt]
+            fake_gt_name = '%s-%s'%(gt,laser)
+            datasets[fake_gt_name] = gtdf
+
+    # do the stats
+    stat_info = [
+        ('trp_basic_control1', ['50660trp-350iru','50660-350iru']),
+        ('trp_basic_control2', ['50660trp-350iru','wtrp-350iru']),
+        ('trp_basic_pooled_controls', ['50660trp-350iru','my_pooled_controls-350iru']),
+
+        ('chrimson_crosstalk_controls', ['50660chrim-350iru','50660-350iru']),
+        ('chrimson_crosstalk_activation_low_1', ['50660chrim-350iru','50660chrim-028ru']),
+        ('chrimson_crosstalk_activation_low_2', ['50660-350iru','50660chrim-028ru']),
+        ('chrimson_activation_high', ['50660-350ru','50660chrim-028ru']),
+
+        ('trp_crosstalk_activation_low', ['50660trp-183iru','50660trp-350ru']),
+        ('trp_activation_high', ['50660trp-183iru','50660trp-434iru']),
+        ]
+    gt_names = {'50660':'Gal4-control',
+                'wtrp':'UAS-control',
+                'my_pooled_controls':'controls',
+                '50660chrim':'MW>Chrim',
+                '50660trp':'MW>TrpA1',
+                }
+    human_label_dict = {}
+    for laser in laser_powers:
+        laser_human = flymad_analysis.laser_desc(laser)
+        assert laser_human != laser
+        for gt in ['50660','50660chrim','50660trp','wtrp','my_pooled_controls']:
+            gt_human = gt_names[gt]
+            assert gt_human != gt
+            key = '%s-%s'%(gt,laser)
+            value = '%s %s'%(gt_human,laser_human)
+            human_label_dict[key] = value
+
+    pooldf = pd.concat([datasets['wtrp-350iru']['df'],datasets['50660-350iru']['df']])
+    datasets['my_pooled_controls-350iru'] = dict(df=pooldf)
+
+    num_bins = [40]
+    for num_bin in num_bins:
+        for experiment_name, exp_gts in stat_info:
+            fname_prefix = flymad_plot.get_plotpath(path,'moonwalker_stats_%s_%d_bins'%(experiment_name,num_bin))
+            madplot.view_pairwise_stats_plotly(datasets, exp_gts, fname_prefix,
+                                               align_colname='t',
+                                               stat_colname='Vfwd',
+                                               layout_title='p-values',
+                                               num_bins=num_bin,
+                                               human_label_dict=human_label_dict,
+                                               )
 
 def plot_all_data(path, data, arena, note):
 
@@ -374,6 +431,7 @@ if __name__ == "__main__":
     #from here on, arena is only used for the units
     assert d1_arena.unit == d2_arena.unit
 
+    do_stats(path,all_data,d1_arena,note)
     plot_all_data(path, all_data, d1_arena, note)
     plot_cross_activation_only(path, all_data, d1_arena, note)
 
