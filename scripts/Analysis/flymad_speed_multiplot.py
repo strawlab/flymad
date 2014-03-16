@@ -176,7 +176,7 @@ def run_stats (path, exp_genotype, ctrl_genotype, expmean, ctrlmean, expstd, ctr
 
 def fit_to_curve (path, smoothstr, p_values):
     x = np.array(p_values['Bin_number'][p_values['Bin_number'] <= 50])
-    logs = -1*(np.log(p_values['P'][p_values['Bin_number'] <= 50]))
+    logs = -1*(np.log10(p_values['P'][p_values['Bin_number'] <= 50]))
     y = np.array(logs)
     # order = 11 #DEFINE ORDER OF POLYNOMIAL HERE.
     # poly_params = np.polyfit(x,y,order)
@@ -193,7 +193,7 @@ def fit_to_curve (path, smoothstr, p_values):
                zorder=-20)
 
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('-log(p)')
+    ax.set_ylabel('-log10(p)')
     ax.set_ylim([0, 25])
     ax.set_xlim([5, 40])
 
@@ -202,6 +202,9 @@ def plot_data(path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, 
     fig2 = plt.figure("Speed Multiplot %s" % smoothstr)
     ax = fig2.add_subplot(1,1,1)
 
+    tb = dict(where=ctrlmean['laser_state'].values>0,
+              xaxis=ctrlmean['align'].values,
+              )
     flymad_plot.plot_timeseries_with_activation(ax,
                     exp=dict(xaxis=expmean['align'].values,
                              value=expmean['v'].values,
@@ -214,7 +217,8 @@ def plot_data(path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, 
                               std=ctrlstd['v'].values,
                               n=ctrln['v'].values,
                               label='Control'),
-                    targetbetween=ctrlmean['laser_state'].values>0,
+                                                sem=True,
+                    targetbetween=tb,
                     downsample=25
     )
     ax.set_xlabel('Time (s)')
