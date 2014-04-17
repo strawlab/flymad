@@ -27,5 +27,5 @@ git archive --prefix flymad-${REV}/ --format tar.gz --output ${THISDIR}/archived
 cd ${THISDIR}
 
 # Now build the installer script
-makeself.sh --base64 archivedir install-flymad-on-ubuntu-12.04-amd64.sh \
+makeself.sh --base64 --help-header help-header.txt archivedir install-flymad-on-ubuntu-12.04-amd64.sh \
   "FlyMAD installer" ./install-flymad.sh ${REV}
