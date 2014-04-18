@@ -39,7 +39,13 @@ export FLYMAD_TARGET="/opt/ros/ros-flymad.hydro"
 rosinstall ${FLYMAD_TARGET} /opt/ros/hydro/.rosinstall ${ROSINSTALL_SPEC_PATH}
 
 source ${FLYMAD_TARGET}/setup.bash
-sudo rosdep init
+
+if [ -f /etc/ros/rosdep/sources.list.d/20-default.list ]; then
+  echo "rosdep already initialized"
+else
+  sudo rosdep init
+fi
+
 ./ensure_line.py "yaml https://raw.github.com/strawlab/rosdistro/hydro/rosdep.yaml" "/etc/ros/rosdep/sources.list.d/20-default.list"
 chmod -R a+rX /etc/ros
 
