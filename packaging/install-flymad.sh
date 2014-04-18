@@ -15,6 +15,10 @@ set -e
 #
 # -----------------------------------------------------------------
 
+# Install as root user. (Do not let ROS install things into ~/.ros .)
+export HOME=/root
+export USER=root
+
 ./install-flymad-prereqs.sh
 
 # ---- get our git revision -----------
