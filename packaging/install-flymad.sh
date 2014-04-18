@@ -55,3 +55,5 @@ rosdep install flymad --default-yes
 rosmake flymad
 
 chmod -R a+rX ${FLYMAD_TARGET}
+
+sudo desktop-file-install ${FLYMAD_TARGET}/flymad/packaging/gflymad.desktop
