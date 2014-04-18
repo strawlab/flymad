@@ -12,6 +12,12 @@ import os.path
 import subprocess
 import datetime
 import glob
+import threading
+import time
+import json
+import urllib2
+
+from distutils.version import StrictVersion
 
 import rospy
 import roslib.packages
@@ -21,13 +27,42 @@ import rosgobject.gtk
 import rosgobject.managers
 from rosgobject.wrappers import *
 
-#lbl_stat_pt_2_30
-
-from gi.repository import Gtk, GLib
+from gi.repository import Gtk, GLib, GObject
 
 DEFAULT_PATH = os.path.expanduser("~/FLYMAD")
 USB_PARAM = '/flymad_micro/port'
 USB_DEFAULT = '/dev/ttyUSB0'
+
+class VersionChecker(threading.Thread, GObject.GObject):
+
+    __gsignals__ =  {
+            "version": (
+                GObject.SignalFlags.RUN_LAST, None, [
+                str]),
+            }
+
+    def __init__(self):
+        threading.Thread.__init__(self, name="version_check")
+        self.daemon = True
+        GObject.GObject.__init__(self)
+
+    def _emit_version(self, s):
+        GObject.idle_add(GObject.GObject.emit,self,"version",s)
+
+    def check(self, check_url):
+        self._url = check_url
+        self.start()
+
+    def run(self):
+        time.sleep(2)
+        try:
+            req = urllib2.Request(self._url)
+            req.add_header('X-FlyMAD-Version', flymad.__version__)
+            resp = urllib2.urlopen(req)
+            content = resp.read()
+            self._emit_version(content)
+        except:
+            self._emit_version('')
 
 class MyGtkButtonStartNode(GtkButtonStartNode):
     def __init__(self,*args,**kwargs):
@@ -45,6 +80,9 @@ class UI:
                     roslib.packages.get_pkg_dir('flymad',required=True),
                     "data","gflymad.glade")
         )
+
+        self._vercheck = VersionChecker()
+        self._vercheck.connect("version", self._on_got_version)
 
         self._fcb = self._ui.get_object("filechooserbutton1")
         self._fcb.set_filename(DEFAULT_PATH)
@@ -80,6 +118,8 @@ class UI:
         self._manager = rosgobject.managers.ROSNodeManager()
         self._build_ui()
 
+        self._window = self._ui.get_object("FlyMAD")
+
         self._ksb = GtkButtonKillNode(
                         self._ui.get_object("bkillExperiment"),
                         self._manager,
@@ -93,6 +133,41 @@ class UI:
         #Start ros joy_node, so that in manual control mode the joystick can be used
         self._joynode_proc = subprocess.Popen(['rosrun', 'joy', 'joy_node'])
         self._rosbag_proc = None
+
+        cdir = os.path.join(GLib.get_user_config_dir(), 'flymad')
+        if not os.path.isfile(os.path.join(cdir,'no_version_check')):
+
+            if os.path.isfile(os.path.join(cdir,'prefer_development_version')):
+                url = "http://updates.flymad.strawlab.org/development/"
+            else:
+                url = "http://updates.flymad.strawlab.org/stable/"
+
+            self._vercheck.check(url)
+
+    def _on_got_version(self, t, version):
+        if not version:
+            return
+
+        try:
+            dat = json.loads(version)
+            if StrictVersion(flymad.__version__) < StrictVersion(dat['version']):
+
+                grid = self._ui.get_object("grid1")
+                grid.insert_row(0)
+                bar = Gtk.InfoBar()
+                grid.attach(bar, 0,0,2,1)
+                bar.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.OK)
+                bar.connect('response', lambda _b, _r: _b.hide())
+                bar.set_message_type(Gtk.MessageType.INFO)
+                label = Gtk.Label()
+                label.set_markup('A new version of FlyMAD is available. '
+                                 '<a href="%s">Click here</a> to learn more' % (
+                                 dat["url"],))
+                bar.get_content_area().pack_start(label, False, False, 0)
+                bar.show_all()
+
+        except Exception, e:
+            print "ERROR checking version: %s" % e
 
     def _on_head_delta(self, msg):
         for v in self._stats.itervalues():
