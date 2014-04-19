@@ -3,7 +3,6 @@
 import roslib
 import roslib.packages
 roslib.load_manifest('flymad')
-roslib.load_manifest('rosgobject')
 import flymad.laser_camera_calibration
 import flymad.refined_utils
 import flymad.msg
