@@ -8,6 +8,7 @@ set -e
 #########################################
 THISDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REV=`git rev-parse --short --verify HEAD`
+VERSION=`python -c "import roslib; roslib.load_manifest('flymad'); import flymad; print flymad.__version__"`
 
 # change into "flymad/packaging/"
 cd ${THISDIR}
@@ -27,5 +28,6 @@ git archive --prefix flymad-${REV}/ --format tar.gz --output ${THISDIR}/archived
 cd ${THISDIR}
 
 # Now build the installer script
-makeself.sh --base64 --help-header help-header.txt archivedir install-flymad-on-ubuntu-12.04-amd64.sh \
-  "FlyMAD installer" ./install-flymad.sh ${REV}
+makeself.sh --base64 --help-header help-header.txt archivedir \
+  install-flymad-on-ubuntu-12.04-amd64.sh \
+  "FlyMAD ${VERSION} installer" ./install-flymad.sh ${REV}
