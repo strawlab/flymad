@@ -57,7 +57,7 @@ class VersionChecker(threading.Thread, GObject.GObject):
         time.sleep(2)
         try:
             req = urllib2.Request(self._url)
-            req.add_header('X-FlyMAD-Version', flymad.__version__)
+            req.add_header('User-Agent', 'gflymad/%s'%flymad.__version__)
             resp = urllib2.urlopen(req)
             content = resp.read()
             self._emit_version(content)
