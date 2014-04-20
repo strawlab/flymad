@@ -32,7 +32,7 @@ flymad-release-$(VERSION): flymad-packaging-dir
 	cp -a $< $@
 
 # the actual packaged file -------------------------------------
-flymad-packaging-dir: install-flymad-on-ubuntu-12.04-amd64.sh tarball-readme.md $(FLYMAD_BASE_DIR)/doc/mechanical_drawings $(FLYMAD_BASE_DIR)/flymad_micro/PCB/shield_10b.zip  $(FLYMAD_BASE_DIR)/flymad_micro/enclosure/PCB_enclosure.svg
+flymad-packaging-dir: install-flymad-on-ubuntu-12.04-amd64.sh tarball-readme.md $(FLYMAD_BASE_DIR)/doc/mechanical_drawings $(FLYMAD_BASE_DIR)/flymad_micro/PCB/shield_10b.zip
 	cp -a $^ $(TMPDIR)
 	mv $(TMPDIR)/tarball-readme.md $(TMPDIR)/README
 	rm -rf $@
