@@ -7,7 +7,7 @@ set -e
 #
 # It does the following:
 #
-#   1) calls the script ./install-flymad-prereq.sh to ensure that
+#   1) calls the script ./install-flymad-prereqs.sh to ensure that
 #      the machine is setup properly
 #   2) it generates a .rosinstall spec file specifying the ROS
 #      stacks necessary
