@@ -15,6 +15,8 @@ Wanted hardware improvements
   current measurement if wanted
 * Add two LEDS - one for init OK and one for Laser On
 * Expose the LASER pin to an external header, not just to the relay
+* Make support for 3x lasers
+* Fix layout to fit better in enclosure
 
 
 
