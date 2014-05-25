@@ -158,7 +158,7 @@ if __name__ == "__main__":
             device_y0=actual_h-PH, device_y1=actual_h
     )
 
-    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(BAG_FILE))
+    moviemaker = madplot.MovieMaker(basename=os.path.basename(BAG_FILE))
 
     ass = Assembler(actual_w, actual_h,
                     panels, 

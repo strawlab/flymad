@@ -6,6 +6,7 @@ GObject.threads_init()
 Gdk.threads_init()
 
 import sys
+import random
 import tempfile
 import subprocess
 import threading
@@ -31,6 +32,9 @@ import flymad.conv as bagconv
 
 # Create a single vlc.Instance() to be shared by (possible) multiple players.
 instance = vlc.Instance("--no-snapshot-preview --snapshot-format png")
+
+from analysis.th_experiments import DOROTHEA_NAME_RE_BASE
+DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '.mp4$')
 
 class OCRThread(threading.Thread):
 
@@ -107,7 +111,7 @@ class OCRThread(threading.Thread):
 
         # Converts to black and white
         if self.THRESH > 0:
-            im = im.point(lambda p: p > self.THRESH and 255)  
+            im = im.point(lambda p: p > self.THRESH and 255)
 
         im.save(out)
 
@@ -222,17 +226,22 @@ class VideoScorer(Gtk.Window):
         "x":"zx",
         "c":"cv",
         "v":"cv",
+        "q":"qw",
+        "w":"qw",
     }
     #which of the pair as defined above means 'OFF'
     KEY_DEFAULTS = {
         "as":"s",
         "zx":"x",
         "cv":"v",
+        "qw":"w",
     }
 
 
-    def __init__(self, mode, force_date):
+    def __init__(self, mode, force_date, out_fname):
         Gtk.Window.__init__(self)
+        self.blind_fname = None
+        self.out_fname = out_fname
         self.vlc = DecoratedVLCWidget()
         self.connect("key-press-event",self._on_key_press)
         self.connect("delete-event", self._on_quit)
@@ -258,7 +267,9 @@ class VideoScorer(Gtk.Window):
     def main(self, fname, bagname, set_title):
         self.fname = fname
         self.bname = bagname
-        self.vlc.player.set_media(instance.media_new(fname))
+        self.blind_fname = tempfile.mktemp(suffix='.mp4') # generate random filename
+        os.symlink(os.path.abspath(fname), self.blind_fname)
+        self.vlc.player.set_media(instance.media_new(self.blind_fname))
         if set_title:
             self.set_title(os.path.basename(fname))
         self.show_all()
@@ -311,10 +322,9 @@ class VideoScorer(Gtk.Window):
 
         filled = final.fillna(method='pad')
 
-        fname = self.fname+".csv"
-        filled.to_csv(fname)
+        filled.to_csv(self.out_fname)
 
-        print "wrote", fname
+        print "saved CSV file"
 
         if self._failures:
             dlg = Gtk.MessageDialog(self, 0, Gtk.MessageType.QUESTION,
@@ -329,6 +339,9 @@ class VideoScorer(Gtk.Window):
                         myzip.write(v)
             dlg.destroy()
 
+        if self.blind_fname is not None:
+            os.unlink(self.blind_fname)
+            self.blind_fname = None
         #keep quitting
         return False
 
@@ -384,10 +397,15 @@ if __name__ == '__main__':
     parser.add_argument('--force-date', metavar='YYYY/MM/DD',
                 help='force the date of the events, only extract the time '\
                      'from the video')
+    parser.add_argument('--bagdir', type=str, default=None)
+    parser.add_argument('--outdir', type=str, default=None,
+                        help='directory for output .csv files')
     parser.add_argument('--framenumber', action='store_true',
                 help='extract the framenumber from the video instead')
     parser.add_argument('--no-merge-bags', action='store_true',
                 help='dont attempt to merge with bag files')
+    parser.add_argument('--max-trial', type=int, default=1000,
+                help='maximum trial number to score')
     parser.add_argument('--set-title', action='store_true',
                 help='set the window title to the current movie '\
                      'warning: this might bias your scoring')
@@ -407,40 +425,97 @@ if __name__ == '__main__':
     elif args.framenumber:
         mode = OCRThread.MODE_FRAMENUMBER
 
-    BAG_DATE_FMT = "rosbagOut_%Y-%m-%d-%H-%M-%S.bag"
-    MP4_DATE_FMT = "%Y%m%d_%H%M%S.mp4"
+    BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S.bag"
+    MP4_DATE_FMT = "%Y%m%d_%H%M%S"
+
+    if not os.path.exists('/usr/bin/gocr'):
+        raise RuntimeError('you need to install gocr')
 
     directory = args.directory[0]
+    if args.bagdir is None:
+        args.bagdir = directory
+
+    if args.outdir is None:
+        args.outdir = directory
+
+    if not os.path.exists(args.outdir):
+        os.makedirs(args.outdir)
+    else:
+        if not os.path.isdir(args.outdir):
+            raise RuntimeError('out directory is not a directory')
 
     if os.path.isdir(directory):
         inputmp4s = glob.glob(directory + "/*.mp4")
-        inputbags = glob.glob(directory + "/*.bag")
+        random.shuffle(inputmp4s)
+
+        if args.bagdir is None:
+            bagdir = directory
+        else:
+            bagdir = args.bagdir
+
+        inputbags = glob.glob(bagdir + "/*.bag")
+        if len(inputbags)==0:
+            print 'no bag files found in %r'
+
     elif os.path.isfile(directory):
-        p = VideoScorer(mode, args.force_date)
-        p.main(directory, "", args.set_title)
-        sys.exit(0)
+        inputmp4s = [directory]
+        random.shuffle(inputmp4s)
+
+        if args.bagdir is None:
+            inputbags = []
+        else:
+            inputbags = glob.glob(os.path.dirname(directory) + "/*.bag")
     else:
         sys.exit(1)
 
+    real_input_mp4s = []
     for mp4 in inputmp4s:
         fname = mp4
+        base_fname = os.path.basename(fname)
+        out_fname = os.path.join(args.outdir, base_fname+'.csv')
+        if os.path.exists(out_fname):
+            if args.skip_existing:
+                print "skipping", fname
+                continue
+            else:
+                print 'will overwrite output file',out_fname
+        real_input_mp4s.append( mp4 )
 
-        if args.skip_existing and os.path.exists(fname+'.csv'):
-            print "skipping", fname
-            continue
+    inputmp4s = real_input_mp4s
+    print 'will score %d mp4 movies'%(len(inputmp4s),)
+
+    for mp4 in inputmp4s:
+        fname = mp4
+        base_fname = os.path.basename(fname)
+        out_fname = os.path.join(args.outdir, base_fname+'.csv')
 
         if args.no_merge_bags:
             bname = None
         else:
             mp4fn = os.path.basename(mp4)
-            genotype,datestr = mp4fn.split("_",1)
-            mp4time = time.strptime(datestr, MP4_DATE_FMT)
-            for bag in inputbags:
-                if  mp4time == time.strptime(os.path.basename(bag), BAG_DATE_FMT):
-                    bname = bag
-                else:
+            matchobj = DOROTHEA_NAME_REGEXP.match(mp4fn)
+            if matchobj is None:
+                continue
+            parsed_data = matchobj.groupdict()
+            if parsed_data['trialnum'] is not None:
+                if int(parsed_data['trialnum']) > args.max_trial:
                     continue
-            assert os.path.exists(bname)
+            #genotype,datestr = mp4fn.split("_",1)
+            mp4time = time.strptime(parsed_data['datetime'], MP4_DATE_FMT)
+
+            bname = None
+            if inputbags:
+                best_diff = np.inf
+                for bag in inputbags:
+                    bagtime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
+                    this_diff = abs(time.mktime(bagtime)-time.mktime(mp4time))
+                    if this_diff < best_diff:
+                        bname = bag
+                        best_diff = this_diff
+                    else:
+                        continue
+                assert best_diff < 10.0
+                assert os.path.exists(bname)
 
         assert os.path.exists(fname)
 
@@ -448,6 +523,6 @@ if __name__ == '__main__':
             print "movie file must exist. give input dir, not dir/"
             sys.exit(2)
 
-        p = VideoScorer(mode, args.force_date)
+        p = VideoScorer(mode, args.force_date, out_fname)
         p.main(fname, bname, args.set_title)
 

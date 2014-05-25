@@ -10,6 +10,8 @@ python-motmot-flytrax:
   ubuntu: python-motmot-flytrax
 python-motmot-trackem:
   ubuntu: python-motmot-trackem
+python-motmot-fview-head-track:
+  ubuntu: python-motmot-fview-head-track
 python-benu:
   ubuntu: python-benu
 python-motmot-fview-head-track:

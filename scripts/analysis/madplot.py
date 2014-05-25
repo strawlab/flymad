@@ -529,6 +529,13 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     print "loading", bagpath
     bag = rosbag.Bag(bagpath)
+    if tzname is None:
+        if int(os.environ.get('MADPLOT_FORCE_USER_TZNAME','0'))==1:
+            raise ValueError('tzname is not specified')
+        else:
+            tzname = 'CET'
+
+    tz = pytz.timezone( tzname )
 
     if tzname is None:
         if int(os.environ.get('MADPLOT_FORCE_USER_TZNAME','0'))==1:
@@ -1453,6 +1460,10 @@ class MovieMaker:
 
         moviefname = self.get_target_movie_name(moviedir)
         sh.mv("-u", "%s/movie.mp4" % self.tmpdir, moviefname)
+        return moviefname
+
+    def get_target_movie_name(self,moviedir):
+        moviefname = os.path.join(moviedir,"%s.mp4" % self.basename)
         return moviefname
 
     def get_target_movie_name(self,moviedir):
