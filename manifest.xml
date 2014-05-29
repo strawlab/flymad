@@ -10,6 +10,7 @@
   <url>http://ros.org/wiki/flymad</url>
 
   <depend package="rospy"/>
+  <depend package="rosbag"/>
   <depend package="geometry_msgs"/>
   <depend package="sensor_msgs"/>
   <depend package="rosgobject"/>

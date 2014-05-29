@@ -1,11 +1,10 @@
-import madplot
-
 import sys
 import json
 import os.path
 import matplotlib.pyplot as plt
 
-import madplot
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
 
 BAG = '/mnt/strawscience/data/FlyMAD/velocity_test/2013-11-21-18-00-00.bag'
 oid = 52251

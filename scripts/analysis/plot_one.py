@@ -3,7 +3,8 @@ import json
 import os.path
 import matplotlib.pyplot as plt
 
-import madplot
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
 
 def plot_trajectory(ax,arena,ldf,tdf,hdf,geom):
     madplot.plot_tracked_trajectory(ax, tdf, arena,

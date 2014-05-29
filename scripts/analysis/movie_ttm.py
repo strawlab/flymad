@@ -6,7 +6,8 @@ import numpy as np
 import benu.benu
 import benu.utils
 
-import madplot
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
 
 assert benu.__version__ >= "0.1.0"
 

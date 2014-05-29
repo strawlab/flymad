@@ -17,12 +17,11 @@ import numpy as np
 import benu.benu
 import benu.utils
 
-import roslib; roslib.load_manifest('rosbag')
+import roslib; roslib.load_manifest('flymad')
 import rosbag
+import flymad.madplot as madplot
+from flymad.th_experiments import DOROTHEA_NAME_RE_BASE
 
-import madplot
-
-from th_experiments import DOROTHEA_NAME_RE_BASE
 DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '$')
 
 USE_MULTIPROCESSING = True

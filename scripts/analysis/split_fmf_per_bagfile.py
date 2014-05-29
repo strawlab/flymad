@@ -18,10 +18,8 @@ import numpy as np
 import benu.benu
 import benu.utils
 
-import roslib; roslib.load_manifest('rosbag')
-import rosbag
-
-import madplot
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
 
 Cut = collections.namedtuple('Cut', 'start end dest')
 

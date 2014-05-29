@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 
 import roslib; roslib.load_manifest('flymad')
 import rosbag
-
-import madplot
-import generate_mw_ttm_movies
 import flymad.trackingparams
+import flymad.madplot as madplot
+
+import generate_mw_ttm_movies
 
 Scored = collections.namedtuple('Scored', 'fmf bag mp4 csv')
 

@@ -14,7 +14,8 @@ import matplotlib.ticker
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 
-import madplot
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
 
 #FIXME: Smoothing and dt calculation calculation is not valid here, as multiple
 #object ids are interleaved in the x_px and y_px arrays.... this will take a while

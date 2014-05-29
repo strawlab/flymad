@@ -22,8 +22,8 @@ from scipy.stats import kruskal
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
-import madplot
-from madplot import p2stars
+import flymad.madplot as madplot
+
 from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
 
 #need to support numpy datetime64 types for resampling in pandas
@@ -387,7 +387,7 @@ def plot_data(path, data):
             ax_cum.set_xlabel('Time (s)')
 
             note = '%s\n%s\np-value: %.3g\n%d flies\nn=%d, %d'%(label,
-                                                                p2stars(ci_data['p_value']),
+                                                                madplot.p2stars(ci_data['p_value']),
                                                             ci_data['p_value'],
                                                             len(gtdf['obj_id'].unique()),
                                                             ci_data['n_head'],

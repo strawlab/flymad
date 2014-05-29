@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-import madplot
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
 
 Err = collections.namedtuple('Err', 'err dt_thisfly dt_ttm')
 Target = collections.namedtuple('Target', 'obj_id from_idx to_idx v ttm_err wf_err')

@@ -23,8 +23,7 @@ from scipy.stats import kruskal, mannwhitneyu
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
-import madplot
-from madplot import p2stars
+import flymad.madplot as madplot
 
 from strawlab_mpl.spines import spine_placer
 
@@ -782,7 +781,7 @@ def plot_distance_histograms( path, bin_size, dfs, gts_only=None ):
                 U, p1 = mannwhitneyu(test1, test2)
                 pval = p1*2 # two tail
                 p_data[period1].append( pval )
-                pstar_data[period1].append( p2stars(pval) )
+                pstar_data[period1].append( madplot.p2stars(pval) )
         P = pd.DataFrame(p_data,index=period_order)
         Pstar = pd.DataFrame(pstar_data,index=period_order)
         fname = 'distance_histogram_%s_stats'%(gt,)

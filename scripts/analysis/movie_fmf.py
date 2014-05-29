@@ -4,7 +4,8 @@ import os.path
 import numpy as np
 import cv2
 
-import madplot
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
 
 if __name__ == "__main__":
     import argparse

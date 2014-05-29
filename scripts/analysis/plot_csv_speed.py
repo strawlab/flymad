@@ -21,7 +21,7 @@ import matplotlib.transforms as mtransforms
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
-import madplot
+import flymad.madplot as madplot
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")

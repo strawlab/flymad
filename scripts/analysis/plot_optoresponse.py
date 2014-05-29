@@ -16,9 +16,9 @@ import cPickle as pickle
 
 import roslib; roslib.load_manifest('flymad')
 import rosbag
-import madplot
 import flymad.flymad_plot as flymad_plot
 import flymad.flymad_analysis_dan as flymad_analysis
+import flymad.madplot as madplot
 
 import pandas as pd
 import numpy as np
@@ -36,16 +36,6 @@ import scipy.interpolate
 
 R2D = 180/np.pi
 CACHE_FNAME = 'optodata.pkl'
-
-#def setup_defaults():
-#    rcParams = matplotlib.rcParams
-
-#    rcParams['legend.numpoints'] = 1
-#    rcParams['legend.fontsize'] = 'medium' #same as axis
-#    rcParams['legend.frameon'] = False
-#    rcParams['legend.numpoints'] = 1
-#    rcParams['legend.scatterpoints'] = 1
-#    matplotlib.rc('font', size=8)
 
 def wrap_dtheta_plus_minus(dtheta, around=np.pi):
     """

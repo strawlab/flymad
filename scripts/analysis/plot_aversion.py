@@ -12,10 +12,8 @@ import shapely.geometry as sg
 import matplotlib.pyplot as plt
 import matplotlib.patches
 
-import roslib; roslib.load_manifest('rosbag')
-import rosbag
-
-import madplot
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
 
 def prepare_data(arena, path, smoothstr, smooth):
 

@@ -26,10 +26,10 @@ import time
 from collections import namedtuple, OrderedDict, defaultdict
 import argparse
 
+import roslib; roslib.load_manifest('flymad')
+import flymad.madplot as madplot
+from flymad.th_experiments import DOROTHEA_NAME_RE_BASE
 
-import madplot
-
-from th_experiments import DOROTHEA_NAME_RE_BASE
 DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '.mp4.csv$')
 BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S.bag"
 

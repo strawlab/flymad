@@ -18,6 +18,8 @@ import matplotlib.transforms as mtransforms
 import roslib; roslib.load_manifest('flymad')
 import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
+import flymad.madplot as madplot
+
 from scipy.stats import kruskal
 
 #need to support numpy datetime64 types for resampling in pandas
@@ -153,7 +155,6 @@ def do_stats(path, smoothstr, expmean, ctrlmean, expstd, ctrlstd, expn, ctrln, d
         }
     names=['OK371>ShiTs','controls']
 
-    import madplot
     num_bins=40
     fname_prefix = flymad_plot.get_plotpath(path,'OK371_pvalues_%d_bins'%(num_bins,))
     madplot.view_pairwise_stats_plotly( data, names, fname_prefix,
