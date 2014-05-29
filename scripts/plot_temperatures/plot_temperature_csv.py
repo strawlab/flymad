@@ -1,3 +1,5 @@
+# /mnt/strawscience/data/FlyMAD/dans_data/simple_temp_data
+
 import glob
 import os.path
 import datetime
