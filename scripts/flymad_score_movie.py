@@ -33,9 +33,6 @@ import flymad.conv as bagconv
 # Create a single vlc.Instance() to be shared by (possible) multiple players.
 instance = vlc.Instance("--no-snapshot-preview --snapshot-format png")
 
-from analysis.th_experiments import DOROTHEA_NAME_RE_BASE
-DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '.mp4$')
-
 class OCRThread(threading.Thread):
 
     #set to zero to let gocr auto-threshold the image
@@ -426,7 +423,7 @@ if __name__ == '__main__':
         mode = OCRThread.MODE_FRAMENUMBER
 
     BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S.bag"
-    MP4_DATE_FMT = "%Y%m%d_%H%M%S"
+    MP4_DATE_FMT = "%Y%m%d_%H%M%S.mp4"
 
     if not os.path.exists('/usr/bin/gocr'):
         raise RuntimeError('you need to install gocr')
@@ -493,21 +490,13 @@ if __name__ == '__main__':
             bname = None
         else:
             mp4fn = os.path.basename(mp4)
-            matchobj = DOROTHEA_NAME_REGEXP.match(mp4fn)
-            if matchobj is None:
-                continue
-            parsed_data = matchobj.groupdict()
-            if parsed_data['trialnum'] is not None:
-                if int(parsed_data['trialnum']) > args.max_trial:
-                    continue
-            #genotype,datestr = mp4fn.split("_",1)
-            mp4time = time.strptime(parsed_data['datetime'], MP4_DATE_FMT)
-
+            genotype,datestr = mp4fn.split("_",1)
+            mp4time = time.strptime(datestr, MP4_DATE_FMT)
             bname = None
             if inputbags:
                 best_diff = np.inf
                 for bag in inputbags:
-                    bagtime = time.strptime(os.path.basename(bag), BAG_DATE_FMT)
+                    bagtime = time.strptime(os.path.basename(bag).replace('rosbagOut',''), BAG_DATE_FMT)
                     this_diff = abs(time.mktime(bagtime)-time.mktime(mp4time))
                     if this_diff < best_diff:
                         bname = bag

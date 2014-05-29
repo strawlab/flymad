@@ -20,15 +20,12 @@ import benu.utils
 import roslib; roslib.load_manifest('flymad')
 import rosbag
 import flymad.madplot as madplot
-from flymad.th_experiments import DOROTHEA_NAME_RE_BASE
-
-DOROTHEA_NAME_REGEXP = re.compile(r'^' + DOROTHEA_NAME_RE_BASE + '$')
 
 USE_MULTIPROCESSING = True
 
 Pair = collections.namedtuple('Pair', 'fmf bag maxt')
 
-FMF_DATE_FMT = "%Y%m%d_%H%M%S"
+FMF_DATE_FMT = "%Y%m%d_%H%M%S.fmf"
 
 assert benu.__version__ >= "0.1.0"
 
@@ -124,7 +121,7 @@ def doit_using_framenumber(user_data):
 
     actual_w, actual_h = benu.utils.negotiate_panel_size_same_height(panels, TARGET_OUT_W)
 
-    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(zoomf), fps=60)
+    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(zoomf), fps=30)
     target_moviefname = moviemaker.get_target_movie_name(mdir)
     if os.path.exists(target_moviefname):
         print 'target %r exists: skipping movie'%(target_moviefname,)
@@ -163,6 +160,7 @@ def make_movie(wide,zoom,bag,imagepath,filename):
 
 def get_matching_bag(fmftime, bagdir):
     bags = []
+
     for bag in glob.glob(os.path.join(bagdir,'*.bag')):
         btime = madplot.strptime_bagfile(bag)
         try:
@@ -182,25 +180,28 @@ def get_matching_bag(fmftime, bagdir):
     else:
         return None
 
-def get_matching_fmf_and_bag(#gt,
-                             base_dir, maxtime=0):
+def get_bag_re(gt):
+    #the non-control MW experiment movies are names Moonw_movie
+    #return re.compile("%s_movie_([abh+]{1,3})_([0-9_]{1,3})(2013)(.*)" % gt)
+    return re.compile("%s_([abh+]{1,3})_([0-9_]+)(2013)(.*)" % gt)
 
+def get_matching_fmf_and_bag(gt, base_dir, maxtime=0):
+
+    bag_re = get_bag_re(gt)
     matching = []
 
-    for fmffile in glob.glob(os.path.join(base_dir,'*.fmf')):
+    for fmffile in glob.glob(os.path.join(base_dir,'%s_*.fmf' % gt)):
         fmfname = os.path.basename(fmffile)
-        matchobj = DOROTHEA_NAME_REGEXP.match(fmfname)
+        matchobj = bag_re.search(fmfname)
         if matchobj is None:
             print "error: incorrectly named fmf file?", fmffile
-            print 'fmfname',fmfname
             continue
-        parsed_data = matchobj.groupdict()
-        print '%s -> %s'%(fmfname,parsed_data)
-        #bagdir = os.path.join(base_dir,'TH_Gal4_bagfiles')
-        bagdir = base_dir
+
+        target,trial,year,date = matchobj.groups()
+        bagdir = os.path.join(base_dir,'%s_%s_%s' % (gt, target, trial))
         if os.path.isdir(bagdir):
             #we found a directory with matching bag files
-            fmftime = time.strptime(parsed_data['datetime'], FMF_DATE_FMT)
+            fmftime = time.strptime("%s%s" % (year,date), FMF_DATE_FMT)
             bagfile = get_matching_bag(fmftime, bagdir)
             if bagfile is None:
                 print "no bag for",fmffile
@@ -216,7 +217,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('path', nargs=1, help='path to data (a dir of fmfs and subdir of bags)')
-#    parser.add_argument('--genotype', required=True, help='genotype (the prefix of the fmfs; cs, Moonw, etc)')
+    parser.add_argument('--genotype', required=True, help='genotype (the prefix of the fmfs; cs, Moonw, etc)')
     parser.add_argument('--disable-multiprocessing', action='store_true', default=False)
     parser.add_argument('--dry-run', action='store_true', default=False)
     parser.add_argument('--show-theta', action='store_true', default=False)
@@ -234,8 +235,7 @@ if __name__ == "__main__":
         args.outdir = os.path.join(path,'mp4s')
 
     matching = [(m,args.outdir,args.show_theta,args.show_velocity)\
-                for m in get_matching_fmf_and_bag(#args.genotype,
-                                                  path, args.max_time)]
+                for m in get_matching_fmf_and_bag(args.genotype, path, args.max_time)]
     print len(matching),"matching"
     if len(matching)==0:
         sys.exit(0)
