@@ -1,3 +1,5 @@
+# /mnt/strawscience/data/FlyMAD/dans_data/kinematics_scored/DATA_speed
+
 import argparse
 import os
 import sys
