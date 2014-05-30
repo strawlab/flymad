@@ -1466,10 +1466,6 @@ class MovieMaker:
         moviefname = os.path.join(moviedir,"%s.mp4" % self.basename)
         return moviefname
 
-    def get_target_movie_name(self,moviedir):
-        moviefname = os.path.join(moviedir,"%s.mp4" % self.basename)
-        return moviefname
-
     def cleanup(self):
         shutil.rmtree(self.tmpdir)
 
