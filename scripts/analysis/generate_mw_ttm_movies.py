@@ -154,10 +154,6 @@ def doit_using_framenumber(user_data):
     moviemaker.cleanup()
     
 
-def make_movie(wide,zoom,bag,imagepath,filename):
-    flymad_compositor.doit(wide,zoom,bag,imagepath=imagepath)
-    return flymad_moviemaker.doit(imagepath,finalmov=filename)
-
 def get_matching_bag(fmftime, bagdir):
     bags = []
 
