@@ -121,7 +121,7 @@ def doit_using_framenumber(user_data):
 
     actual_w, actual_h = benu.utils.negotiate_panel_size_same_height(panels, TARGET_OUT_W)
 
-    moviemaker = madplot.MovieMaker(obj_id=os.path.basename(zoomf), fps=30)
+    moviemaker = madplot.MovieMaker(basename=os.path.basename(zoomf), fps=30)
     target_moviefname = moviemaker.get_target_movie_name(mdir)
     if os.path.exists(target_moviefname):
         print 'target %r exists: skipping movie'%(target_moviefname,)
