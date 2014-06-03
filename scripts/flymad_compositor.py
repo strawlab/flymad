@@ -3,7 +3,6 @@ import motmot.FlyMovieFormat.FlyMovieFormat as fmf
 import argparse
 import collections
 import numpy as np
-import motmot.imops.imops as imops
 import warnings
 import pytz
 import datetime
@@ -143,9 +142,6 @@ def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
 
         wide_frame, this_wide_ts = wide.get_frame_at_or_before_timestamp(cur_time)
         zoom_frame, this_zoom_ts = zoom.get_frame_at_or_before_timestamp(cur_time)
-
-        #wide_frame = imops.auto_convert(wide.format, wide_frame)
-        #zoom_frame = imops.auto_convert(zoom.format, zoom_frame)
 
         #cond = (cur_time - rate < raw2d['stamp']) & (raw2d['stamp'] <= cur_time)
         cond = (cur_time - 50*rate < raw2d['stamp']) & (raw2d['stamp'] <= cur_time)
