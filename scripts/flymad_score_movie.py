@@ -29,6 +29,7 @@ import ImageChops
 import roslib; roslib.load_manifest('flymad')
 import flymad.vlc as vlc
 import flymad.conv as bagconv
+import flymad.filename_regexes as filename_regexes
 
 # Create a single vlc.Instance() to be shared by (possible) multiple players.
 instance = vlc.Instance("--no-snapshot-preview --snapshot-format png")
@@ -422,9 +423,6 @@ if __name__ == '__main__':
     elif args.framenumber:
         mode = OCRThread.MODE_FRAMENUMBER
 
-    BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S.bag"
-    MP4_DATE_FMT = "%Y%m%d_%H%M%S.mp4"
-
     if not os.path.exists('/usr/bin/gocr'):
         raise RuntimeError('you need to install gocr')
 
@@ -442,28 +440,25 @@ if __name__ == '__main__':
             raise RuntimeError('out directory is not a directory')
 
     if os.path.isdir(directory):
-        inputmp4s = glob.glob(directory + "/*.mp4")
-        random.shuffle(inputmp4s)
-
+        inputmp4s = glob.glob(os.path.join(directory,"*.mp4"))
         if args.bagdir is None:
             bagdir = directory
         else:
             bagdir = args.bagdir
-
-        inputbags = glob.glob(bagdir + "/*.bag")
-        if len(inputbags)==0:
-            print 'no bag files found in %r'
-
     elif os.path.isfile(directory):
         inputmp4s = [directory]
-        random.shuffle(inputmp4s)
-
         if args.bagdir is None:
-            inputbags = []
+            bagdir = '/dev/null'
         else:
-            inputbags = glob.glob(os.path.dirname(directory) + "/*.bag")
+            bagdir = os.path.dirname(directory)
     else:
         sys.exit(1)
+
+    inputbags = glob.glob(os.path.join(bagdir,"*.bag"))
+    if len(inputbags)==0:
+        print 'no bag files found in %r' % bagdir
+
+    random.shuffle(inputmp4s)
 
     real_input_mp4s = []
     for mp4 in inputmp4s:
@@ -489,14 +484,21 @@ if __name__ == '__main__':
         if args.no_merge_bags:
             bname = None
         else:
-            mp4fn = os.path.basename(mp4)
-            genotype,datestr = mp4fn.split("_",1)
-            mp4time = time.strptime(datestr, MP4_DATE_FMT)
+            try:
+                mp4time = filename_regexes.parse_date(mp4)
+            except filename_regexes.RegexError, e:
+                print "error: incorrectly named mp4 file?", mp4
+                continue
+
             bname = None
             if inputbags:
                 best_diff = np.inf
                 for bag in inputbags:
-                    bagtime = time.strptime(os.path.basename(bag).replace('rosbagOut',''), BAG_DATE_FMT)
+                    try:
+                        bagtime = filename_regexes.parse_date(bag)
+                    except filename_regexes.RegexError, e:
+                        print "error: incorrectly named bag file?", bag
+                        continue
                     this_diff = abs(time.mktime(bagtime)-time.mktime(mp4time))
                     if this_diff < best_diff:
                         bname = bag
