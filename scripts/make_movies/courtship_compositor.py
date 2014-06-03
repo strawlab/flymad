@@ -1,6 +1,4 @@
-#!/usr/bin/env python
 import motmot.FlyMovieFormat.FlyMovieFormat as fmf
-import argparse
 import collections
 import numpy as np
 import warnings
@@ -23,21 +21,6 @@ def scale(w, h, x, y, maximum=True):
         return nw or 1, y
     return x, nh or 1
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('wide', type=str)
-    parser.add_argument('zoom', type=str)
-    parser.add_argument('rosbag', type=str)
-
-    parser.add_argument('--wide_transform', type=str, default=None)
-    parser.add_argument('--zoom_transform', type=str, default=None)
-    args = parser.parse_args()
-
-    doit(widef=args.wide,zoomf=args.zoom,rosbagf=args.rosbag,
-         widet=args.wide_transform,
-         zoomt=args.zoom_transform,
-         )
-
 def get_progress_bar(name, maxval):
     widgets = ["%s: " % name, progressbar.Percentage(),
                progressbar.Bar(), progressbar.ETA()]
@@ -51,7 +34,7 @@ class DateFormatter:
     def format_date(self, x, pos=None):
         return str(datetime.datetime.fromtimestamp(x,self.tz))
 
-def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
+def composite_fmfs(widef,zoomf,rosbagf,imagepath,fps=15):
     wide = fmf.FlyMovie(widef)
     zoom = fmf.FlyMovie(zoomf)
     bag = rosbag.Bag(rosbagf)
@@ -120,14 +103,13 @@ def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
                          np.max(raw2d['stamp'])] )
 
     dur = stop_time-start_time
-    FPS = 15.0
-    rate = 1.0/FPS
+    rate = 1.0/fps
 
     #HACK ANDREW
     use_wide_zoomed = False
 
     times = np.arange(start_time, stop_time+1e-10, rate)
-    print 'at %f fps, this is %d frames'%(FPS,len(times))
+    print 'rendered at %f fps, this is %d frames'%(fps,len(times))
 
     tz = pytz.timezone( tzname )
     pretty_time = DateFormatter(tz)
@@ -165,8 +147,6 @@ def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
             warnings.warn('WARNING: zooming on center region as a hack!!!!')
             x0+=100; w-=240
         user_rect = (x0,y0,w,h)
-        if widet is not None and '90' in widet: # rotate aspect ratio
-            w,h = h,w
         dev_w, dev_h = scale( w, h, max_panel_w, max_panel_h )
         device_rect = (margin, margin, dev_w, dev_h)
 
@@ -231,7 +211,7 @@ def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
             wide_imgs_benu.append( (device_rect_crop, user_rect_crop) )
 
         for d,u in wide_imgs_benu:
-            with canv.set_user_coords(d, u, transform=widet):
+            with canv.set_user_coords(d, u):
                 canv.imshow(wide_frame,0,0,filter='nearest')
                 canv.scatter( this_raw2d['x'],
                               this_raw2d['y'],
@@ -261,12 +241,10 @@ def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
 
         # zoomed view --------------------------
         w,h = zoom.get_width(), zoom.get_height()
-        if zoomt is not None and '90' in zoomt: # rotate aspect ratio
-            w,h = h,w
         dev_w, dev_h = scale( w, h, max_panel_w, max_panel_h )
         device_rect = (final_w // 2 + margin//2, margin, dev_w, dev_h)
         user_rect = (0,0, zoom.get_width(), zoom.get_height())
-        with canv.set_user_coords(device_rect, user_rect, transform=zoomt):
+        with canv.set_user_coords(device_rect, user_rect):
             canv.imshow(zoom_frame,0,0,filter='best')
             if 1:
             #with benu_ctx.clip_off(): # also transform off
@@ -287,6 +265,4 @@ def doit(widef,zoomf,rosbagf,widet=None, zoomt=None, imagepath="./"):
 
     progress.finish()
 
-if __name__=='__main__':
-    main()
 
