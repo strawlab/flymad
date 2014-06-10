@@ -7,7 +7,7 @@ import collections
 BAG_DATE_FMT = "%Y-%m-%d-%H-%M-%S"
 BAG_FILENAME_REGEX = "(?:rosbagOut_)?(?P<desc>[\w\-]+?)?_?(?P<date>(201[0-9][0-9\-]{15})|(201[0-9][0-9_]{11}))\.bag"
 MP4_DATE_FMT = "%Y%m%d_%H%M%S"
-MP4_FILENAME_REGEX = "(?P<desc>[\-\w]+)(?P<date>201[0-9]+[0-9]{4}_[0-9]{6})\..*"
+MP4_FILENAME_REGEX = "(?P<desc>[\-\w]+?)_?(?P<date>201[0-9]+[0-9]{4}_[0-9]{6})\..*"
 
 FMF_DATE_FMT = MP4_DATE_FMT
 FMF_FILENAME_REGEX = "(?P<desc>[\w\-]+?)_?(?P<camn>wide|zoom)?_(?P<date>201[0-9]+[0-9]{4}_[0-9]{6})\..*"
@@ -15,7 +15,8 @@ FMF_FILENAME_REGEX = "(?P<desc>[\w\-]+?)_?(?P<camn>wide|zoom)?_(?P<date>201[0-9]
 _MATCH_PATTERNS = {
     "bag":(BAG_DATE_FMT,BAG_FILENAME_REGEX),
     "mp4":(MP4_DATE_FMT,MP4_FILENAME_REGEX),
-    "fmf":(FMF_DATE_FMT,FMF_FILENAME_REGEX)
+    "fmf":(FMF_DATE_FMT,FMF_FILENAME_REGEX),
+    "csv":(MP4_DATE_FMT,MP4_FILENAME_REGEX),
 }
 
 class RegexError(Exception):
@@ -76,4 +77,19 @@ def get_matching_files(dira, exta, dirb, extb, maxdt=20):
                 matched.append(klass(a,ainfo,atime,b,binfo,btime,dt))
 
     return matched
+
+if __name__ == "__main__":
+    from pprint import pprint
+
+    files = ("rosbagOut_2014-02-23-16-28-08.bag",
+             "wGP-140hpc-01_20140223_162808.mp4",
+             "wGP-140hpc-01_20140223_162808.mp4.csv",
+             "wGP-140hpc-01_wide_20140223_162809.fmf",
+             "db194-ok371-05_20140523_131735.bag")
+    for f in files:
+        print f,
+        try:
+            pprint( parse_filename(f) )
+        except RegexError:
+            print "regex failed"
 
