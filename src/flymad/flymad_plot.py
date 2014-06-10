@@ -6,9 +6,17 @@ import numpy as np
 import scipy.signal
 import scipy.stats
 
-import strawlab_mpl.defaults as smd
-from strawlab_mpl.many_timeseries import ManyTimeseries
-from strawlab_mpl.spines import spine_placer, auto_reduce_spine_bounds
+try:
+    import strawlab_mpl.defaults as smd
+    from strawlab_mpl.spines import spine_placer
+except ImportError:
+    print "ERROR: please install strawlab_mpl for nicer plots"
+    def spine_placer(*args, **kwargs):
+        pass
+    class smd:
+        @classmethod
+        def setup_defaults(*args, **kwargs):
+            pass
 
 import matplotlib
 import matplotlib.pyplot as plt
