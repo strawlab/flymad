@@ -22,13 +22,27 @@ _MATCH_PATTERNS = {
 class RegexError(Exception):
     pass
 
-def parse_filename(path, regex=None):
+def parse_filename(path, regex=None, extract_genotype_and_laser=False):
     if regex is None:
         _,regex = _MATCH_PATTERNS[os.path.splitext(path)[1][1:]]
     matchobj = re.search(regex, os.path.basename(path))
     if matchobj is None:
         raise RegexError("incorrectly named file: %s" % path)
-    return matchobj.groupdict()
+
+    res = matchobj.groupdict()
+
+    if extract_genotype_and_laser and res.get('desc'):
+        desc = res['desc']
+        try:
+            gt,laser,repid = desc.split('-')
+        except ValueError:
+            gt,laser = desc.split('-')
+            repid = None
+        res['genotype'] = gt
+        res['laser'] = laser
+        res['repid'] = repid
+
+    return res
 
 def parse_date(path, regex=None):
     if regex is None:
@@ -85,11 +99,15 @@ if __name__ == "__main__":
              "wGP-140hpc-01_20140223_162808.mp4",
              "wGP-140hpc-01_20140223_162808.mp4.csv",
              "wGP-140hpc-01_wide_20140223_162809.fmf",
-             "db194-ok371-05_20140523_131735.bag")
+             "db194-ok371-05_20140523_131735.bag",
+             "wshits-120t-08_20140307_125321.mp4.csv",
+             "OK371shits-nolaser-05_20140227_141405.mp4.csv",
+    )
+
     for f in files:
         print f,
         try:
-            pprint( parse_filename(f) )
+            pprint( parse_filename(f, extract_genotype_and_laser=True) )
         except RegexError:
             print "regex failed"
 
