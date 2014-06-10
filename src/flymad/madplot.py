@@ -770,6 +770,9 @@ def load_bagfile(bagpath, arena, filter_short=100, filter_short_pct=0, smooth=Fa
 
     t_df['experiment'] = 0
 
+    l_df['laser_state'] = 0
+    l_df['laser_state'][l_df['laser_power'] > 0] = 1
+
     results = geom, {"targeted":l_df, "tracked":t_df, "ttm":h_df, "extra":e_df}
 
     save_bagfile_cache(results, cache_args, cache_fname)
