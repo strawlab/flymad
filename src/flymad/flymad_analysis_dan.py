@@ -644,6 +644,13 @@ def fixup_index_and_resample(df, resample_specifier='10L'):
 
     return df
 
+def resample(df, resample_specifier='10L'):
+    if resample_specifier != '10L':
+        print "WARNING: Your code may assume 10ms (100fps). Are you sure you want to resample to", resample_specifier
+
+    #now resample to 10ms (mean)
+    return df.resample(resample_specifier, fill_method='ffill')
+
 def extract_metadata_from_filename(csvfile):
     csvfilefn = os.path.basename(csvfile)
     try:
