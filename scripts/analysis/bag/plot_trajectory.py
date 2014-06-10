@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 import roslib; roslib.load_manifest('flymad')
 import flymad.madplot as madplot
 
-def plot_trajectory(ax,arena,ldf,tdf,hdf,geom):
+def plot_trajectory(ax,arena,ldf,tdf,hdf,geom,debug):
     madplot.plot_tracked_trajectory(ax, tdf, arena,
-                debug_plot=True,
+                debug_plot=debug,
                 color='k',
     )
     ax.add_patch(arena.get_patch(color='k', alpha=0.1))
@@ -28,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument('path', nargs=1, help='path to bag file')
     parser.add_argument('--unit', default=False)
     parser.add_argument('--no-smooth', dest='smooth', action='store_false', default=True)
+    parser.add_argument('--tracking-stats', action='store_true', default=False)
 
     args = parser.parse_args()
     path = args.path[0]
@@ -39,24 +40,27 @@ if __name__ == "__main__":
     hdf = dfs["ttm"]
 
     axt = plt.figure("Trajectory").add_subplot(1,1,1)
-    plot_trajectory(axt,arena,ldf,tdf,hdf,geom)
+    plot_trajectory(axt,arena,ldf,tdf,hdf,geom, debug=args.tracking_stats)
 
-    axl = plt.figure("Laser").add_subplot(1,1,1)
+    axl = plt.figure("Laser State").add_subplot(1,1,1)
     plot_laser(axl,arena,ldf,tdf,hdf,geom)
 
     for ax in (axt,axl):
         ax.set_xlabel('x (%s)' % arena.unit)
         ax.set_ylabel('y (%s)' % arena.unit)
 
-    axdt = plt.figure("Tracking").add_subplot(1,1,1)
+    if args.tracking_stats:
+        axdt = plt.figure("Tracking Regularity").add_subplot(1,1,1)
     axvel = plt.figure("Velocity").add_subplot(1,1,1)
     for obj_id,df in tdf.groupby('tobj_id'):
-        axdt.plot(df['t_dt'].values, ',')
+        if args.tracking_stats:
+            axdt.plot(df['t_dt'].values, ',')
         t = df['t_ts'].values
         axvel.plot(t - t[0], df['v'].values, ',', label=str(obj_id))
 
-    axdt.set_xlabel('observation (n)')
-    axdt.set_ylabel('observation dt (s)')
+    if args.tracking_stats:
+        axdt.set_xlabel('observation (n)')
+        axdt.set_ylabel('observation dt (s)')
     axvel.legend()
     axvel.set_xlabel('t (s)')
     axvel.set_ylabel('velocity (%s/s)' % arena.unit)
