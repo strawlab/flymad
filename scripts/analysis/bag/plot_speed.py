@@ -162,7 +162,7 @@ def plot_data(path, data, arena, note):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('path', nargs='+', help='path to bag files')
     parser.add_argument('--show', action='store_true', default=False)
     parser.add_argument('--only-plot', action='store_true', default=False,
