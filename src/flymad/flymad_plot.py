@@ -165,8 +165,10 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
 
     plotted = {}
 
+    exps_colors = [plt.cm.gnuplot(i) for i in np.linspace(0, 1.0, len(datasets))]
+
     cur_zorder = 2
-    for data in sorted(datasets.keys(), cmp=_sort_by_order):
+    for data,default_color in zip(sorted(datasets.keys(), cmp=_sort_by_order), exps_colors):
         exp = datasets[data]
 
         label = exp.get('label',data)
@@ -188,7 +190,10 @@ def plot_timeseries_with_activation(ax, targetbetween=None, downsample=1, sem=Fa
         else:
             spread = None
 
-        color = exp.get('color',DEFAULT_COLORS.get(data,'k'))
+        if exp.get('color') is None:
+            color = default_color
+        else:
+            color = DEFAULT_COLORS.get(data,default_color)
 
         if spread is not None:
             ax.fill_between(exp['xaxis'][::downsample], _ds(exp['value']+spread), _ds(exp['value']-spread),
