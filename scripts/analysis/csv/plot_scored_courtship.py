@@ -1,3 +1,6 @@
+# python csv/plot_scored_courtship.py /mnt/strawscience/data/FlyMAD/DROPBOX_AS_SUBMITTED/FlyMAD_resubmission/scored_data/Persistent_courtship/exemplary_performers/ --exp-genotype wGP --other-genotypes wtrpmyc,40347trpmyc,G323,40347 --only-trajectories 100L --calibration-file /mnt/strawscience/data/FlyMAD/DROPBOX_AS_SUBMITTED/FlyMAD_resubmission/scored_data/calibrations/calibration20140219_064948.filtered.yaml --show
+# python csv/plot_scored_courtship.py /mnt/strawscience/data/FlyMAD/DROPBOX_AS_SUBMITTED/FlyMAD_resubmission/scored_data/Persistent_courtship/ --exp-genotype wGP --other-genotypes wtrpmyc,40347trpmyc,G323,40347
+
 import os
 if 'DISPLAY' not in os.environ:
     import matplotlib
@@ -25,7 +28,12 @@ import flymad.flymad_analysis_dan as flymad_analysis
 import flymad.flymad_plot as flymad_plot
 import flymad.madplot as madplot
 
-from strawlab_mpl.spines import spine_placer
+try:
+    from strawlab_mpl.spines import spine_placer
+except ImportError:
+    print "ERROR: please install strawlab_mpl for nicer plots"
+    def spine_placer(*args, **kwargs):
+        pass
 
 #need to support numpy datetime64 types for resampling in pandas
 assert np.version.version in ("1.7.1", "1.6.1")
@@ -817,7 +825,9 @@ def plot_data(path, laser, bin_size, dfs):
                             color=GT_COLORS[gt],
                             df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
-    ctrlmean = dfs['wtrpmyc']['mean']
+
+    #assume protocol was identical with laser on
+    ctrlmean = dfs[dfs.keys()[0]]['mean']
 
     figure_title = "Courtship Wingext 10min (%s)" % laser
     fig = plt.figure(figure_title)
@@ -828,7 +838,7 @@ def plot_data(path, laser, bin_size, dfs):
                                        where=ctrlmean['laser_state'].values>0),
                     sem=True,
                     note="laser %s\nbin %s\n" % (flymad_analysis.laser_desc(laser), bin_size),
-                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'zx'} for k in ('wGP','40347trpmyc')},
+                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'zx'} for k in datasets},
                     individual_title=figure_title + ' Individual Traces',
                     **datasets
     )
@@ -859,7 +869,9 @@ def plot_data(path, laser, bin_size, dfs):
                             color=GT_COLORS[gt],
                             df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
-    ctrlmean = dfs['wtrpmyc']['mean']
+
+    #assume protocol was identical with laser on
+    ctrlmean = dfs[dfs.keys()[0]]['mean']
 
     figure_title = "Courtship Dtarget 10min (%s)" % laser
     fig = plt.figure(figure_title)
@@ -871,7 +883,7 @@ def plot_data(path, laser, bin_size, dfs):
                     sem=True,
                     legend_location='lower right',
                     note="laser %s\nbin %s\n" % (flymad_analysis.laser_desc(laser), bin_size),
-                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'dtarget'} for k in ('wGP','40347trpmyc')},
+                    individual={k:{'groupby':'obj_id','xaxis':'t','yaxis':'dtarget'} for k in datasets},
                     individual_title=figure_title + ' Individual Traces',
                     **datasets
     )
@@ -1180,20 +1192,14 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
         fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
 if __name__ == "__main__":
-    CTRL_GENOTYPE = 'wtrpmyc'
-    EXP_GENOTYPE = 'wGP'
-    EXP2_GENOTYPE = '40347trpmyc'
-    CTRL2_GENOTYPE = 'G323'
-    CTRL3_GENOTYPE = '40347'
-    LASERS = [100,120,140]#,160]
-
-    gts = EXP_GENOTYPE, EXP2_GENOTYPE, CTRL_GENOTYPE, CTRL2_GENOTYPE, CTRL3_GENOTYPE
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('path', nargs=1, help='path to csv files')
     parser.add_argument('--only-plot', action='store_true', default=False)
     parser.add_argument('--show', action='store_true', default=False)
+    parser.add_argument('--stats', action='store_true', default=False, help='do stats plots')
     parser.add_argument('--laser', default='140hpc', help='laser specifier')
+    parser.add_argument('--laser-dose-response', help='comma separated list of laser powers for dose-response plots')
     parser.add_argument('--only-trajectories', default=None, required=False,
                         help='plot trajectories per fly (LOTS OF PLOTS) at this binning then exit.' \
                              'try 100L')
@@ -1202,9 +1208,18 @@ if __name__ == "__main__":
     parser.add_argument('--only-period-histograms', default=None, required=False,
                         help='plot histograms for periods as specified then exit. try 2S')
     parser.add_argument('--calibration-file', help='calibration yaml files', required=False, default=None)
+    parser.add_argument('--exp-genotype', help='experimental genotype', required=True)
+    parser.add_argument('--other-genotypes', help='other genotypes (comma separated list)')
 
     args = parser.parse_args()
     path = args.path[0]
+
+    if args.laser_dose_response:
+        lasers = map(int,args.laser_dose_response.split(','))
+    else:
+        lasers = []
+
+    gts = [args.exp_genotype] + (args.other_genotypes.split(',') if args.other_genotypes else [])
 
     if args.only_trajectories is not None:
         bin_size = str(args.only_trajectories)
@@ -1279,61 +1294,63 @@ if __name__ == "__main__":
         dfs = prepare_data(path, args.laser, bin_size, gts)
         madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
-    finescale_stat_info = [
-        #('P1', ('wGP', 'G323', 'wtrpmyc')),
-        #('pIP10', ('40347trpmyc','40347','wtrpmyc')),
-        ('P1', ('wGP', 'pooled controls for P1')),
-        ('pIP10', ('40347trpmyc','pooled controls for pIP10')),
-        ]
-
-    for experiment_name, exp_gts in finescale_stat_info:
-        fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_WEI_%s'%experiment_name)
-        madplot.view_pairwise_stats_plotly(dfs, exp_gts, fname_prefix,
-                                           align_colname='t',
-                                           stat_colname='zx',
-                                           layout_title='p-values for WEI, %s (binsize %s)'%(experiment_name,bin_size),
-                                           num_bins=STATS_NUM_BINS,
-                                           )
-
-        fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_dtarget_%s'%experiment_name)
-        madplot.view_pairwise_stats_plotly(dfs, exp_gts, fname_prefix,
-                                           align_colname='t',
-                                           stat_colname='dtarget',
-                                           layout_title='p-values for dtarget, %s (binsize %s)'%(experiment_name,bin_size),
-                                           num_bins=STATS_NUM_BINS,
-                                           )
-
     plot_data(path, args.laser, bin_size, dfs)
 
-    bin_size = '5S'
-    cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % bin_size)
-    cache_args = bin_size, EXP_GENOTYPE, LASERS
-    data = None
-    if args.only_plot:
-        data = madplot.load_bagfile_cache(cache_args, cache_fname)
-    if data is None:
-        data = {}
-        for laser in LASERS:
-            laser = '%dhpc' % laser
-            data[laser] = prepare_data(path, laser, bin_size, [EXP_GENOTYPE])
-        madplot.save_bagfile_cache(data, cache_args, cache_fname)
-    plot_dose_response(path, bin_size, EXP_GENOTYPE, data)
+    if args.stats:
+        finescale_stat_info = [
+            #('P1', ('wGP', 'G323', 'wtrpmyc')),
+            #('pIP10', ('40347trpmyc','40347','wtrpmyc')),
+            ('P1', ('wGP', 'pooled controls for P1')),
+            ('pIP10', ('40347trpmyc','pooled controls for pIP10')),
+            ]
 
-    bin_size = '10L'
-    cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % bin_size)
-    cache_args = bin_size, EXP_GENOTYPE, LASERS
-    data = None
-    if args.only_plot:
-        data = madplot.load_bagfile_cache(cache_args, cache_fname)
-    if data is None:
-        data = {}
-        for laser in LASERS:
-            laser = '%dhpc' % laser
-            data[laser] = prepare_data(path, laser, bin_size, [EXP_GENOTYPE])
-        madplot.save_bagfile_cache(data, cache_args, cache_fname)
+        for experiment_name, exp_gts in finescale_stat_info:
+            fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_WEI_%s'%experiment_name)
+            madplot.view_pairwise_stats_plotly(dfs, exp_gts, fname_prefix,
+                                               align_colname='t',
+                                               stat_colname='zx',
+                                               layout_title='p-values for WEI, %s (binsize %s)'%(experiment_name,bin_size),
+                                               num_bins=STATS_NUM_BINS,
+                                               )
 
-    plot_dose_response_dtarget_by_wei(path, bin_size, EXP_GENOTYPE, data)
-    plot_dose_response_wei_by_proximity(path, bin_size, EXP_GENOTYPE, data)
+            fname_prefix = flymad_plot.get_plotpath(path,'csv_courtship_dtarget_%s'%experiment_name)
+            madplot.view_pairwise_stats_plotly(dfs, exp_gts, fname_prefix,
+                                               align_colname='t',
+                                               stat_colname='dtarget',
+                                               layout_title='p-values for dtarget, %s (binsize %s)'%(experiment_name,bin_size),
+                                               num_bins=STATS_NUM_BINS,
+                                               )
+
+    if lasers:
+        bin_size = '5S'
+        cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % bin_size)
+        cache_args = bin_size, args.exp_genotype, lasers
+        data = None
+        if args.only_plot:
+            data = madplot.load_bagfile_cache(cache_args, cache_fname)
+        if data is None:
+            data = {}
+            for laser in lasers:
+                laser = '%dhpc' % laser
+                data[laser] = prepare_data(path, laser, bin_size, [args.exp_genotype])
+            madplot.save_bagfile_cache(data, cache_args, cache_fname)
+        plot_dose_response(path, bin_size, args.exp_genotype, data)
+
+        bin_size = '10L'
+        cache_fname = os.path.join(path,'courtship_dr_%s.madplot-cache' % bin_size)
+        cache_args = bin_size, args.exp_genotype, lasers
+        data = None
+        if args.only_plot:
+            data = madplot.load_bagfile_cache(cache_args, cache_fname)
+        if data is None:
+            data = {}
+            for laser in lasers:
+                laser = '%dhpc' % laser
+                data[laser] = prepare_data(path, laser, bin_size, [args.exp_genotype])
+            madplot.save_bagfile_cache(data, cache_args, cache_fname)
+
+        plot_dose_response_dtarget_by_wei(path, bin_size, args.exp_genotype, data)
+        plot_dose_response_wei_by_proximity(path, bin_size, args.exp_genotype, data)
 
     if args.show:
         plt.show()
