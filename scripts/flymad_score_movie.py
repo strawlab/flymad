@@ -19,6 +19,7 @@ import glob
 import zipfile
 import argparse
 import collections
+import calendar
 
 import numpy as np
 import pandas as pd
@@ -43,7 +44,9 @@ class OCRThread(threading.Thread):
     #both and adjust the regex to not need them
     #2013-08-1411:00:30092675+02:00
     DT_CROP = (0, 0, 245 , 35)
-    DT_RE = r"([0-9]{4})([_ ]{1})([0-9]{2})([_ ]{1})([0-9]{2})([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
+#    DT_RE = r"([0-9]{4})([_ ]{1})([0-9]{2})([_ ]{1})([0-9]{2})([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
+
+    DT_RE = r"(?P<year>[0-9]{4})(?:[_ ]{1})(?P<month>[0-9]{2})(?:[_ ]{1})(?P<day>[0-9]{2})(?P<hour>[0-9]{2})(?:[:_ ]{1})(?P<minute>[0-9]{2})(?:[:_ ]{1})(?P<second>[0-9]{2})(?:[._ ]{0,1})(?P<secondfrac>[0-9]+)(?P<tzsign>[+_]{1})(?P<tzspec>[0-9:]{5})"
 
     T_CROP = (85, 0, 245 , 35)
     T_RE = r"([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
@@ -81,7 +84,15 @@ class OCRThread(threading.Thread):
 
         t = None
         if self._mode == self.MODE_NORMAL:
-            y,_,m,_,d,H,_,M,_,S,_,ms = self._re.match(stdout).groups()
+            y,m,d,H,M,S,ms,_,_ = self._re.match(stdout).groups()
+            res = self._re.match(stdout).groupdict()
+            res['tzsign'] = '-' if res['tzsign'] == '_' else '+'
+
+            #2013-05-11T21:23:58.970460+00:00
+            s = "%(year)s-%(month)s-%(day)sT%(hour)s:%(minute)s:%(second)s.%(secondfrac)s%(tzsign)s%(tzspec)s" % res
+            import arrow
+            t = arrow.get(s).to('UTC').datetime
+            
         elif self._mode == self.MODE_FORCE_DATE:
             y,m,d = self._force_date
             H,_,M,_,S,_,ms = self._re.match(stdout).groups()
@@ -132,6 +143,7 @@ class OCRThread(threading.Thread):
                 else:
                     #convert to seconds since epoch in UTC
                     now = time.mktime(dt.timetuple())+1e-6*dt.microsecond
+                    now = calendar.timegm(dt.utctimetuple())+1e-6*dt.microsecond
                 print stdout.replace('\n','')," = ",dt, now
             except Exception, e:
                 err = 'error parsing string %s' % stdout
