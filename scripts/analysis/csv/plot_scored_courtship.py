@@ -172,7 +172,7 @@ def prepare_data(path, only_laser, resample_bin, gts):
 
         duration = (df.index[-1] - df.index[0]).total_seconds()
         if duration < EXPERIMENT_DURATION:
-            print "\tmissing data", csvfilefn
+            print "\tmissing data (experiment only %.1ss long) %s" % (duration, csvfilefn)
             continue
 
         print "\t%ss experiment" % duration
