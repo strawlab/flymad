@@ -28,6 +28,7 @@ class TestTZ:
 
         print self.now, dfnow
 
+        print (dfnow-self.now) / 60
 
 if __name__ == "__main__":
     import argparse
