@@ -7,9 +7,11 @@ import flymad.conv
 from flymad_score_movie import OCRThread
 
 class TestTZ:
-    def __init__(self, mp4, bag):
+    def __init__(self, mp4, bag, force_date=None):
         self.bag = bag
-        self.t = OCRThread(self._on_processing_finished, 'z', None, OCRThread.MODE_NORMAL, None)
+        self.t = OCRThread(self._on_processing_finished, 'z', None,
+                    OCRThread.MODE_FORCE_DATE if force_date else OCRThread.MODE_NORMAL,
+                    force_date)
         subprocess.check_call("ffmpeg -i %s -vframes 1 -an -f image2 -y %s" % (mp4,self.t.input_image()),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -39,4 +41,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     t = TestTZ(args.mp4[0], args.bag[0])
+    t.run()
+
+    t = TestTZ(args.mp4[0], args.bag[0], [2013,01,01])
     t.run()

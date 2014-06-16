@@ -21,6 +21,7 @@ import argparse
 import collections
 import calendar
 
+import arrow
 import numpy as np
 import pandas as pd
 
@@ -40,19 +41,39 @@ class OCRThread(threading.Thread):
     #set to zero to let gocr auto-threshold the image
     THRESH = 0#140
 
-    #spaces are sometime spuriously detected, dots are often not detected. Drop
-    #both and adjust the regex to not need them
-    #2013-08-1411:00:30092675+02:00
     DT_CROP = (0, 0, 245 , 35)
-#    DT_RE = r"([0-9]{4})([_ ]{1})([0-9]{2})([_ ]{1})([0-9]{2})([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
-
-    DT_RE = r"(?P<year>[0-9]{4})(?:[_ ]{1})(?P<month>[0-9]{2})(?:[_ ]{1})(?P<day>[0-9]{2})(?P<hour>[0-9]{2})(?:[:_ ]{1})(?P<minute>[0-9]{2})(?:[:_ ]{1})(?P<second>[0-9]{2})(?:[._ ]{0,1})(?P<secondfrac>[0-9]+)(?P<tzsign>[+_]{1})(?P<tzspec>[0-9:]{5})"
+    #spaces are sometime spuriously detected, dots are not detected. Drop
+    #both and adjust the regex to not need them
+    #2014-05-26 09:40:40.697289+05:00 -> 2014_05_2609:40:40.697289_05:00
+    DT_RE = r"""
+        ^
+        (?P<year>[0-9]{4})(?:[_ ]{1})       #year,month,day require a trailing sep
+        (?P<month>[0-9]{2})(?:[_ ]{1})
+        (?P<day>[0-9]{2})                   #no space betwen date and time
+        (?P<hour>[0-9]{2})(?:[:_ ]{1})      #hour,min,sec are all 2 digits
+        (?P<minute>[0-9]{2})(?:[:_ ]{1})
+        (?P<second>[0-9]{2})(?:[._ ]{0,1})  #we sometimes get the dot, sometimes it is replaced as _
+        (?P<secondfrac>[0-9]+)              #all numerical digits until +,_ is the second fraction
+        (?P<tzsign>[+_]{1})                 #its hard to detect -, we dont try, it gets replaced as _
+        (?P<tzspec>[0-9:]{5})               #we require the tzoffset colon and 4 digits
+        $
+    """
 
     T_CROP = (85, 0, 245 , 35)
-    T_RE = r"([0-9]{2})([:_ ]{1})([0-9]{2})([:_ ]{1})([0-9]{2})([._ ]{0,1})([0-9]+)"
+    T_RE = r"""
+        ^
+        (?:[0-9_]*)                         #ignore the date
+        (?P<hour>[0-9]{2})(?:[:_ ]{1})
+        (?P<minute>[0-9]{2})(?:[:_ ]{1})
+        (?P<second>[0-9]{2})(?:[._ ]{0,1})
+        (?P<secondfrac>[0-9]+)
+        (?P<tzsign>[+_]{1})
+        (?P<tzspec>[0-9:]{5})
+        $
+    """
 
     F_CROP = (0, 35, 150, 55)
-    F_RE = r"([0-9]+)"
+    F_RE = r"""([0-9]+)"""
 
     MODE_NORMAL = 'normal'
     MODE_FORCE_DATE = 'force date'
@@ -75,38 +96,36 @@ class OCRThread(threading.Thread):
 
         self._force_date = force_date
         self._crop = self.CROPS[mode]
-        self._re = re.compile(self.RES[mode])
+        self._re = re.compile(self.RES[mode], re.VERBOSE)
 
     def input_image(self, fn="in.png"):
         return os.path.join(self._tdir, fn)
 
     def run_regex(self, stdout):
 
-        t = None
-        if self._mode == self.MODE_NORMAL:
-            y,m,d,H,M,S,ms,_,_ = self._re.match(stdout).groups()
-            res = self._re.match(stdout).groupdict()
+        def _get_dt(re_result):
             res['tzsign'] = '-' if res['tzsign'] == '_' else '+'
-
+            #make ISO8601 format string
             #2013-05-11T21:23:58.970460+00:00
             s = "%(year)s-%(month)s-%(day)sT%(hour)s:%(minute)s:%(second)s.%(secondfrac)s%(tzsign)s%(tzspec)s" % res
-            import arrow
-            t = arrow.get(s).to('UTC').datetime
-            
+            return arrow.get(s).to('UTC').datetime
+
+        t = None
+        if self._mode == self.MODE_NORMAL:
+            res = self._re.match(stdout).groupdict()
+            t = _get_dt(res)
         elif self._mode == self.MODE_FORCE_DATE:
             y,m,d = self._force_date
-            H,_,M,_,S,_,ms = self._re.match(stdout).groups()
+            res = self._re.match(stdout).groupdict()
+            res['year'] = "%02d" % y
+            res['month'] = "%02d" % m
+            res['day'] = "%02d" % d
+            t = _get_dt(res)
         elif self._mode == self.MODE_FRAMENUMBER:
             t, = self._re.match(stdout).groups()
-        else:
-            raise Exception("Unknown Mode")
 
         if t is None:
-            t = datetime.datetime(
-                    int(y),int(m),int(d),
-                    int(H),int(M),int(S),
-                    int(float("0."+ms)*1e6), #us
-            )
+            raise Exception("Unknown Mode")
 
         return t
 
@@ -146,7 +165,7 @@ class OCRThread(threading.Thread):
                     now = calendar.timegm(dt.utctimetuple())+1e-6*dt.microsecond
                 print stdout.replace('\n','')," = ",dt, now
             except Exception, e:
-                err = 'error parsing string %s' % stdout
+                err = 'error parsing string %s (%s)' % (stdout, e)
                 print err
                 now = np.nan
         else:
