@@ -41,6 +41,7 @@ add-apt-repository 'deb http://packages.ros.org/ros/ubuntu precise main'
 
 # -------------- update local package index ----
 apt-get update --yes
+apt-get upgrade --yes
 
 # ---- install ROS
 
