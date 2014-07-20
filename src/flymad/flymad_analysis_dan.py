@@ -7,6 +7,8 @@ import datetime
 import calendar
 import time
 import re
+import pickle
+import subprocess
 
 import numpy as np
 import pandas as pd
@@ -172,34 +174,84 @@ def to_si(d,space=''):
 
     return s
 
+def get_targets(path, date, csvfile=None):
+    #first we look for a png file corresponding to the scored MP4 (for
+    #consistency with the initial submission)
 
-def scoring_video_mp4_click(image_path):
-    img = mimg.imread(image_path)
-    fig1 = plt.figure()
-    fig1.set_size_inches(12,8)
-    fig1.subplots_adjust(hspace=0)
-    ax1 = fig1.add_subplot(1,1,1)
+    def _mp4_click(image_path, cache_path):
+        img = mimg.imread(image_path)
+        fig1 = plt.figure()
+        fig1.set_size_inches(12,8)
+        fig1.subplots_adjust(hspace=0)
+        ax1 = fig1.add_subplot(1,1,1)
 
-    #the original wide field camera was 659x494px. The rendered mp4 is 384px high
-    #the widefield image is padded with a 10px margin, so it is technically 514 high.
-    #scaling h=384->514 means new w=1371
-    #
-    #the image origin is top-left because matplotlib
-    ax1.imshow(img, extent=[0,1371,514,0],zorder=0) #extent=[h_min,h_max,v_min,v_max]
-    ax1.axis('off')
+        #the original wide field camera was 659x494px. The rendered mp4 is 384px high
+        #the widefield image is padded with a 10px margin, so it is technically 514 high.
+        #scaling h=384->514 means new w=1371
+        #
+        #the image origin is top-left because matplotlib
+        ax1.imshow(img, extent=[0,1371,514,0],zorder=0) #extent=[h_min,h_max,v_min,v_max]
+        ax1.axis('off') 
 
-    targets = []
-    def _onclick(target):
-        #subtract 10px for the margin
-        xydict = {'x': target.xdata-10, 'y': target.ydata-10}
-        targets.append(xydict)
+        targets = []
+        def _onclick(target):
+            #subtract 10px for the margin
+            xydict = {'x': target.xdata-10, 'y': target.ydata-10}
+            targets.append(xydict)
 
-    cid = fig1.canvas.mpl_connect('button_press_event', _onclick)
-    plt.show()
-    fig1.canvas.mpl_disconnect(cid)
+        cid = fig1.canvas.mpl_connect('button_press_event', _onclick)
+        plt.show()
+        fig1.canvas.mpl_disconnect(cid)
 
-    return targets
+        with open(cache_path, 'wb') as f:
+            pickle.dump(targets, f, -1)
 
+        return targets
+
+    def _fmf_click(image_path, cache_path):
+        pass
+
+    def _maybe_glob_path(_path, _date, _ext):
+        if csvfile is None:
+            return os.path.join(path,'*%s*%s' % (_date, _ext))
+        return csvfile.replace('.mp4', '') + _ext
+
+    #cached results
+    pata = _maybe_glob_path(path,date,'.mp4.png.madplot-cache')
+    mp4pngcache = glob.glob(pata)
+    if len(mp4pngcache) == 1:
+        return pickle.load( open(mp4pngcache[0],'rb') )
+
+    #targets from fmf
+    #fmf2bmps wGP-140hpc-10_wide_20140225_105341.fmf --start=10 --stop=10 --extension=fmf.png
+
+    #targets from mp4
+    patb = _maybe_glob_path(path,date,'.mp4.png')
+    mp4png = glob.glob(patb)
+    if len(mp4png) == 1:
+        return _mp4_click(mp4png[0], mp4png[0] + '.madplot-cache')
+
+    patc =  _maybe_glob_path(path,date,'.mp4')
+    mp4 = glob.glob(patc)
+    if not mp4:
+        msg = "could not find"
+    elif len(mp4) > 1:
+        msg = "multiple videos for day found"
+    else:
+        msg = ""
+    
+    if not msg:
+        mp4 = mp4[0]
+        mp4png = mp4 + '.png'
+        #make a thumbnail
+        subprocess.check_call("ffmpeg -i %s -vframes 1 -an -f image2 -y %s" % (mp4,mp4png),
+                              shell=True)
+        return _mp4_click(mp4png, mp4png + '.madplot-cache')
+
+    print "WARNING: %s\n\t" % msg,
+    print "\n\t".join((pata,patb,patc))
+
+    return []
 
 def get_arena_conf(calibration_file=None, **kwargs):
     #DEFAULTS FROM THE FIRST NMETH SUBMISSION - AS USED FOR DANS

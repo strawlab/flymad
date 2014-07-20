@@ -65,73 +65,7 @@ GT_COLORS = {'wtrpmyc':flymad_plot.BLACK,
 
 DIRECTED_COURTING_DIST = 50
 
-def _get_targets(path, date):
-    #first we look for a png file corresponding to the scored MP4 (for
-    #consistency with the initial submission)
-
-    def _mp4_click(image_path, cache_path):
-        img = mimg.imread(image_path)
-        fig1 = plt.figure()
-        fig1.set_size_inches(12,8)
-        fig1.subplots_adjust(hspace=0)
-        ax1 = fig1.add_subplot(1,1,1)	
-
-        #the original wide field camera was 659x494px. The rendered mp4 is 384px high
-        #the widefield image is padded with a 10px margin, so it is technically 514 high.
-        #scaling h=384->514 means new w=1371
-        #
-        #the image origin is top-left because matplotlib
-        ax1.imshow(img, extent=[0,1371,514,0],zorder=0) #extent=[h_min,h_max,v_min,v_max]
-        ax1.axis('off') 
-
-        targets = []
-        def _onclick(target):
-            #subtract 10px for the margin
-            xydict = {'x': target.xdata-10, 'y': target.ydata-10}
-            targets.append(xydict)
-
-        cid = fig1.canvas.mpl_connect('button_press_event', _onclick)
-        plt.show()
-        fig1.canvas.mpl_disconnect(cid)
-
-        with open(cache_path, 'wb') as f:
-            pickle.dump(targets, f, -1)
-
-        return targets
-
-    def _fmf_click(image_path, cache_path):
-        pass
-
-    #cached results
-    pata = os.path.join(path,'*%s*.mp4.png.madplot-cache' % date)
-    mp4pngcache = glob.glob(pata)
-    if len(mp4pngcache) == 1:
-        return pickle.load( open(mp4pngcache[0],'rb') )
-
-    #targets from fmf
-    #fmf2bmps wGP-140hpc-10_wide_20140225_105341.fmf --start=10 --stop=10 --extension=fmf.png
-
-    #targets from mp4
-    patb = os.path.join(path,'*%s*.mp4.png' % date)
-    mp4png = glob.glob(patb)
-    if len(mp4png) == 1:
-        return _mp4_click(mp4png[0], mp4png[0] + '.madplot-cache')
-
-    patc = os.path.join(path,'*%s*.mp4' % date)
-    mp4 = glob.glob(patc)
-    if len(mp4) == 1:
-        mp4 = mp4[0]
-        mp4png = mp4 + '.png'
-        #make a thumbnail
-        subprocess.check_call("ffmpeg -i %s -vframes 1 -an -f image2 -y %s" % (mp4,mp4png),
-                              shell=True)
-        return _mp4_click(mp4png, mp4png + '.madplot-cache')
-
-    print "WARNING: could not find\n\t", "\n\t".join((pata,patb,patc))
-
-    return []
-
-def prepare_data(path, only_laser, resample_bin, gts):
+def prepare_data(path, only_laser, resample_bin, gts, min_experiment_duration, target_movie):
     data = {}
 
     #PROCESS SCORE FILES:
@@ -146,7 +80,7 @@ def prepare_data(path, only_laser, resample_bin, gts):
             print "\tskipping genotype", genotype
             continue
 
-        targets = _get_targets(path, date)
+        targets = flymad_analysis.get_targets(path, date, target_movie)
         assert len(targets) == 4
         targets = pd.DataFrame(targets)
         targets = (targets + 0.5).astype(int)
@@ -650,7 +584,7 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
 
     dt = df.index[0].to_datetime()
     date = dt.strftime('%Y%m%d')
-    targets = _get_targets(path, date)
+    targets = flymad_analysis.get_targets(path, date)
 
     #FIXME: I think this doesn't work for sets of multiple flies
     for desc,split in _split_df(df):
