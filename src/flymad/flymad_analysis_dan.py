@@ -275,12 +275,6 @@ def get_arena_conf(calibration_file=None, **kwargs):
     y = t['y'] + (h/2.0)
     r = min(w,h)/2.0
 
-    #NO DAN. NEVER REVERSE THE AXIS BY SETTING xlim[-1] < xlim[0]
-    #self._xlim = [self._y+self._r+10,self._y-self._r-10]
-
-    xlim = [y-r-10,y+r+10]
-    ylim = [x-r-10,x+r+10]
-
     rw = 0.045
 
     if 'l' not in kwargs:
@@ -319,9 +313,6 @@ class Arena:
         self._x = l['x'] + (w/2.0) + 12
         self._y = t['y'] + (h/2.0)
         self._r = min(w,h)/2.0
-
-        #NO DAN. NEVER REVERSE THE AXIS BY SETTING xlim[-1] < xlim[0]
-        #self._xlim = [self._y+self._r+10,self._y-self._r-10]
 
         self._xlim = [self._y-self._r-10,self._y+self._r+10]
         self._ylim = [self._x-self._r-10,self._x+self._r+10]
