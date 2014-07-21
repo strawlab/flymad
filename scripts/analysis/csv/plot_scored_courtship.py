@@ -39,7 +39,6 @@ except ImportError:
 assert np.version.version in ("1.7.1", "1.6.1")
 assert pd.version.version in ("0.11.0", "0.12.0")
 
-EXPERIMENT_DURATION = 600
 STATS_NUM_BINS = 40
 
 XLIM_10MIN = [-60,480]
@@ -105,8 +104,8 @@ def prepare_data(path, only_laser, resample_bin, gts, min_experiment_duration, t
             df['dtarget'] = 0
 
         duration = (df.index[-1] - df.index[0]).total_seconds()
-        if duration < EXPERIMENT_DURATION:
-            print "\tmissing data", csvfilefn
+        if duration < min_experiment_duration:
+            print "\tmissing data? %s (duration %s < %s)" % (csvfilefn, duration, min_experiment_duration)
             continue
 
         print "\t%ss experiment" % duration
@@ -128,7 +127,7 @@ def prepare_data(path, only_laser, resample_bin, gts, min_experiment_duration, t
             df = flymad_analysis.align_t_by_laser_on(
                     df,
                     resample_bin=resample_bin,
-                    min_experiment_duration=EXPERIMENT_DURATION,
+                    min_experiment_duration=min_experiment_duration,
                     align_first_only=True)
         except flymad_analysis.AlignError, err:
             print "\talign error %s (%s)" % (csvfilefn, err)
@@ -1144,9 +1143,18 @@ if __name__ == "__main__":
     parser.add_argument('--calibration-file', help='calibration yaml files', required=False, default=None)
     parser.add_argument('--exp-genotype', help='experimental genotype', required=True)
     parser.add_argument('--other-genotypes', help='other genotypes (comma separated list)')
+    parser.add_argument('--experiment-duration', type=int, default=600)
+    parser.add_argument('--target-movie', help='path to mp4 that for indicating target locations FOR ALL CSV FILES GIVEN')
 
     args = parser.parse_args()
     path = args.path[0]
+
+    if args.target_movie:
+        if not os.path.isfile(args.target_movie):
+            parser.error('could not find target movie %s' % args.target_movie)
+    target_movie = args.target_movie
+
+    min_experiment_duration = args.experiment_duration
 
     if args.laser_dose_response:
         lasers = map(int,args.laser_dose_response.split(','))
@@ -1163,7 +1171,7 @@ if __name__ == "__main__":
         if args.only_plot:
             dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
         if dfs is None:
-            dfs = prepare_data(path, args.laser, bin_size, gts)
+            dfs = prepare_data(path, args.laser, bin_size, gts, min_experiment_duration, target_movie)
             madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
         arena = madplot.Arena(
@@ -1186,7 +1194,7 @@ if __name__ == "__main__":
         if args.only_plot:
             dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
         if dfs is None:
-            dfs = prepare_data(path, args.laser, bin_size, gts)
+            dfs = prepare_data(path, args.laser, bin_size, gts, min_experiment_duration, target_movie)
             madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
         stats = []
@@ -1209,7 +1217,7 @@ if __name__ == "__main__":
         if args.only_plot:
             dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
         if dfs is None:
-            dfs = prepare_data(path, args.laser, bin_size, gts)
+            dfs = prepare_data(path, args.laser, bin_size, gts, min_experiment_duration, target_movie)
             madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
         plot_distance_histograms( path, bin_size, dfs)#, gts_only=['wGP'] )
@@ -1225,7 +1233,7 @@ if __name__ == "__main__":
     if args.only_plot:
         dfs = madplot.load_bagfile_cache(cache_args, cache_fname)
     if dfs is None:
-        dfs = prepare_data(path, args.laser, bin_size, gts)
+        dfs = prepare_data(path, args.laser, bin_size, gts, min_experiment_duration, target_movie)
         madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
     plot_data(path, args.laser, bin_size, dfs)
@@ -1266,7 +1274,7 @@ if __name__ == "__main__":
             data = {}
             for laser in lasers:
                 laser = '%dhpc' % laser
-                data[laser] = prepare_data(path, laser, bin_size, [args.exp_genotype])
+                data[laser] = prepare_data(path, laser, bin_size, [args.exp_genotype], min_experiment_duration, target_movie)
             madplot.save_bagfile_cache(data, cache_args, cache_fname)
         plot_dose_response(path, bin_size, args.exp_genotype, data)
 
@@ -1280,7 +1288,7 @@ if __name__ == "__main__":
             data = {}
             for laser in lasers:
                 laser = '%dhpc' % laser
-                data[laser] = prepare_data(path, laser, bin_size, [args.exp_genotype])
+                data[laser] = prepare_data(path, laser, bin_size, [args.exp_genotype], min_experiment_duration, target_movie)
             madplot.save_bagfile_cache(data, cache_args, cache_fname)
 
         plot_dose_response_dtarget_by_wei(path, bin_size, args.exp_genotype, data)
