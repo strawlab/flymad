@@ -628,7 +628,7 @@ def plot_trajectories_by_stage(df, arena, laser, figsize=(4,4)):
         fig.canvas.print_svg(
                 filename=flymad_plot.get_plotpath(path,"%s_bare.svg" % figname))
 
-def plot_distance_histograms( path, bin_size, dfs, gts_only=None ):
+def plot_distance_histograms( path, bin_size, dfs, gts_only=None, do_stats=False, one_plot_per_period=True):
     if gts_only is None:
         gts_only = dfs.keys()
 
@@ -679,23 +679,24 @@ def plot_distance_histograms( path, bin_size, dfs, gts_only=None ):
                 xs.append(bins[-1])
                 ys.append(0)
 
-            fig = plt.figure(figname,figsize=mini_figsize)
-            ax = fig.add_subplot(111)
-            ax.plot( xs, ys, color=flymad_plot.BLACK, linestyle='-')
             label = '%s (%d - %d)'%(period,
                                     PERIODS[period][0],
                                     PERIODS[period][1] )
             ax_all.plot( xs, ys, label=label )
 
-            spine_placer(ax, location='left,bottom')
-            ax.set_ylim((0,max_ylim))
-            ax.set_xlim((0,max_xlim))
-            ax.set_ylabel('Fraction time (%)')
-            ax.set_xlabel('Distance (px)')
-            flymad_plot.retick_relabel_axis(ax, [0, max_xlim//2, max_xlim], [0, max_ylim//2, max_ylim])
+            if one_plot_per_period:
+                fig = plt.figure(figname,figsize=mini_figsize)
+                ax = fig.add_subplot(111)
+                ax.plot( xs, ys, color=flymad_plot.BLACK, linestyle='-')
+                spine_placer(ax, location='left,bottom')
+                ax.set_ylim((0,max_ylim))
+                ax.set_xlim((0,max_xlim))
+                ax.set_ylabel('Fraction time (%)')
+                ax.set_xlabel('Distance (px)')
+                flymad_plot.retick_relabel_axis(ax, [0, max_xlim//2, max_xlim], [0, max_ylim//2, max_ylim])
 
-            fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
-            fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
+                fig.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
+                fig.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
 
         figname = 'distance_histogram_%s_all'%(gt,)
@@ -709,38 +710,39 @@ def plot_distance_histograms( path, bin_size, dfs, gts_only=None ):
         fig_all.savefig(flymad_plot.get_plotpath(path,"%s.png" % figname), bbox_inches='tight')
         fig_all.savefig(flymad_plot.get_plotpath(path,"%s.svg" % figname), bbox_inches='tight')
 
-        # statistics on distances
-        p_data = {}
-        pstar_data = {}
-        for i,period1 in enumerate(period_order):
-            p_data[period1] = []
-            pstar_data[period1] = []
-            for j,period2 in enumerate(period_order):
-                test1 = all_dists[period1]
-                test2 = all_dists[period2]
-                #hval, pval = kruskal(test1, test2)
-                U, p1 = mannwhitneyu(test1, test2)
-                pval = p1*2 # two tail
-                p_data[period1].append( pval )
-                pstar_data[period1].append( madplot.p2stars(pval) )
-        P = pd.DataFrame(p_data,index=period_order)
-        Pstar = pd.DataFrame(pstar_data,index=period_order)
-        fname = 'distance_histogram_%s_stats'%(gt,)
-        fname = flymad_plot.get_plotpath(path,"%s.html" % fname)
-        pd.set_option('display.precision',3) # print full P values below
-        human_gt = flymad_analysis.human_label(gt)
-        with open(fname, mode='w') as fd:
-            fd.write('<h1>%s</h1>'%human_gt)
-            fd.write( '<object type="image/svg+xml" data="%s">Your browser does not support SVG</object>'%(figname+'.svg',) )
+        if do_stats:
+            # statistics on distances
+            p_data = {}
+            pstar_data = {}
+            for i,period1 in enumerate(period_order):
+                p_data[period1] = []
+                pstar_data[period1] = []
+                for j,period2 in enumerate(period_order):
+                    test1 = all_dists[period1]
+                    test2 = all_dists[period2]
+                    #hval, pval = kruskal(test1, test2)
+                    U, p1 = mannwhitneyu(test1, test2)
+                    pval = p1*2 # two tail
+                    p_data[period1].append( pval )
+                    pstar_data[period1].append( madplot.p2stars(pval) )
+            P = pd.DataFrame(p_data,index=period_order)
+            Pstar = pd.DataFrame(pstar_data,index=period_order)
+            fname = 'distance_histogram_%s_stats'%(gt,)
+            fname = flymad_plot.get_plotpath(path,"%s.html" % fname)
+            pd.set_option('display.precision',3) # print full P values below
+            human_gt = flymad_analysis.human_label(gt)
+            with open(fname, mode='w') as fd:
+                fd.write('<h1>%s</h1>'%human_gt)
+                fd.write( '<object type="image/svg+xml" data="%s">Your browser does not support SVG</object>'%(figname+'.svg',) )
 
-            fd.write( '<h2>p values</h2>\n' )
-            fd.write( P._repr_html_() + '\n\n' )
-            fd.write( Pstar._repr_html_() + '\n\n' )
-            fd.write( '<h2>N numbers</h2>\n' )
-            fd.write('<ul>\n')
-            for period1 in period_order:
-                fd.write('<li>%s: %d</li>\n'%(period1, len(all_dists[period1]) ))
-            fd.write('</ul>\n')
+                fd.write( '<h2>p values</h2>\n' )
+                fd.write( P._repr_html_() + '\n\n' )
+                fd.write( Pstar._repr_html_() + '\n\n' )
+                fd.write( '<h2>N numbers</h2>\n' )
+                fd.write('<ul>\n')
+                for period1 in period_order:
+                    fd.write('<li>%s: %d</li>\n'%(period1, len(all_dists[period1]) ))
+                fd.write('</ul>\n')
 
 def plot_data(path, laser, bin_size, dfs):
 
@@ -1220,7 +1222,7 @@ if __name__ == "__main__":
             dfs = prepare_data(path, args.laser, bin_size, gts, min_experiment_duration, target_movie)
             madplot.save_bagfile_cache(dfs, cache_args, cache_fname)
 
-        plot_distance_histograms( path, bin_size, dfs)#, gts_only=['wGP'] )
+        plot_distance_histograms( path, bin_size, dfs, do_stats=args.stats)
 
         if args.show:
             plt.show()
