@@ -757,7 +757,7 @@ def plot_data(path, laser, bin_size, dfs):
                             n=gtdf['n']['zx'].values,
                             label=flymad_analysis.human_label(gt, specific=True),
                             order=flymad_analysis.get_genotype_order(gt),
-                            color=GT_COLORS[gt],
+                            color=GT_COLORS.get(gt),
                             df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
 
@@ -801,7 +801,7 @@ def plot_data(path, laser, bin_size, dfs):
                             n=gtdf['n']['dtarget'].values,
                             label=flymad_analysis.human_label(gt, specific=True),
                             order=flymad_analysis.get_genotype_order(gt),
-                            color=GT_COLORS[gt],
+                            color=GT_COLORS.get(gt),
                             df=gtdf['df'],
                             N=len(gtdf['df']['obj_id'].unique()))
 
@@ -854,7 +854,7 @@ def plot_dose_response(path, bin_size, exp_gt, data):
                                   value=expdf['mean']['zx'].values,
                                   std=expdf['std']['zx'].values,
                                   n=expdf['n']['zx'].values,
-                                  color=DR_COLORS[laser],
+                                  color=DR_COLORS.get(laser),
                                   label=flymad_analysis.laser_desc(laser),
                                   df=expdf['df'],
                                   N=len(expdf['df']['obj_id'].unique()))
@@ -862,7 +862,7 @@ def plot_dose_response(path, bin_size, exp_gt, data):
                                     value=expdf['mean']['dtarget'].values,
                                     std=expdf['std']['dtarget'].values,
                                     n=expdf['n']['dtarget'].values,
-                                    color=DR_COLORS[laser],
+                                    color=DR_COLORS.get(laser),
                                     label=flymad_analysis.laser_desc(laser),
                                     df=expdf['df'],
                                     N=len(expdf['df']['obj_id'].unique()))
@@ -872,7 +872,7 @@ def plot_dose_response(path, bin_size, exp_gt, data):
         wedf = non_grouped_df[non_grouped_df['zx'] > 0]
         laser_dtarget_we[laser] = dict(xaxis=wedf['t'].values,
                                        value=wedf['dtarget'].values,
-                                       color=DR_COLORS[laser],
+                                       color=DR_COLORS.get(laser),
                                        label=flymad_analysis.laser_desc(laser),
                                        df=wedf,
                                        N=len(wedf['obj_id'].unique()))
@@ -954,7 +954,7 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
         non_grouped_df = expdf['df']
 
         laser_dtarget[laser] = dict(value=non_grouped_df['dtarget'].values,
-                                    color=DR_COLORS[laser],
+                                    color=DR_COLORS.get(laser),
                                     label=flymad_analysis.laser_desc(laser))
 
         #keep only values where there was WE
@@ -962,7 +962,7 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
         gwedf = wedf.groupby('t_align').mean()
         laser_dtarget_we[laser] = dict(xaxis=gwedf['t'].values,
                                        value=gwedf['dtarget'].values,
-                                       color=DR_COLORS[laser],
+                                       color=DR_COLORS.get(laser),
                                        label=flymad_analysis.laser_desc(laser),
                                        df=wedf,
                                        N=len(gwedf['obj_id'].unique()))
@@ -983,7 +983,7 @@ def plot_dose_response_dtarget_by_wei(path, bin_size, exp_gt, data):
 
         laser_dtarget_prop[laser] = dict(xaxis=grouped['t'].mean().values,
                                         value=np.array(proportions),
-                                        color=DR_COLORS[laser],
+                                        color=DR_COLORS.get(laser),
                                         label=flymad_analysis.laser_desc(laser),
                                         N=len(grouped['obj_id'].unique()))
 
@@ -1071,7 +1071,7 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
                               value=gdf['zx'].values,
 #                              std=grp.std()['zx'].values,
 #                              n=grp.count()['zx'].values,
-                              color=DR_COLORS[laser],
+                              color=DR_COLORS.get(laser),
                               label=flymad_analysis.laser_desc(laser),
                               df=non_grouped_df,
                               N=len(non_grouped_df['obj_id'].unique()))
@@ -1082,7 +1082,7 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
                                     value=cdf['zx'].values,
 #                                    std=grp.std()['zx'].values,
 #                                    n=grp.count()['zx'].values,
-                                    color=DR_COLORS[laser],
+                                    color=DR_COLORS.get(laser),
                                     label=flymad_analysis.laser_desc(laser),
                                     df=closedf,
                                     N=len(closedf['obj_id'].unique()))
@@ -1093,7 +1093,7 @@ def plot_dose_response_wei_by_proximity(path, bin_size, exp_gt, data):
                                   value=fdf['zx'].values,
 #                                  std=grp.std()['zx'].values,
 #                                  n=grp.count()['zx'].values,
-                                  color=DR_COLORS[laser],
+                                  color=DR_COLORS.get(laser),
                                   label=flymad_analysis.laser_desc(laser),
                                   df=fardf,
                                   N=len(fardf['obj_id'].unique()))
