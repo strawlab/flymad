@@ -9,9 +9,11 @@ import os.path
 
 from benu import benu
 
-import roslib; roslib.load_manifest('rosbag')
+import roslib; roslib.load_manifest('flymad')
 import rospy
 import rosbag
+
+from flymad.flymad_analysis_dan import ScoredMovie
 
 def scale(w, h, x, y, maximum=True):
     # see http://code.activestate.com/recipes/577575-scale-rectangle-while-keeping-aspect-ratio/
@@ -130,10 +132,10 @@ def composite_fmfs(widef,zoomf,rosbagf,imagepath,fps=15):
         this_raw2d = raw2d[cond]
 
         save_fname_path = os.path.join(imagepath,'out%06d.png' % out_fno)
-        final_w = 1024
-        final_h = 768 / (1 if use_wide_zoomed else 2)
+        final_w = ScoredMovie.MOVIE_TARGET_WIDTH
+        final_h = ScoredMovie.MOVIE_TARGET_HEIGHT
 
-        margin = 10
+        margin = ScoredMovie.MOVIE_MARGIN
         max_panel_w = final_w // 2 - 3*margin//2
         max_panel_h = final_h - 2*margin
 

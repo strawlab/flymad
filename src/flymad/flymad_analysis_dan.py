@@ -44,6 +44,11 @@ HUMAN_LABELS = {
 UNIT_SPACE = u"\u205F"
 UNIT_SPACE = " "
 
+class ScoredMovie:
+    MOVIE_MARGIN = 10
+    MOVIE_TARGET_WIDTH = 1024
+    MOVIE_TARGET_HEIGHT = 768
+
 class AlignError(Exception):
     pass
 
