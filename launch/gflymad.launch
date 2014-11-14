@@ -1,9 +1,5 @@
 <launch>
 
-  <env name="LIBCAMIFACE_ARAVIS_DEBUG" value="1" />
-  <env name="LIBCAMIFACE_ARAVIS_PACKET_SIZE" value="8000" />
-  <env name="LIBCAMIFACE_ARAVIS_ENABLE_RESEND" value="0" />
-
   <param name="/ttm/headtrack_templateimg" type="string" value="$(find flymad)/data/templates/ds4_flybody_dan_ts12.png" />
 
   <node name="gflymad" pkg="flymad" type="gflymad.py" />
