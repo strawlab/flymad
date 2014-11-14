@@ -7,7 +7,7 @@ import collections
 
 import roslib; roslib.load_manifest('flymad')
 import rospy
-from std_msgs.msg import UInt8, UInt16, String, Float32
+from std_msgs.msg import UInt8, UInt16, String, Float32, Bool
 from flymad.msg import MicroVelocity, MicroPosition
 from flymad.util import myint16, dac_value_wrap
 
@@ -46,6 +46,9 @@ class FlyMADMicro(object):
                                         tcp_nodelay=True)
         self._pub_state = rospy.Publisher('~state',
                                         String,
+                                        tcp_nodelay=True)
+        self._pub_init = rospy.Publisher('~initialized',
+                                        Bool,
                                         tcp_nodelay=True)
 
         self._send_timezone()
@@ -244,6 +247,7 @@ class FlyMADMicro(object):
                 print 'rxu: %r %d %d'%(st, dacA, dacB)
 
             self._pub_state.publish(repr(st))
+            self._pub_init.publish(state & STATE_INITIALIZED)
 
             if not (state & STATE_INITIALIZED):
                 return False

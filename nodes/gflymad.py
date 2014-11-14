@@ -244,6 +244,11 @@ class UI:
         w = self._ui.get_object("bTTM")
         w.connect("clicked", self._on_start_ttm)
 
+        self._refs.append( GtkImageTopicWidget(
+                widget=self._ui.get_object("iMicroInitialized"),
+                nodepath="/flymad_micro/initialized",
+                msgclass=std_msgs.msg.Bool)
+                )
         self._refs.append( GtkButtonStartNode(
                 widget=self._ui.get_object("bTracker"),
                 nodepath="flymad_tracker",
