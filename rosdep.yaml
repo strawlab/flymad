@@ -18,3 +18,5 @@ python-motmot-fview-head-track:
   ubuntu: python-motmot-fview-head-track
 gocr:
   ubuntu: gocr
+arduino-udev:
+  ubuntu: arduino-udev
