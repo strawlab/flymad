@@ -13,7 +13,7 @@
   <param name="/ttm/headtrack_mincontourarea" type="int" value="1000" />
   <param name="/ttm/headtrack_checkflipped" type="int" value="1" />
   <param name="/ttm/headtrack_usegpu" type="int" value="0" />
-  <param name="/ttm/headtrack_templateimg" type="string" value="$(find flymad)/data/templates/ds4_flybody_dan_ts18.png" />
+  <param name="/ttm/headtrack_templateimg" type="string" value="$(find flymad)/data/templates/ds4_flybody_dan_ts12.png" />
 
   <node name="gflymad" pkg="flymad" type="gflymad.py" />
 
