@@ -63,9 +63,13 @@ class Targeter:
         _ = rospy.Subscriber('/experiment/laser',
                             UInt8,
                             self.on_laser)
+        _ = rospy.Service('/experiment/laser', LaserState, self.on_laser_srv)
 
     def on_laser(self, msg):
         self._laser = msg.data
+    def on_laser_srv(self, req):
+        self._laser = req.data
+        return LaserStateResponse()
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
