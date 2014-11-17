@@ -3,6 +3,7 @@ import roslib; roslib.load_manifest('flymad')
 import rospy
 
 from flymad.msg import MicroPosition
+from flymad.constants import LASERS_ALL_ON
 
 import math
 
@@ -22,7 +23,7 @@ class Circler:
             msg = MicroPosition()
             msg.posA = int(round(x))
             msg.posB = int(round(y))
-            msg.laser = 0xFF;
+            msg.laser = LASERS_ALL_ON;
             self.pub.publish(msg)
             r.sleep()
 

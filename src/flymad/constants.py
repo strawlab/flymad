@@ -1,1 +1,9 @@
 FPS = 100.0
+
+LASERS_ALL_OFF = 0x00
+LASER0_ON      = 0x01
+LASER1_ON      = 0x02
+LASER2_ON      = 0x04
+LASERS_ALL_ON  = 0xFF
+
+

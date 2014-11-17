@@ -11,6 +11,7 @@ import rospy
 
 from flymad.msg import MicroPosition, Raw2dPositions
 from flymad.laser_camera_calibration import save_raw_calibration_data
+from flymad.constants import LASERS_ALL_ON
 
 PER_PIXEL_SECONDS = 0.1
 WAIT = 0.03
@@ -44,6 +45,7 @@ class Calibration:
             msg = MicroPosition()
             msg.posA = daca
             msg.posB = dacb
+            msg.laser = LASERS_ALL_ON
             self.pub.publish(msg)
             rospy.sleep(PER_PIXEL_SECONDS) # allow msec
             pixels.append(self.get_last_pixel(timeout=WAIT))

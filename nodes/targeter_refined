@@ -11,12 +11,10 @@ from geometry_msgs.msg import Vector3
 from std_msgs.msg import UInt8, Int64, String
 from flymad.msg import MicroPosition, TargetedObj, HeadDetect
 
+from flymad.constants import LASERS_ALL_ON, LASERS_ALL_OFF
 from flymad.laser_camera_calibration import load_calibration
 from flymad.util import myint32, myint16
 from flymad.refined_utils import ControlManager, target_dx_dy_from_message
-
-LASER_POWER_ON  = 255
-LASER_POWER_OFF = 0
 
 #MAKE THIS FALSE TO DISABLE TTL
 ENABLE_TTL = True
@@ -31,7 +29,7 @@ class Targeter:
         rospy.init_node('flymad_targeter')
         self.cur_obj_id = 0
         self.dacs       = 0,0
-        self.last_vals  = 0,0,LASER_POWER_OFF #a,b,laser
+        self.last_vals  = 0,0,LASERS_ALL_OFF #a,b,laser
 
         self._track_lock = threading.Lock()
         self._track_mode = 'W' #W or F (wide or fine)
@@ -48,7 +46,7 @@ class Targeter:
         self._disable_laser_when_lose_targeting = rospy.get_param(
                     '~disable_laser_when_lose_targeting', False)
 
-        self._laser_power = LASER_POWER_OFF
+        self._laser = LASERS_ALL_OFF
 
         self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
                                                 MicroPosition,
@@ -82,7 +80,7 @@ class Targeter:
                             self.on_laser)
 
     def on_laser(self, msg):
-        self._laser_power = LASER_POWER_ON if msg.data else LASER_POWER_OFF
+        self._laser = msg.data
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -132,7 +130,7 @@ class Targeter:
                         self._track_zoom_misses = 0
                         return
 
-            self.send_dac(cmdA, cmdB, self._laser_power)
+            self.send_dac(cmdA, cmdB, self._laser)
             self.send_targeted(MODE_ZOOM)
 
     def stop_tracking(self,old_obj_id):
@@ -197,12 +195,12 @@ class Targeter:
         except IndexError:
             return
 
-        self.send_dac(daca, dacb, self._laser_power)
+        self.send_dac(daca, dacb, self._laser)
         self.send_targeted(MODE_WIDE)
 
     def turnoff_laser(self):
         a,b,_ = self.last_vals
-        msg = MicroPosition(a, b, LASER_POWER_OFF)
+        msg = MicroPosition(a, b, LASERS_ALL_OFF)
         this_vals = msg.posA, msg.posB, msg.laser
         self.pub_dac_position.publish(msg)
         self.last_vals = this_vals
@@ -220,7 +218,7 @@ class Targeter:
         msg.fly_y = float(self._cur_y)
         msg.laser_x = float(dac_pixel_x)
         msg.laser_y = float(dac_pixel_y)
-        msg.laser_power = int(self._laser_power)
+        msg.laser_power = int(self._laser)
         msg.mode = int(mode)
         self.pub_targeted.publish(msg)
 
@@ -234,9 +232,9 @@ class Targeter:
             self.last_vals = this_vals
 
     def run(self):
-        self._laser_power = LASER_POWER_ON
+        self._laser = LASERS_ALL_ON
         rospy.spin()
-        self.send_dac(0, 0, LASER_POWER_OFF)
+        self.send_dac(0, 0, LASERS_ALL_OFF)
 
 
 if __name__=='__main__':
