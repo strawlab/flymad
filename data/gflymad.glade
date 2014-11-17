@@ -466,27 +466,6 @@
                           </packing>
                         </child>
                         <child>
-                          <placeholder/>
-                        </child>
-                        <child>
-                          <placeholder/>
-                        </child>
-                        <child>
-                          <placeholder/>
-                        </child>
-                        <child>
-                          <placeholder/>
-                        </child>
-                        <child>
-                          <placeholder/>
-                        </child>
-                        <child>
-                          <placeholder/>
-                        </child>
-                        <child>
-                          <placeholder/>
-                        </child>
-                        <child>
                           <object class="GtkLabel" id="lMicro">
                             <property name="visible">True</property>
                             <property name="can_focus">False</property>
@@ -506,7 +485,7 @@
                             <property name="can_focus">False</property>
                             <property name="xalign">1</property>
                             <property name="xpad">5</property>
-                            <property name="stock">gtk-missing-image</property>
+                            <property name="stock">gtk-no</property>
                           </object>
                           <packing>
                             <property name="left_attach">1</property>
@@ -514,6 +493,27 @@
                             <property name="width">1</property>
                             <property name="height">1</property>
                           </packing>
+                        </child>
+                        <child>
+                          <placeholder/>
+                        </child>
+                        <child>
+                          <placeholder/>
+                        </child>
+                        <child>
+                          <placeholder/>
+                        </child>
+                        <child>
+                          <placeholder/>
+                        </child>
+                        <child>
+                          <placeholder/>
+                        </child>
+                        <child>
+                          <placeholder/>
+                        </child>
+                        <child>
+                          <placeholder/>
                         </child>
                       </object>
                     </child>
