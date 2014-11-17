@@ -269,6 +269,13 @@ class UI:
                 package=package,
                 node_type="flymad_micro")
                 )
+        self._refs.append( GtkButtonStartNode(
+                widget=self._ui.get_object("bMicroV2"),
+                nodepath="flymad_micro",
+                nodemanager=self._manager,
+                package=package,
+                node_type="flymad_micro_v2")
+                )
         self._refs.append( GtkButtonKillNode(
                 widget=self._ui.get_object("bStopMicro"),
                 nodepath= "/flymad_micro",
@@ -472,10 +479,35 @@ class UI:
                 package=package,
                 node_type="flymad_joy")
                 )
-
         self._refs.append( GtkButtonKillNode(
                 widget=self._ui.get_object("bStopManualControll"),
                 nodepath= "/flymad_joy",
+                nodemanager=self._manager )
+                )
+
+        self._refs.append( GtkButtonStartNode(
+                widget=self._ui.get_object("bStartCircle"),
+                nodepath="circler",
+                nodemanager=self._manager,
+                package=package,
+                node_type="circle_mirrors.py")
+                )
+        self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopCircle"),
+                nodepath= "/circler",
+                nodemanager=self._manager )
+                )
+
+        self._refs.append( GtkButtonStartNode(
+                widget=self._ui.get_object("bStartConfLasers"),
+                nodepath="configurelasers",
+                nodemanager=self._manager,
+                package=package,
+                node_type="configure_lasers.py")
+                )
+        self._refs.append( GtkButtonKillNode(
+                widget=self._ui.get_object("bStopConfLasers"),
+                nodepath= "/configurelasers",
                 nodemanager=self._manager )
                 )
 
