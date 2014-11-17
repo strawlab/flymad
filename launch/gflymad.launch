@@ -2,6 +2,6 @@
 
   <param name="/ttm/headtrack_templateimg" type="string" value="$(find flymad)/data/templates/ds4_flybody_dan_ts12.png" />
 
-  <node name="gflymad" pkg="flymad" type="gflymad.py" />
+  <node name="gflymad" pkg="flymad" type="gflymad.py" required="true"/>
 
 </launch>
