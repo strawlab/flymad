@@ -20,7 +20,7 @@ LATENCY = 0.05
 K_PROPORTIONAL = 1e3/30.0
 
 class Targeter:
-    def __init__(self,cal_fname, border_x_1=0, border_x_2=500, border_y_1=0, border_y_2=500):
+    def __init__(self,cal_fname):
         self.cal = load_calibration(cal_fname)
         rospy.init_node('flymad_targeter')
         self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
@@ -37,10 +37,17 @@ class Targeter:
         self.dacs = 0,0
         self.last_vals = None
         self.stop_tracking(None)
-        self.border_x_1 = int(border_x_1)
-        self.border_x_2 = int(border_x_2)
-        self.border_y_1 = int(border_y_1)
-        self.border_y_2 = int(border_y_2)
+
+        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
+                                                MicroPosition,
+                                                tcp_nodelay=True)
+        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
+                                                MicroVelocity,
+                                                tcp_nodelay=True)
+
+        self.pub_targeted = rospy.Publisher('/flymad/targeted',
+                                            StampedObject,
+                                            tcp_nodelay=True)
 
 
         _ = rospy.Subscriber('/flymad/tracked',
@@ -53,20 +60,12 @@ class Targeter:
                              MicroPosition,
                              self.on_dac)
 
+        _ = rospy.Subscriber('/experiment/laser',
+                            UInt8,
+                            self.on_laser)
 
-        self.pub_dac_position = rospy.Publisher('/flymad_micro/position',
-                                                MicroPosition,
-                                                tcp_nodelay=True)
-        self.pub_laser = rospy.Publisher('/flymad_micro/laser',
-                                         UInt8,
-                                         tcp_nodelay=True)
-        self.pub_dac_velocity = rospy.Publisher('/flymad_micro/velocity',
-                                                MicroVelocity,
-                                                tcp_nodelay=True)
-
-        self.pub_targeted = rospy.Publisher('/flymad/targeted',
-                                            StampedObject,
-                                            tcp_nodelay=True)
+    def on_laser(self, msg):
+        self._laser = msg.data
 
     def on_dac(self,msg):
         self.dacs = msg.posA, msg.posB
@@ -136,16 +135,8 @@ class Targeter:
             msg.velA = myint32(vela)
             msg.velB = myint32(velb)
 
-            position = MicroPosition
-            if msg.velA is None:
-                msg.posA = 0
-
             this_vels = msg.velA, msg.velB
             if this_vels != self.last_vals:
-                if self.border_x_1 <= x <= self.border_x_2 and self.border_y_1 <= y <= self.border_y_2:
-                    self.pub_laser.publish( 1 )
-                else:
-                    self.pub_laser.publish( 0 )
                 self.pub_dac_velocity.publish(msg)
                 self.last_vals = this_vels
         else:
@@ -176,6 +167,5 @@ class Targeter:
 
 if __name__=='__main__':
     cal_fname = rospy.myargv()[1]
-    args = rospy.myargv()[2:]
-    t=Targeter(cal_fname, *args)
+    t=Targeter(cal_fname)
     t.run()
