@@ -42,6 +42,8 @@ class Targeter:
         self._cur_vx = 0
         self._cur_vy = 0
 
+        self._laser = LASERS_ALL_ON
+
         self._control = ControlManager()
 
         self._disable_laser_when_lose_targeting = rospy.get_param(

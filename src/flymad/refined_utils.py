@@ -33,6 +33,14 @@ def target_dx_dy_from_message(msg):
 
     return dx, dy
 
+def predict_position(s, latency):
+    """ returns (x,y,vx,vy) """
+    if latency > 0:
+        #add predict the position based on the current velocity
+        return s[0] + s[2]*latency,s[1] + s[3]*latency,s[2],s[3]
+    else:
+        return s[0],s[1],s[2],s[3]
+
 class ControlManager:
 
     PX = -0.6
@@ -77,12 +85,7 @@ class ControlManager:
         return cmdA,cmdB
 
     def predict_position(self, s):
-        """ returns (x,y,vx,vy) """
-        if self.LATENCY > 0:
-            #add predict the position based on the current velocity
-            return s[0] + s[2]*self.LATENCY,s[1] + s[3]*self.LATENCY,s[2],s[3]
-        else:
-            return s[0],s[1],s[2],s[3]
+        return predict_position(s, self.LATENCY)
 
     def __repr__(self):
         return "<ControlManager PX:%.1f PY:%.1f PV:%.1f LATENCY:%.1f>" % (
