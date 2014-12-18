@@ -9,7 +9,7 @@ import flymad.msg
 import flymad.srv
 import geometry_msgs.msg
 
-from flymad.constants import LASERS_ALL_OFF, LASER2_ON
+from flymad.constants import LASERS_ALL_OFF, LASERS_ALL_ON
 from motmot.fview.utils import lineseg_circle
 
 from transitions import State, Machine, Transition
@@ -96,7 +96,7 @@ class Experiment:
 
     #these are the functions called on state transision
     def on_enter_laser_on(self, *args):
-        self._laser(LASER2_ON)
+        self._laser(LASERS_ALL_ON)
     def on_enter_laser_off(self, *args):
         self._laser(LASERS_ALL_OFF)
     def on_enter_tile(self, *args):
