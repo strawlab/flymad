@@ -141,7 +141,7 @@ class PixelCoordWidget(Gtk.DrawingArea):
         return True
 
 class ViewerApp(Gtk.Window):
-    def __init__(self,cal_fname=None):
+    def __init__(self,cal_fname=None, send_tracked=False):
         super(ViewerApp,self).__init__()
         if cal_fname is not None:
             rospy.loginfo('starting viewer with calibration %s'%cal_fname)
@@ -157,6 +157,15 @@ class ViewerApp(Gtk.Window):
         box.pack_start(cal_fname_label,False,False,0)
 
         self.pcw = PixelCoordWidget()
+        if send_tracked:
+            self.pcw.add_events(
+                    Gdk.EventMask.POINTER_MOTION_HINT_MASK | \
+                    Gdk.EventMask.POINTER_MOTION_MASK
+            )
+            self.pcw.connect('motion-notify-event', self.on_motion_notify_event)
+            self._fn = 1
+            self._pub_pos = rospy.Publisher('/flymad/tracked', TrackedObj)
+
         box.pack_start(self.pcw,True,True,0)
 
         hb = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
@@ -185,6 +194,17 @@ class ViewerApp(Gtk.Window):
         self._subtra.connect("message", self.on_tracking)
 
         self._pub = rospy.Publisher('/flymad/target_object', Int64)
+
+    def on_motion_notify_event(self, da, event):
+        t = TrackedObj()
+        t.state_vec[0] = event.x
+        t.state_vec[1] = event.y
+        t.obj_id = 1
+        t.framenumber = self._fn
+        t.is_living = True
+        self._fn += 1
+        self._pub_pos.publish(t)
+        return True
 
     def on_row_dbl_clicked(self, treeview, treepath, treecolumn):
         obj_id = treeview.get_model()[treepath][0]
@@ -223,6 +243,6 @@ if __name__ == "__main__":
         cal_fname = None
 
     rosgobject.init_node('viewer')
-    app = ViewerApp(cal_fname)
+    app = ViewerApp(cal_fname, send_tracked=False)
     rosgobject.spin()
 
