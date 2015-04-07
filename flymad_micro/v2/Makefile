@@ -3,6 +3,6 @@
 
 ARDUINO_DIR = /usr/share/arduino
 BOARD_TAG    = nano328
-ARDUINO_PORT = /dev/ttyUSB* /dev/ttyACM*
+ARDUINO_PORT = /dev/ttyUSB*
 ARDUINO_LIBS = SPI EEPROM UDEV
 include /usr/share/arduino/Arduino.mk
