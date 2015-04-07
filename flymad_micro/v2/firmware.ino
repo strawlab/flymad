@@ -160,6 +160,9 @@ void lasers_tick_1ms(void) {
 }
 
 void setup() {
+  udev.begin();
+  udev.serial_handshake();   //blocks for 10 seconds by default
+
   pinMode(PIN_LED, OUTPUT);
 
   //ensure lasers are off
@@ -172,10 +175,6 @@ void setup() {
 
   // start serial port at 115200 bps:
   Serial.begin(115200);
-
-  //wait for 5 seconds for an id
-  udev.begin();
-  udev.setup(PIN_LED);
 
   dac_gyro.begin();
 

@@ -5,6 +5,8 @@ import threading
 import time
 import collections
 
+from arduinoudev import serial_handshake
+
 import roslib; roslib.load_manifest('flymad')
 import rospy
 from std_msgs.msg import UInt8, UInt16, String, Float32, Bool
@@ -35,6 +37,8 @@ class FlyMADMicro(object):
 
         port = rospy.get_param( '~port', default = '/dev/ttyUSB0' )
         try:
+            name = serial_handshake(port)
+            rospy.loginfo('connected to device named %r' % name)
             self.ser = serial.Serial(port=port,
                                      timeout=0.1,
                                      baudrate=115200)
