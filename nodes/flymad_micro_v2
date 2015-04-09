@@ -111,6 +111,7 @@ class FlyMADMicro(object):
         argA = 0
         argB = 0
         argC = laser
+        self._last_laser = laser
 
         if velA is not None or velB is not None:
             argA = velA
